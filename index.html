@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#202734">
+  <title>Claro Home — Interactive storyboard</title>
+  <link rel="stylesheet" href="storyboard.css">
+  <script src="storyboard.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#phone-content">Skip to phone preview</a>
+  <aside class="sidebar">
+    <a class="brand" href="#home" aria-label="Claro Home storyboard home">
+      <span class="brand-mark" aria-hidden="true">c<span></span></span>
+      <span>claro<span class="brand-sub">HOME LAUNCHER</span></span>
+    </a>
+    <div class="edition">PRODUCT STORYBOARD <span>02</span></div>
+    <p class="sidebar-intro">A familiar phone.<br>A little more independence.</p>
+    <nav id="screen-nav" aria-label="Storyboard screens"></nav>
+    <div class="sidebar-bottom">
+      <span class="status-dot"></span> Interactive concept · No real actions
+      <a href="docs/PRD.md">Read the full product brief ↗</a>
+    </div>
+  </aside>
+  <main class="workspace">
+    <header class="workspace-header">
+      <div class="breadcrumb">Claro Home <span>/</span> Product exploration <span>/</span> <strong id="section-name">Everyday use</strong></div>
+      <span class="concept-badge"><span></span> DESIGN CONCEPT</span>
+    </header>
+    <section class="stage-heading">
+      <div><p class="eyebrow">RECOGNIZE. TAP. DONE.</p><h1 id="screen-title">A familiar kind of home.</h1><p id="screen-subtitle">Large icons. Clear choices. Nothing in the way.</p></div>
+      <div class="step-controls">
+        <button id="previous-screen" class="icon-button" aria-label="Previous storyboard screen">←</button>
+        <span id="screen-count"></span>
+        <button id="next-screen" class="icon-button" aria-label="Next storyboard screen">→</button>
+      </div>
+    </section>
+    <div class="stage">
+      <section class="phone-column" aria-label="Interactive Android phone concept">
+        <div class="phone">
+          <div class="phone-hardware" aria-hidden="true"><span></span></div>
+          <div class="device-status"><span>9:41</span><span class="device-status-right" aria-label="Demo signal full, battery 82 percent">▂▄▆█ &nbsp; 82% ▰</span></div>
+          <div id="phone-content" class="phone-content" tabindex="-1"></div>
+          <div id="phone-actions" class="phone-action-dock" role="group" aria-label="Screen actions" hidden></div>
+          <nav class="phone-system-nav" aria-label="Phone navigation">
+            <button id="phone-back" aria-label="Go back">← <span>Back</span></button>
+            <button id="phone-home" aria-label="Return home"><span class="home-outline" aria-hidden="true"></span> Home</button>
+          </nav>
+        </div>
+        <div class="preview-caption"><span class="status-dot"></span> Click the phone to explore <span>·</span> Sample data only</div>
+      </section>
+      <aside class="annotation-panel">
+        <div class="annotation-heading"><span class="small-sun" aria-hidden="true">✳</span> REVIEW NOTES · NOT PART OF THE APP</div>
+        <h2 id="note-title">Familiar, not overwhelming.</h2>
+        <p id="note-description"></p>
+        <div id="screen-notes"></div>
+        <div class="try-card"><span class="eyebrow">TRY IT YOURSELF</span><p id="try-instruction"></p></div>
+        <div class="journey-card"><span class="eyebrow">YOU ARE EXPLORING</span><p id="journey-name"></p><span id="prototype-status">All calls, messages and purchases are simulated.</span></div>
+        <details class="review-tools"><summary>Review screen states</summary><div id="state-controls"></div></details>
+      </aside>
+    </div>
+    <footer class="workspace-footer"><span>CLARO HOME <span class="footer-divider">/</span> Independence, thoughtfully designed.</span><span>Prototype only. Not an emergency service.</span></footer>
+  </main>
+  <label class="capture-toggle"><input type="checkbox" id="clean-preview">Phone only</label>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script>
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") document.getElementById("clean-preview").checked = false;
+    });
+  </script>
+</body>
+</html>
