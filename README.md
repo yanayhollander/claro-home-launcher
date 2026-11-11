@@ -182,6 +182,17 @@ The proposed product direction is not final commercial or safety approval.
 In particular, trial terms and pricing require confirmation, and Android phone,
 SMS and emergency behavior require real-device validation before release.
 
+## Native Android foundation
+
+The repository also contains a modular Kotlin and Jetpack Compose application
+scaffold. It preserves the static storyboard and establishes replaceable
+data/platform/vendor boundaries, persisted Touch/Classic visual mode, typed
+navigation, startup recovery, deterministic fake data, and accessible placeholder
+homes without implementing production phone, SMS, billing, or telemetry flows.
+
+See [Android foundation](docs/android-foundation.md) for the module graph,
+dependency policy, and local build commands.
+
 ## Scope boundary
 
 The storyboard is deliberately dependency-free HTML, CSS and JavaScript. It does
