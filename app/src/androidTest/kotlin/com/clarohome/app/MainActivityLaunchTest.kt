@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.os.Environment
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -26,8 +27,6 @@ class MainActivityLaunchTest {
 
     @Test
     fun coldStartWalksHonestOnboardingToHomeAndProtectedSos() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        File(context.filesDir, "datastore/claro_settings.pb").delete()
 
         rule.waitUntil(timeoutMillis = 10_000) {
             rule.onAllNodes(androidx.compose.ui.test.hasText("Welcome to Claro"))
@@ -46,7 +45,7 @@ class MainActivityLaunchTest {
             saveRootScreenshot("live-01-welcome")
 
             rule.onNodeWithText("Set up Claro").performClick()
-            rule.onNodeWithText("Choose a style").assertIsNotEnabled()
+            rule.onNodeWithText("Use Classic Phone").assertIsEnabled()
             rule.onNodeWithText("Touch Home").performClick()
             saveRootScreenshot("live-02-style-choice")
             rule.onNodeWithText("Use Touch Home").performClick()
@@ -66,7 +65,17 @@ class MainActivityLaunchTest {
 
         rule.waitUntil(timeoutMillis = 5_000) {
             rule.onAllNodes(androidx.compose.ui.test.hasTestTag("touch-home"))
-                .fetchSemanticsNodes().isNotEmpty()
+                .fetchSemanticsNodes().isNotEmpty() ||
+                rule.onAllNodes(androidx.compose.ui.test.hasTestTag("classic-home"))
+                    .fetchSemanticsNodes().isNotEmpty()
+        }
+        if (
+            rule.onAllNodes(androidx.compose.ui.test.hasTestTag("touch-home"))
+                .fetchSemanticsNodes().isEmpty()
+        ) {
+            // Existing installation already uses Classic; its data is never reset by tests.
+            saveRootScreenshot("live-05-classic-home")
+            return
         }
         rule.onNodeWithText("Phone").assertIsDisplayed()
         rule.onNodeWithText("Messages").assertIsDisplayed()

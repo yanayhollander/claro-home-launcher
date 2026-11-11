@@ -9,7 +9,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -112,7 +112,7 @@ class StoryboardRegressionTest {
 
         compose.onNodeWithText("Touch Home").assertIsDisplayed()
         compose.onNodeWithText("Classic Phone").assertIsDisplayed()
-        compose.onNodeWithText("Choose a style").assertIsNotEnabled()
+        compose.onNodeWithText("Use Classic Phone").assertIsEnabled()
         compose.onNodeWithText("Touch Home").performClick()
         compose.onNodeWithText("Use Touch Home").assertHeightIsAtLeast(64.dp)
         capture("onboarding-mode-choice", "onboarding-screen")

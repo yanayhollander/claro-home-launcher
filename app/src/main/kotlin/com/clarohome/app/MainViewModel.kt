@@ -149,6 +149,8 @@ class MainViewModel @Inject constructor(
         settingsManager.setLanguageAndDisplay(language, size, highContrast, hapticFeedback)
     }
 
+    fun setHapticFeedback(enabled: Boolean) = launch { settingsManager.setHapticFeedback(enabled) }
+
     fun useDateQuestion() = launch { settingsManager.useDateQuestion() }
 
     fun useDateQuestionForSettings(onSuccess: () -> Unit) {

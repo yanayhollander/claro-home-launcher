@@ -159,6 +159,10 @@ class OnboardingSettingsManager @Inject constructor(
         )
     }
 
+    suspend fun setHapticFeedback(enabled: Boolean) = update {
+        it.copy(hapticFeedback = enabled)
+    }
+
     suspend fun useDateQuestion() = update {
         it.copy(
             accessProtection = AccessProtection(mode = SettingsAccessMode.DATE_QUESTION),

@@ -10,7 +10,7 @@ import org.junit.Test
 class LocalHomeRepositoryTest {
     @Test
     fun initialStateHasFourUnassignedSlotsAndSixCoreTiles() = runTest {
-        LocalHomeRepository().home.test {
+        LocalHomeRepository(InMemoryFavoriteStore()).home.test {
             val home = awaitItem()
             assertThat(home.favorites).hasSize(4)
             assertThat(home.tiles.map { it.id }).containsExactly(
@@ -26,8 +26,29 @@ class LocalHomeRepositoryTest {
     }
 
     @Test
+    fun assignedFavoritesSurviveRecreationAndResetClearsThem() = runTest {
+        val store = InMemoryFavoriteStore()
+        LocalHomeRepository(store).setFavorite(
+            1,
+            com.clarohome.core.model.FavoritePerson("c1", "Maya", "+15550101"),
+        )
+
+        val restored = LocalHomeRepository(store)
+        restored.home.test {
+            assertThat(awaitItem().favorites[1].displayName).isEqualTo("Maya")
+            cancelAndIgnoreRemainingEvents()
+        }
+        restored.reset()
+        LocalHomeRepository(store).home.test {
+            assertThat(awaitItem().favorites.map { it.displayName }.distinct())
+                .containsExactly("Add person")
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun roleLossMakesAuthoritativeCountsUnknown() = runTest {
-        val repository = LocalHomeRepository()
+        val repository = LocalHomeRepository(InMemoryFavoriteStore())
 
         repository.setHomeRoleState(HomeRoleState.AVAILABLE)
 
@@ -42,7 +63,7 @@ class LocalHomeRepositoryTest {
 
     @Test
     fun customizedAppIsAddedAfterProtectedCoreTiles() = runTest {
-        val repository = LocalHomeRepository()
+        val repository = LocalHomeRepository(InMemoryFavoriteStore())
         repository.setInstalledApps(
             listOf(
                 com.clarohome.core.model.InstalledApp(

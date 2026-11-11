@@ -639,14 +639,7 @@ private fun ClaroApp(
                                 onOpenPlans = {
                                     navController.navigate(MembershipRoute)
                                 },
-                                onHapticFeedbackChange = { enabled ->
-                                    viewModel.saveLanguageDisplay(
-                                        state.preferences.language,
-                                        state.preferences.textSize,
-                                        state.preferences.highContrast,
-                                        enabled,
-                                    )
-                                },
+                                onHapticFeedbackChange = viewModel::setHapticFeedback,
                             ),
                         )
                     }

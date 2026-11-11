@@ -855,7 +855,7 @@ private fun PhoneStyleChoice(
     onSelected: (VisualMode) -> Unit,
     onContinue: () -> Unit,
 ) {
-    var selected by rememberSaveable { mutableStateOf<VisualMode?>(null) }
+    var selected by rememberSaveable { mutableStateOf(VisualMode.CLASSIC) }
 
     OnboardingStepScaffold(
         title = OnboardingStep.PHONE_STYLE.title(),
@@ -863,11 +863,11 @@ private fun PhoneStyleChoice(
         message = message,
         dock = {
             ClaroPrimaryButton(
-                label = selected?.let {
-                    stringResource(R.string.onb_use_style, it.localizedDisplayName())
-                } ?: stringResource(R.string.onb_choose_a_style),
-                enabled = selected != null,
-                onClick = onContinue,
+                label = stringResource(R.string.onb_use_style, selected.localizedDisplayName()),
+                onClick = {
+                    onSelected(selected)
+                    onContinue()
+                },
             )
         },
     ) {
@@ -880,10 +880,7 @@ private fun PhoneStyleChoice(
         VisualModeGrid(
             selected = selected,
             stackVertically = preferences.textSize == TextSize.HUGE,
-            onSelect = { mode ->
-                selected = mode
-                onSelected(mode)
-            },
+            onSelect = { mode -> selected = mode },
         )
     }
 }
@@ -1321,15 +1318,15 @@ private fun VisualModeGrid(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             VisualModeCard(
-                mode = VisualMode.TOUCH,
-                selected = selected == VisualMode.TOUCH,
-                onSelect = { onSelect(VisualMode.TOUCH) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            VisualModeCard(
                 mode = VisualMode.CLASSIC,
                 selected = selected == VisualMode.CLASSIC,
                 onSelect = { onSelect(VisualMode.CLASSIC) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            VisualModeCard(
+                mode = VisualMode.TOUCH,
+                selected = selected == VisualMode.TOUCH,
+                onSelect = { onSelect(VisualMode.TOUCH) },
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -1339,15 +1336,15 @@ private fun VisualModeGrid(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             VisualModeCard(
-                mode = VisualMode.TOUCH,
-                selected = selected == VisualMode.TOUCH,
-                onSelect = { onSelect(VisualMode.TOUCH) },
-                modifier = Modifier.weight(1f),
-            )
-            VisualModeCard(
                 mode = VisualMode.CLASSIC,
                 selected = selected == VisualMode.CLASSIC,
                 onSelect = { onSelect(VisualMode.CLASSIC) },
+                modifier = Modifier.weight(1f),
+            )
+            VisualModeCard(
+                mode = VisualMode.TOUCH,
+                selected = selected == VisualMode.TOUCH,
+                onSelect = { onSelect(VisualMode.TOUCH) },
                 modifier = Modifier.weight(1f),
             )
         }

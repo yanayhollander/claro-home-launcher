@@ -30,7 +30,6 @@
     <string name="onb_welcome_subtitle">מסך בית, טלפון והודעות פשוטים וברורים יותר — להגדרה עצמית או יחד עם אדם קרוב.</string>
     <string name="onb_welcome_permissions_sos_note">Android מבקשת בנפרד גישה למסך הבית, לטלפון, ל-SMS ולמצלמה בעת הצורך. לחצן SOS מתקשר לאיש קשר אחד שבחרתם — זה אינו מוקד חירום מאויש.</string>
 
-    <string name="onb_choose_a_style">בחרו סגנון</string>
     <string name="onb_use_style">בחירת %1$s</string>
     <string name="onb_apply_style">החלת %1$s</string>
     <string name="onb_phone_style_choice_body">בחרו איך Claro ייראה. שני הסגנונות חולקים את אותם אנשי קשר, הודעות והגדרות.</string>

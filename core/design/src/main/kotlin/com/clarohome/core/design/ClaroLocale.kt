@@ -2,7 +2,10 @@ package com.clarohome.core.design
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.res.AssetManager
 import android.content.res.Configuration
+import android.content.res.Resources
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
@@ -51,7 +54,7 @@ fun ClaroLocaleContainer(
         }
     }
     val localizedContext = remember(baseContext, localizedConfig) {
-        baseContext.createConfigurationContext(localizedConfig)
+        LocalizedContext(baseContext, baseContext.createConfigurationContext(localizedConfig))
     }
     SideEffect {
         Locale.setDefault(locale)
@@ -62,4 +65,10 @@ fun ClaroLocaleContainer(
         LocalLayoutDirection provides layoutDirection,
         content = content,
     )
+}
+
+/** Keeps the Activity in the wrapper chain so Compose can still find its result-registry and back-dispatcher owners. */
+private class LocalizedContext(base: Context, private val localized: Context) : ContextWrapper(base) {
+    override fun getResources(): Resources = localized.resources
+    override fun getAssets(): AssetManager = localized.assets
 }

@@ -47,6 +47,20 @@ class OnboardingSettingsManagerTest {
     }
 
     @Test
+    fun hapticToggleAfterLanguageSelectionKeepsChosenLanguage() = runTest {
+        val repository = FakePreferencesRepository()
+        val manager = manager(repository)
+
+        manager.setLanguageAndDisplay(AppLanguage.HEBREW, TextSize.LARGE, true, true)
+        manager.setHapticFeedback(false)
+
+        assertThat(repository.current.language).isEqualTo(AppLanguage.HEBREW)
+        assertThat(repository.current.textSize).isEqualTo(TextSize.LARGE)
+        assertThat(repository.current.highContrast).isTrue()
+        assertThat(repository.current.hapticFeedback).isFalse()
+    }
+
+    @Test
     fun dateQuestionUsesExactCurrentZeroPaddedDateAndHasNoRecovery() = runTest {
         val repository = FakePreferencesRepository()
         val time = FakeTimeProvider(today = LocalDate.of(2028, 2, 29))

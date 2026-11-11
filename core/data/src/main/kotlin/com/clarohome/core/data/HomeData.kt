@@ -13,9 +13,12 @@ import com.clarohome.core.model.HomeTile
 import com.clarohome.core.model.HomeTileKind
 import com.clarohome.core.model.InstalledApp
 import com.clarohome.core.model.TileAccent
+import android.content.Context
+import androidx.core.content.edit
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,8 +26,61 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+interface FavoriteStore {
+    fun load(): List<FavoritePerson?>
+    fun save(favorites: List<FavoritePerson>)
+}
+
+class InMemoryFavoriteStore : FavoriteStore {
+    private var saved: List<FavoritePerson?> = emptyList()
+    override fun load() = saved
+    override fun save(favorites: List<FavoritePerson>) {
+        saved = favorites
+    }
+}
+
 @Singleton
-class LocalHomeRepository @Inject constructor() : HomeRepository {
+class SharedPreferencesFavoriteStore @Inject constructor(
+    @ApplicationContext context: Context,
+) : FavoriteStore {
+    private val prefs = context.getSharedPreferences("claro_favorites", Context.MODE_PRIVATE)
+
+    override fun load(): List<FavoritePerson?> = List(FAVORITE_SLOTS) { slot ->
+        val id = prefs.getString("$slot.id", null) ?: return@List null
+        val state = runCatching {
+            FavoriteState.valueOf(prefs.getString("$slot.state", null).orEmpty())
+        }.getOrDefault(FavoriteState.READY)
+        if (state == FavoriteState.UNASSIGNED) return@List null
+        FavoritePerson(
+            id = id,
+            displayName = prefs.getString("$slot.name", null).orEmpty(),
+            phoneNumber = prefs.getString("$slot.number", null),
+            photoUri = prefs.getString("$slot.photo", null),
+            state = state,
+        )
+    }
+
+    override fun save(favorites: List<FavoritePerson>) {
+        prefs.edit {
+            clear()
+            favorites.take(FAVORITE_SLOTS).forEachIndexed { slot, person ->
+                if (person.state == FavoriteState.UNASSIGNED) return@forEachIndexed
+                putString("$slot.id", person.id)
+                putString("$slot.name", person.displayName)
+                putString("$slot.number", person.phoneNumber)
+                putString("$slot.photo", person.photoUri)
+                putString("$slot.state", person.state.name)
+            }
+        }
+    }
+}
+
+private const val FAVORITE_SLOTS = 4
+
+@Singleton
+class LocalHomeRepository @Inject constructor(
+    private val favoriteStore: FavoriteStore,
+) : HomeRepository {
     private val state = MutableStateFlow(
         HomeSnapshot(
             greeting = "",
@@ -33,7 +89,7 @@ class LocalHomeRepository @Inject constructor() : HomeRepository {
             battery = BatteryStatus(0, isCharging = false),
             cellular = CellularStatus(CellularAvailability.UNKNOWN),
             favorites = List(4) { index ->
-                FavoritePerson(
+                favoriteStore.load().getOrNull(index) ?: FavoritePerson(
                     id = "favorite-$index",
                     displayName = "Add person",
                     state = FavoriteState.UNASSIGNED,
@@ -73,6 +129,7 @@ class LocalHomeRepository @Inject constructor() : HomeRepository {
                 if (index == slot) person else current
             },
         )
+        favoriteStore.save(state.value.favorites)
     }
 
     override suspend fun clearFavorite(slot: Int) {
@@ -90,6 +147,7 @@ class LocalHomeRepository @Inject constructor() : HomeRepository {
                 }
             },
         )
+        favoriteStore.save(state.value.favorites)
     }
 
     override suspend fun reset() {
@@ -106,6 +164,7 @@ class LocalHomeRepository @Inject constructor() : HomeRepository {
                 )
             },
         ).withApps(clearedApps)
+        favoriteStore.save(state.value.favorites)
     }
 
     override suspend fun setInstalledApps(apps: List<InstalledApp>) {
@@ -204,4 +263,7 @@ class LocalHomeRepository @Inject constructor() : HomeRepository {
 abstract class HomeDataModule {
     @Binds
     abstract fun bindHomeRepository(repository: LocalHomeRepository): HomeRepository
+
+    @Binds
+    abstract fun bindFavoriteStore(store: SharedPreferencesFavoriteStore): FavoriteStore
 }

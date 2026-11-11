@@ -2,6 +2,8 @@ package com.clarohome.app
 
 import android.graphics.Bitmap
 import android.os.Environment
+import androidx.activity.compose.LocalActivityResultRegistryOwner
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -47,6 +49,21 @@ import org.junit.runner.RunWith
 class LocalizationRegressionTest {
     @get:Rule
     val compose = createComposeRule()
+
+    @Test
+    fun localeContainerKeepsActivityResultAndBackOwnersForNestedScreens() {
+        var hasRegistryOwner = false
+        var hasBackOwner = false
+        compose.setContent {
+            ClaroLocaleContainer(language = AppLanguage.HEBREW) {
+                hasRegistryOwner = LocalActivityResultRegistryOwner.current != null
+                hasBackOwner = LocalOnBackPressedDispatcherOwner.current != null
+            }
+        }
+        compose.waitForIdle()
+        assertEquals(true, hasRegistryOwner)
+        assertEquals(true, hasBackOwner)
+    }
 
     @Test
     fun runtimeLanguageSwitchesBetweenEnglishSpanishAndHebrewWithRtl() {
