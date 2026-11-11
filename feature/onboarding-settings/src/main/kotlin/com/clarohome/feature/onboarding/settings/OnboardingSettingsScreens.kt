@@ -1,45 +1,78 @@
 package com.clarohome.feature.onboarding.settings
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.sp
+import com.clarohome.core.design.ClaroAvatar
+import com.clarohome.core.design.ClaroBannerTone
 import com.clarohome.core.design.ClaroColors
 import com.clarohome.core.design.ClaroDimensions
+import com.clarohome.core.design.ClaroIcon
+import com.clarohome.core.design.ClaroIconKind
+import com.clarohome.core.design.ClaroInfoCard
+import com.clarohome.core.design.ClaroPrimaryButton
+import com.clarohome.core.design.ClaroRowButton
+import com.clarohome.core.design.ClaroScreenScaffold
+import com.clarohome.core.design.ClaroSecondaryButton
 import com.clarohome.core.model.AppLanguage
 import com.clarohome.core.model.CapabilityStatus
 import com.clarohome.core.model.ClaroPreferences
@@ -56,9 +89,12 @@ data class OnboardingCallbacks(
     val onLanguageDisplay: (AppLanguage, TextSize, Boolean) -> Unit,
     val onUseDateQuestion: () -> Unit,
     val onConfigurePin: (String, String, String) -> Unit,
-    val onAssignments: (Int, Boolean, Boolean, Boolean) -> Unit,
-    val onReadiness: (ReadinessCapability, CapabilityStatus) -> Unit,
+    val onOpenPeopleSetup: () -> Unit,
+    val onOpenSosSetup: () -> Unit,
+    val onRequestCapability: (ReadinessCapability) -> Unit,
     val onHandover: (HandoverCheck, Boolean) -> Unit,
+    val onOpenAppsSetup: () -> Unit = {},
+    val onOpenPlans: () -> Unit = {},
 )
 
 @Composable
@@ -67,74 +103,69 @@ fun OnboardingFlow(
     message: String?,
     callbacks: OnboardingCallbacks,
 ) {
-    val step = preferences.onboarding.currentStep
-    val title = if (step == OnboardingStep.WELCOME) {
-        stringResource(R.string.onboarding_welcome)
-    } else {
-        step.title()
-    }
-    ClaroScreen(title = title, message = message) {
-        when (step) {
-            OnboardingStep.WELCOME -> WelcomeStep {
-                callbacks.onContinue(OnboardingStep.PHONE_STYLE)
-            }
-            OnboardingStep.PHONE_STYLE -> PhoneStyleChoice(
-                selected = preferences.visualMode,
-                onSelected = callbacks.onChooseMode,
-                onContinue = { callbacks.onContinue(OnboardingStep.LANGUAGE_AND_DISPLAY) },
+    when (preferences.onboarding.currentStep) {
+        OnboardingStep.WELCOME -> WelcomeStep(
+            message = message,
+            onContinue = { callbacks.onContinue(OnboardingStep.PHONE_STYLE) },
+        )
+        OnboardingStep.PHONE_STYLE -> PhoneStyleChoice(
+            preferences = preferences,
+            message = message,
+            onSelected = callbacks.onChooseMode,
+            onContinue = { callbacks.onContinue(OnboardingStep.LANGUAGE_AND_DISPLAY) },
+        )
+        OnboardingStep.LANGUAGE_AND_DISPLAY -> LanguageDisplayOnboardingStep(
+            preferences = preferences,
+            message = message,
+            onSave = { language, size, contrast ->
+                callbacks.onLanguageDisplay(language, size, contrast)
+                callbacks.onContinue(OnboardingStep.SETTINGS_ACCESS)
+            },
+        )
+        OnboardingStep.SETTINGS_ACCESS -> AccessSetupOnboardingStep(
+            accessMode = preferences.accessProtection.mode,
+            message = message,
+            onDateQuestion = {
+                callbacks.onUseDateQuestion()
+                callbacks.onContinue(OnboardingStep.PEOPLE_AND_SPEED_DIAL)
+            },
+            onPin = callbacks.onConfigurePin,
+        )
+        OnboardingStep.PEOPLE_AND_SPEED_DIAL -> PeopleSetupStep(
+            preferences = preferences,
+            message = message,
+            onOpenPeopleSetup = callbacks.onOpenPeopleSetup,
+            onContinue = { callbacks.onContinue(OnboardingStep.SOS_CONTACT) },
+        )
+        OnboardingStep.SOS_CONTACT -> SosSetupStep(
+            agreed = preferences.onboarding.sosRecipientAgreed,
+            message = message,
+            onOpenSosSetup = callbacks.onOpenSosSetup,
+            onContinue = { callbacks.onContinue(OnboardingStep.ROLE_READINESS) },
+        )
+        OnboardingStep.ROLE_READINESS -> ReadinessChecklist(
+            readiness = preferences.onboarding.readiness,
+            message = message,
+            onRequest = callbacks.onRequestCapability,
+            onContinue = { callbacks.onContinue(OnboardingStep.HANDOVER) },
+        )
+        OnboardingStep.HANDOVER -> HandoverChecklist(
+            checked = preferences.onboarding.handoverChecks,
+            message = message,
+            onChecked = callbacks.onHandover,
+            onOpenAppsSetup = callbacks.onOpenAppsSetup,
+            onOpenPlans = callbacks.onOpenPlans,
+            onFinish = { callbacks.onContinue(OnboardingStep.COMPLETE) },
+        )
+        OnboardingStep.COMPLETE -> OnboardingStepScaffold(
+            title = OnboardingStep.COMPLETE.title(),
+            stepIndex = null,
+            message = message,
+        ) {
+            ClaroInfoCard(
+                text = "Setup complete. Your Home screen is ready.",
+                tone = ClaroBannerTone.SUCCESS,
             )
-            OnboardingStep.LANGUAGE_AND_DISPLAY -> LanguageDisplayStep(
-                preferences = preferences,
-                onSave = { language, size, contrast ->
-                    callbacks.onLanguageDisplay(language, size, contrast)
-                    callbacks.onContinue(OnboardingStep.SETTINGS_ACCESS)
-                },
-            )
-            OnboardingStep.SETTINGS_ACCESS -> AccessSetupStep(
-                accessMode = preferences.accessProtection.mode,
-                onDateQuestion = {
-                    callbacks.onUseDateQuestion()
-                    callbacks.onContinue(OnboardingStep.PEOPLE_AND_SPEED_DIAL)
-                },
-                onPin = { pin, confirmation, recovery ->
-                    callbacks.onConfigurePin(pin, confirmation, recovery)
-                },
-            )
-            OnboardingStep.PEOPLE_AND_SPEED_DIAL -> PeopleSetupStep(
-                preferences = preferences,
-                onSave = { count, one, two ->
-                    callbacks.onAssignments(
-                        count,
-                        one,
-                        two,
-                        preferences.onboarding.sosRecipientAgreed,
-                    )
-                    callbacks.onContinue(OnboardingStep.SOS_CONTACT)
-                },
-            )
-            OnboardingStep.SOS_CONTACT -> SosSetupStep(
-                agreed = preferences.onboarding.sosRecipientAgreed,
-                onSave = { agreed ->
-                    callbacks.onAssignments(
-                        preferences.onboarding.favoriteSlotsAssigned,
-                        preferences.onboarding.speedDialOneAssigned,
-                        preferences.onboarding.speedDialTwoAssigned,
-                        agreed,
-                    )
-                    callbacks.onContinue(OnboardingStep.ROLE_READINESS)
-                },
-            )
-            OnboardingStep.ROLE_READINESS -> ReadinessChecklist(
-                readiness = preferences.onboarding.readiness,
-                onStatus = callbacks.onReadiness,
-                onContinue = { callbacks.onContinue(OnboardingStep.HANDOVER) },
-            )
-            OnboardingStep.HANDOVER -> HandoverChecklist(
-                checked = preferences.onboarding.handoverChecks,
-                onChecked = callbacks.onHandover,
-                onFinish = { callbacks.onContinue(OnboardingStep.COMPLETE) },
-            )
-            OnboardingStep.COMPLETE -> Unit
         }
     }
 }
@@ -147,48 +178,75 @@ fun AccessGateScreen(
     onCancel: () -> Unit,
     onRecoverPin: () -> Unit,
 ) {
-    var input by rememberSaveable { mutableStateOf("") }
-    ClaroScreen(
-        title = if (mode == SettingsAccessMode.DATE_QUESTION) "Today's date?" else "Caregiver PIN",
-        message = message,
-    ) {
-        Text(
-            if (mode == SettingsAccessMode.DATE_QUESTION) {
-                "Enter today's date in dd/MM/YYYY format. This prevents accidental changes; it is not a secure lock."
-            } else {
-                "Enter the 6-digit caregiver PIN."
-            },
-        )
-        OutlinedTextField(
-            value = input,
-            onValueChange = { input = it },
-            modifier = Modifier.fillMaxWidth(),
-            label = {
-                Text(if (mode == SettingsAccessMode.DATE_QUESTION) "dd/MM/YYYY" else "PIN")
-            },
-            visualTransformation =
-                if (mode == SettingsAccessMode.CAREGIVER_PIN) PasswordVisualTransformation()
-                else androidx.compose.ui.text.input.VisualTransformation.None,
-            singleLine = true,
-        )
-        PrimaryButton(stringResource(R.string.unlock)) { onUnlock(input) }
-        if (mode == SettingsAccessMode.CAREGIVER_PIN) {
-            OutlinedButton(
-                onClick = onRecoverPin,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = ClaroDimensions.SecondaryTarget),
-            ) {
-                Text("Recover PIN")
+    var input by rememberSaveable(mode) { mutableStateOf("") }
+    val isDateMode = mode == SettingsAccessMode.DATE_QUESTION
+
+    ClaroScreenScaffold(
+        title = if (isDateMode) "Today's date?" else "Settings access",
+        modifier = Modifier.testTag("onboarding-screen"),
+        bannerText = message,
+        bannerTone = messageBannerTone(message),
+        dock = {
+            ClaroPrimaryButton(
+                label = stringResource(R.string.unlock),
+                onClick = { onUnlock(input) },
+            )
+            if (mode == SettingsAccessMode.CAREGIVER_PIN) {
+                ClaroSecondaryButton(
+                    label = "Forgot PIN?",
+                    onClick = onRecoverPin,
+                )
             }
-        }
-        OutlinedButton(
-            onClick = onCancel,
+            ClaroSecondaryButton(
+                label = "Cancel",
+                onClick = onCancel,
+            )
+        },
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = ClaroDimensions.PrimaryTarget),
+                .padding(horizontal = 6.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("Cancel")
+            Box(
+                modifier = Modifier
+                    .size(88.dp)
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(ClaroColors.PaleBlue),
+                contentAlignment = Alignment.Center,
+            ) {
+                ClaroIcon(
+                    kind = ClaroIconKind.LOCK,
+                    tint = ClaroColors.Blue,
+                    size = 56.dp,
+                )
+            }
+            Text(
+                text = if (isDateMode) {
+                    "Enter today's local date as dd/MM/YYYY. This prevents accidental taps; it is not a security lock."
+                } else {
+                    "Enter your 6-digit caregiver PIN to open Settings."
+                },
+                color = ClaroColors.Ink,
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (isDateMode) {
+                ClaroDateField(
+                    value = input,
+                    onValueChange = { input = it },
+                )
+            } else {
+                PinIndicatorDots(filledCount = input.length)
+                ClaroPinField(
+                    label = "6-digit PIN",
+                    value = input,
+                    onValueChange = { input = it },
+                )
+            }
         }
     }
 }
@@ -202,24 +260,73 @@ fun PinRecoveryScreen(
     var recovery by rememberSaveable { mutableStateOf("") }
     var pin by rememberSaveable { mutableStateOf("") }
     var confirmation by rememberSaveable { mutableStateOf("") }
-    ClaroScreen(title = "Recover caregiver PIN", message = message) {
-        Text("Use the recovery secret stored during setup. There is no master code or date fallback.")
-        SecretField("Recovery secret", recovery) { recovery = it }
-        SecretField("New 6-digit PIN", pin) { pin = it }
-        SecretField("Confirm new PIN", confirmation) { confirmation = it }
-        PrimaryButton("Set new PIN") { onRecover(recovery, pin, confirmation) }
-        OutlinedButton(
-            onClick = onCancel,
+
+    ClaroScreenScaffold(
+        title = "Recover caregiver PIN",
+        modifier = Modifier.testTag("onboarding-screen"),
+        bannerText = message,
+        bannerTone = messageBannerTone(message),
+        dock = {
+            ClaroPrimaryButton(
+                label = "Set new PIN",
+                onClick = { onRecover(recovery, pin, confirmation) },
+            )
+            ClaroSecondaryButton(
+                label = "Cancel",
+                onClick = onCancel,
+            )
+        },
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = ClaroDimensions.PrimaryTarget),
+                .padding(horizontal = 6.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("Cancel")
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(76.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(ClaroColors.PaleBlue),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    ClaroIcon(
+                        kind = ClaroIconKind.LOCK,
+                        tint = ClaroColors.Blue,
+                        size = 44.dp,
+                    )
+                }
+            }
+            Text(
+                text = "Use the recovery secret saved during setup. Today's date cannot bypass or reset a caregiver PIN.",
+                color = ClaroColors.Ink,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            ClaroSecretField(
+                label = "Recovery secret",
+                value = recovery,
+                onValueChange = { recovery = it },
+            )
+            ClaroPinField(
+                label = "New 6-digit PIN",
+                value = pin,
+                onValueChange = { pin = it },
+            )
+            ClaroPinField(
+                label = "Confirm new PIN",
+                value = confirmation,
+                onValueChange = { confirmation = it },
+            )
+            ClaroInfoCard(
+                text = "Lost both the PIN and recovery secret? Reset Claro in Android app settings. " +
+                    "Local Claro preferences and drafts are cleared; Android contacts, SMS and photos stay.",
+                tone = ClaroBannerTone.WARNING,
+            )
         }
-        Text(
-            "If both the PIN and recovery secret are lost, use Android reset/reconfiguration. " +
-                "That removes Claro local setup data.",
-        )
     }
 }
 
@@ -231,52 +338,146 @@ fun SettingsHubScreen(
     onAccessMethod: () -> Unit,
     onReadiness: () -> Unit,
     onHomeAndApps: () -> Unit,
-    onPeopleAndSafety: () -> Unit,
+    onPeople: () -> Unit,
+    onSafety: () -> Unit,
     onMembershipPrivacy: () -> Unit,
     onLockAndExit: () -> Unit,
+    onResetClaro: () -> Unit = {},
 ) {
-    ClaroScreen(title = stringResource(R.string.settings)) {
-        SettingsRow(
-            title = stringResource(R.string.phone_style),
-            detail = preferences.visualMode.localizedDisplayName(),
-            onClick = onPhoneStyle,
-        )
-        SettingsRow(
-            title = "Language and display",
-            detail = "${preferences.language.displayName()} · ${preferences.textSize.displayName()}",
-            onClick = onDisplayLanguage,
-        )
-        SettingsRow(
-            title = "Settings access",
-            detail = if (preferences.accessProtection.mode == SettingsAccessMode.DATE_QUESTION) {
-                "Today's date question"
-            } else {
-                "Caregiver PIN with local recovery"
-            },
-            onClick = onAccessMethod,
-        )
-        SettingsRow(
-            title = "Role readiness",
-            detail = readinessSummary(preferences),
-            onClick = onReadiness,
-        )
-        SettingsRow(
-            title = "Home and apps",
-            detail = "Allowed apps and additional Home tiles",
-            onClick = onHomeAndApps,
-        )
-        SettingsRow(
-            title = "People and safety",
-            detail = "${preferences.onboarding.favoriteSlotsAssigned}/4 people · " +
-                if (preferences.onboarding.sosRecipientAgreed) "SOS agreed" else "SOS needs setup",
-            onClick = onPeopleAndSafety,
-        )
-        SettingsRow(
-            "Membership and privacy",
-            "Core features remain free · diagnostics off by default",
-            onClick = onMembershipPrivacy,
-        )
-        PrimaryButton("Lock settings and go Home", onLockAndExit)
+    ClaroScreenScaffold(
+        title = stringResource(R.string.settings),
+        modifier = Modifier.testTag("onboarding-screen"),
+        dock = {
+            ClaroPrimaryButton(
+                label = "Done · lock",
+                icon = ClaroIconKind.LOCK,
+                onClick = onLockAndExit,
+            )
+        },
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            ClaroRowButton(
+                title = stringResource(R.string.phone_style),
+                subtitle = preferences.visualMode.localizedDisplayName(),
+                leading = {
+                    ClaroIcon(
+                        kind = ClaroIconKind.HOME,
+                        tint = ClaroColors.Blue,
+                        size = 32.dp,
+                    )
+                },
+                onClick = onPhoneStyle,
+            )
+            ClaroRowButton(
+                title = "Home & apps",
+                subtitle = "Allowed apps and extra Home tiles",
+                leading = {
+                    ClaroIcon(
+                        kind = ClaroIconKind.APPS,
+                        tint = ClaroColors.Blue,
+                        size = 32.dp,
+                    )
+                },
+                onClick = onHomeAndApps,
+            )
+            ClaroRowButton(
+                title = "People & speed dial",
+                subtitle = "${preferences.onboarding.favoriteSlotsAssigned}/4 Home people configured",
+                leading = {
+                    ClaroIcon(
+                        kind = ClaroIconKind.CONTACT,
+                        tint = ClaroColors.Blue,
+                        size = 32.dp,
+                    )
+                },
+                onClick = onPeople,
+            )
+            ClaroRowButton(
+                title = "Language & display",
+                subtitle = buildString {
+                    append(preferences.language.displayName())
+                    append(" · ")
+                    append(preferences.textSize.displayName())
+                    if (preferences.highContrast) append(" · High contrast")
+                },
+                leading = {
+                    ClaroIcon(
+                        kind = ClaroIconKind.SUN,
+                        tint = ClaroColors.Blue,
+                        size = 32.dp,
+                    )
+                },
+                onClick = onDisplayLanguage,
+            )
+            ClaroRowButton(
+                title = "SOS contact",
+                subtitle = if (preferences.onboarding.sosRecipientAgreed) {
+                    "Trusted person agreed · test separate"
+                } else {
+                    "Not configured"
+                },
+                leading = {
+                    ClaroIcon(
+                        kind = ClaroIconKind.SOS,
+                        tint = ClaroColors.Red,
+                        size = 32.dp,
+                    )
+                },
+                onClick = onSafety,
+            )
+            ClaroRowButton(
+                title = "Permissions & roles",
+                subtitle = readinessSummary(preferences),
+                leading = {
+                    ClaroIcon(
+                        kind = ClaroIconKind.CHECK,
+                        tint = ClaroColors.Blue,
+                        size = 32.dp,
+                    )
+                },
+                onClick = onReadiness,
+            )
+            ClaroRowButton(
+                title = "Settings access",
+                subtitle = if (preferences.accessProtection.mode == SettingsAccessMode.DATE_QUESTION) {
+                    "Today's date question"
+                } else {
+                    "Caregiver PIN · local recovery"
+                },
+                leading = {
+                    ClaroIcon(
+                        kind = ClaroIconKind.LOCK,
+                        tint = ClaroColors.Blue,
+                        size = 32.dp,
+                    )
+                },
+                onClick = onAccessMethod,
+            )
+            ClaroRowButton(
+                title = "Membership & privacy",
+                subtitle = "Core features free · diagnostics off by default",
+                leading = {
+                    ClaroIcon(
+                        kind = ClaroIconKind.SETTINGS,
+                        tint = ClaroColors.Blue,
+                        size = 32.dp,
+                    )
+                },
+                onClick = onMembershipPrivacy,
+            )
+            ClaroRowButton(
+                title = "Reset Claro",
+                subtitle = "Clear local Claro setup only",
+                leading = {
+                    ClaroIcon(
+                        kind = ClaroIconKind.BACKSPACE,
+                        tint = ClaroColors.Red,
+                        size = 32.dp,
+                    )
+                },
+                onClick = onResetClaro,
+            )
+        }
     }
 }
 
@@ -288,20 +489,43 @@ fun AccessMethodSettingsScreen(
     onConfigurePin: (String, String, String) -> Unit,
     onCancel: () -> Unit,
 ) {
-    ClaroScreen(title = "Settings access", message = message) {
-        AccessSetupStep(
-            accessMode = accessMode,
-            onDateQuestion = onUseDateQuestion,
-            onPin = onConfigurePin,
+    var mode by rememberSaveable(accessMode) { mutableStateOf(accessMode) }
+    var pin by rememberSaveable { mutableStateOf("") }
+    var confirmation by rememberSaveable { mutableStateOf("") }
+    var recovery by rememberSaveable { mutableStateOf("") }
+
+    ClaroScreenScaffold(
+        title = "Settings access",
+        modifier = Modifier.testTag("onboarding-screen"),
+        bannerText = message,
+        bannerTone = messageBannerTone(message),
+        dock = {
+            ClaroPrimaryButton(
+                label = "Save access method",
+                onClick = {
+                    if (mode == SettingsAccessMode.DATE_QUESTION) {
+                        onUseDateQuestion()
+                    } else {
+                        onConfigurePin(pin, confirmation, recovery)
+                    }
+                },
+            )
+            ClaroSecondaryButton(
+                label = "Cancel",
+                onClick = onCancel,
+            )
+        },
+    ) {
+        AccessSetupFields(
+            mode = mode,
+            onModeChange = { mode = it },
+            pin = pin,
+            onPinChange = { pin = it },
+            confirmation = confirmation,
+            onConfirmationChange = { confirmation = it },
+            recovery = recovery,
+            onRecoveryChange = { recovery = it },
         )
-        OutlinedButton(
-            onClick = onCancel,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = ClaroDimensions.PrimaryTarget),
-        ) {
-            Text("Cancel")
-        }
     }
 }
 
@@ -314,31 +538,40 @@ fun PhoneStyleSettingsScreen(
     onCancel: () -> Unit,
 ) {
     var preview by rememberSaveable(current) { mutableStateOf(current) }
-    ClaroScreen(title = stringResource(R.string.phone_style), message = message) {
-        Text("Preview either style. Applying changes only the presentation; shared data stays in place.")
-        VisualModeCard(
-            mode = VisualMode.TOUCH,
-            selected = preview == VisualMode.TOUCH,
-            onSelect = { preview = VisualMode.TOUCH },
+    val stackVertically = MaterialTheme.typography.bodyLarge.fontSize >= 32.sp
+
+    ClaroScreenScaffold(
+        title = stringResource(R.string.phone_style),
+        modifier = Modifier.testTag("onboarding-screen"),
+        bannerText = message,
+        bannerTone = messageBannerTone(message),
+        dock = {
+            ClaroPrimaryButton(
+                label = "Apply ${preview.localizedDisplayName()}",
+                onClick = { onApply(preview) },
+            )
+            ClaroSecondaryButton(
+                label = "Cancel",
+                onClick = onCancel,
+            )
+        },
+    ) {
+        Text(
+            text = "Preview either style. Switching changes only the presentation — your contacts, messages and settings stay in place.",
+            color = ClaroColors.Ink,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
         )
-        VisualModeCard(
-            mode = VisualMode.CLASSIC,
-            selected = preview == VisualMode.CLASSIC,
-            onSelect = { preview = VisualMode.CLASSIC },
+        VisualModeGrid(
+            selected = preview,
+            stackVertically = stackVertically,
+            onSelect = { preview = it },
         )
         if (pending != null) {
-            Text(
-                "A switch to ${pending.localizedDisplayName()} is waiting for the current activity to finish.",
+            ClaroInfoCard(
+                text = "A switch to ${pending.localizedDisplayName()} is waiting for the current activity to finish.",
+                tone = ClaroBannerTone.WARNING,
             )
-        }
-        PrimaryButton("Apply ${preview.localizedDisplayName()}") { onApply(preview) }
-        OutlinedButton(
-            onClick = onCancel,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = ClaroDimensions.PrimaryTarget),
-        ) {
-            Text("Cancel")
         }
     }
 }
@@ -349,128 +582,309 @@ fun DisplayLanguageSettingsScreen(
     onApply: (AppLanguage, TextSize, Boolean) -> Unit,
     onCancel: () -> Unit,
 ) {
-    LanguageDisplayStep(preferences = preferences, onSave = onApply, onCancel = onCancel)
+    var language by rememberSaveable { mutableStateOf(preferences.language) }
+    var textSize by rememberSaveable { mutableStateOf(preferences.textSize) }
+    var highContrast by rememberSaveable { mutableStateOf(preferences.highContrast) }
+
+    ClaroScreenScaffold(
+        title = "Language and display",
+        modifier = Modifier.testTag("onboarding-screen"),
+        dock = {
+            ClaroPrimaryButton(
+                label = "Save",
+                onClick = { onApply(language, textSize, highContrast) },
+            )
+            ClaroSecondaryButton(
+                label = "Cancel",
+                onClick = onCancel,
+            )
+        },
+    ) {
+        LanguageDisplayFields(
+            language = language,
+            onLanguageChange = { language = it },
+            textSize = textSize,
+            onTextSizeChange = { textSize = it },
+            highContrast = highContrast,
+            onHighContrastChange = { highContrast = it },
+        )
+    }
 }
 
 @Composable
 fun ReadinessSettingsScreen(
     readiness: Map<ReadinessCapability, CapabilityStatus>,
-    onStatus: (ReadinessCapability, CapabilityStatus) -> Unit,
+    onRequest: (ReadinessCapability) -> Unit,
     onBack: () -> Unit,
 ) {
-    ClaroScreen(title = "Role readiness") {
-        ReadinessRows(readiness, onStatus)
-        Text("Ready means the capability is granted, not that a real call, message, or SOS test succeeded.")
-        PrimaryButton("Back to Settings", onBack)
+    ClaroScreenScaffold(
+        title = "Permissions & roles",
+        modifier = Modifier.testTag("onboarding-screen"),
+        dock = {
+            ClaroPrimaryButton(
+                label = "Back to Settings",
+                onClick = onBack,
+            )
+        },
+    ) {
+        ReadinessRows(
+            readiness = readiness,
+            onRequest = onRequest,
+        )
+        ClaroInfoCard(
+            text = "Allowed means Android granted access — it does not verify that a real call, SMS or SOS test succeeded.",
+            tone = ClaroBannerTone.INFO,
+        )
     }
 }
 
 @Composable
-private fun WelcomeStep(onContinue: () -> Unit) {
-    Text("Claro provides a simpler home, phone and messages in one app.")
-    Text("Camera and system role prompts open Android screens. SOS calls one agreed trusted person; it is not monitored emergency dispatch.")
-    Text("You can finish setup independently or with a caregiver. Setup resumes after interruption.")
-    PrimaryButton("Continue free", onContinue)
+fun ResetClaroScreen(
+    hasActiveCall: Boolean,
+    onReturnToCall: () -> Unit,
+    onConfirmReset: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    var confirming by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(hasActiveCall) {
+        if (hasActiveCall) confirming = false
+    }
+
+    ClaroScreenScaffold(
+        title = "Reset Claro?",
+        modifier = Modifier.testTag("onboarding-screen"),
+        dock = {
+            when {
+                hasActiveCall -> {
+                    ClaroPrimaryButton(
+                        label = "Return to call",
+                        icon = ClaroIconKind.PHONE,
+                        containerColor = ClaroColors.Green,
+                        onClick = onReturnToCall,
+                    )
+                    ClaroSecondaryButton(
+                        label = "Cancel",
+                        onClick = onCancel,
+                    )
+                }
+                confirming -> {
+                    ClaroPrimaryButton(
+                        label = "Reset Claro",
+                        containerColor = ClaroColors.Red,
+                        onClick = onConfirmReset,
+                    )
+                    ClaroSecondaryButton(
+                        label = "Cancel",
+                        onClick = {
+                            confirming = false
+                            onCancel()
+                        },
+                    )
+                }
+                else -> {
+                    ClaroPrimaryButton(
+                        label = "Continue",
+                        containerColor = ClaroColors.Red,
+                        onClick = { confirming = true },
+                    )
+                    ClaroSecondaryButton(
+                        label = "Cancel",
+                        onClick = onCancel,
+                    )
+                }
+            }
+        },
+    ) {
+        if (hasActiveCall) {
+            ClaroInfoCard(
+                text = "End your call first.",
+                tone = ClaroBannerTone.ERROR,
+            )
+        } else if (confirming) {
+            ClaroInfoCard(
+                text = "Reset all Claro changes?",
+                tone = ClaroBannerTone.WARNING,
+            )
+        } else {
+            ClaroInfoCard(
+                text = "Resets Claro on this phone only. Device data and store purchases stay unchanged.",
+                tone = ClaroBannerTone.WARNING,
+            )
+        }
+        ResetScopeCard(
+            heading = "Cleared from Claro",
+            accentColor = ClaroColors.Red,
+            backgroundColor = ClaroColors.PaleRed,
+            items = listOf(
+                "Claro preferences (phone style, language, text size, contrast, diagnostics)",
+                "Home favorites and Hold 1 / Hold 2 speed dials",
+                "Selected photo references and SOS contact assignment",
+                "Caregiver PIN, recovery secret and unsent Claro message drafts",
+            ),
+        )
+        ResetScopeCard(
+            heading = "Kept on your phone",
+            accentColor = ClaroColors.Green,
+            backgroundColor = ClaroColors.PaleGreen,
+            items = listOf(
+                "Android contacts and call log",
+                "SMS and MMS conversations",
+                "Device photos and videos",
+                "Google Play subscriptions and purchases",
+            ),
+        )
+    }
+}
+
+@Composable
+private fun WelcomeStep(
+    message: String?,
+    onContinue: () -> Unit,
+) {
+    ClaroScreenScaffold(
+        title = stringResource(R.string.onboarding_welcome),
+        modifier = Modifier.testTag("onboarding-screen"),
+        bannerText = message,
+        bannerTone = messageBannerTone(message),
+        dock = {
+            ClaroPrimaryButton(
+                label = "Set up Claro",
+                onClick = onContinue,
+            )
+            ClaroSecondaryButton(
+                label = "Continue free",
+                onClick = onContinue,
+            )
+            Text(
+                text = "Installing Claro does not start a trial or charge.",
+                color = Color(0xFFE2E8F0),
+                fontSize = 16.sp,
+                lineHeight = 20.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
+            )
+        },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(116.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(ClaroColors.PaleBlue),
+                contentAlignment = Alignment.Center,
+            ) {
+                ClaroIcon(
+                    kind = ClaroIconKind.SUN,
+                    tint = ClaroColors.Blue,
+                    size = 84.dp,
+                )
+            }
+            Text(
+                text = "Your people. One touch away.",
+                color = ClaroColors.Ink,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                text = "A simpler home, phone and messages — set up for yourself or together with someone you trust.",
+                color = ClaroColors.Muted,
+                style = MaterialTheme.typography.bodyLarge,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            ClaroInfoCard(
+                text = "Android asks separately for Home, Phone, SMS and Camera access when needed. " +
+                    "SOS calls one trusted person — it is not monitored emergency dispatch.",
+                tone = ClaroBannerTone.INFO,
+            )
+        }
+    }
 }
 
 @Composable
 private fun PhoneStyleChoice(
-    selected: VisualMode,
+    preferences: ClaroPreferences,
+    message: String?,
     onSelected: (VisualMode) -> Unit,
     onContinue: () -> Unit,
 ) {
-    Text("Choose a large visual home. You can preview and change it later in protected Settings.")
-    VisualModeCard(VisualMode.TOUCH, selected == VisualMode.TOUCH) {
-        onSelected(VisualMode.TOUCH)
-    }
-    VisualModeCard(VisualMode.CLASSIC, selected == VisualMode.CLASSIC) {
-        onSelected(VisualMode.CLASSIC)
-    }
-    PrimaryButton("Use ${selected.localizedDisplayName()}", onContinue)
-}
+    var selected by rememberSaveable { mutableStateOf<VisualMode?>(null) }
 
-@Composable
-private fun VisualModeCard(
-    mode: VisualMode,
-    selected: Boolean,
-    onSelect: () -> Unit,
-) {
-    Card(
-        onClick = onSelect,
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 132.dp),
-        border = if (selected) BorderStroke(4.dp, ClaroColors.Blue) else null,
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(selected = selected, onClick = onSelect)
-                Text(mode.localizedDisplayName(), modifier = Modifier.semantics { heading() })
-            }
-            Text(
-                if (mode == VisualMode.TOUCH) {
-                    "Large photo contacts and a two-column tile home."
-                } else {
-                    "A permanent 12-key keypad with fixed Call, Home, Back and Menu controls."
-                },
+    OnboardingStepScaffold(
+        title = OnboardingStep.PHONE_STYLE.title(),
+        stepIndex = 1,
+        message = message,
+        dock = {
+            ClaroPrimaryButton(
+                label = selected?.let { "Use ${it.localizedDisplayName()}" } ?: "Choose a style",
+                enabled = selected != null,
+                onClick = onContinue,
             )
-            Text(if (selected) "Selected" else "Preview")
-        }
+        },
+    ) {
+        Text(
+            text = "Choose how Claro looks. Both styles share the same people, messages and settings.",
+            color = ClaroColors.Ink,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+        VisualModeGrid(
+            selected = selected,
+            stackVertically = preferences.textSize == TextSize.HUGE,
+            onSelect = { mode ->
+                selected = mode
+                onSelected(mode)
+            },
+        )
     }
 }
 
 @Composable
-private fun LanguageDisplayStep(
+private fun LanguageDisplayOnboardingStep(
     preferences: ClaroPreferences,
+    message: String?,
     onSave: (AppLanguage, TextSize, Boolean) -> Unit,
-    onCancel: (() -> Unit)? = null,
 ) {
     var language by rememberSaveable { mutableStateOf(preferences.language) }
     var textSize by rememberSaveable { mutableStateOf(preferences.textSize) }
     var highContrast by rememberSaveable { mutableStateOf(preferences.highContrast) }
-    ClaroScreenContent {
-        Text("Language")
-        AppLanguage.entries.forEach { option ->
-            ChoiceRow(option.displayName(), language == option) { language = option }
-        }
-        Text("Text size")
-        TextSize.entries.forEach { option ->
-            ChoiceRow(option.displayName(), textSize == option) { textSize = option }
-        }
-        ToggleRow("High contrast", highContrast) { highContrast = it }
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp)) {
-                Text("Preview", modifier = Modifier.semantics { heading() })
-                Text(language.previewText())
-                if (language == AppLanguage.HEBREW) {
-                    androidx.compose.runtime.CompositionLocalProvider(
-                        LocalLayoutDirection provides LayoutDirection.Ltr,
-                    ) {
-                        Text("050-123-4567 · 12/11/2026")
-                    }
-                }
-            }
-        }
-        PrimaryButton("Save preview") { onSave(language, textSize, highContrast) }
-        onCancel?.let {
-            OutlinedButton(
-                onClick = it,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = ClaroDimensions.PrimaryTarget),
-            ) {
-                Text("Cancel")
-            }
-        }
+
+    OnboardingStepScaffold(
+        title = OnboardingStep.LANGUAGE_AND_DISPLAY.title(),
+        stepIndex = 2,
+        message = message,
+        dock = {
+            ClaroPrimaryButton(
+                label = "Save and continue",
+                onClick = { onSave(language, textSize, highContrast) },
+            )
+        },
+    ) {
+        LanguageDisplayFields(
+            language = language,
+            onLanguageChange = { language = it },
+            textSize = textSize,
+            onTextSizeChange = { textSize = it },
+            highContrast = highContrast,
+            onHighContrastChange = { highContrast = it },
+        )
     }
 }
 
 @Composable
-private fun AccessSetupStep(
+private fun AccessSetupOnboardingStep(
     accessMode: SettingsAccessMode,
+    message: String?,
     onDateQuestion: () -> Unit,
     onPin: (String, String, String) -> Unit,
 ) {
@@ -478,237 +892,1387 @@ private fun AccessSetupStep(
     var pin by rememberSaveable { mutableStateOf("") }
     var confirmation by rememberSaveable { mutableStateOf("") }
     var recovery by rememberSaveable { mutableStateOf("") }
-    ChoiceRow("Date question", mode == SettingsAccessMode.DATE_QUESTION) {
-        mode = SettingsAccessMode.DATE_QUESTION
-    }
-    Text("No secret to remember. Anyone who knows today's date can unlock.")
-    ChoiceRow("Caregiver PIN", mode == SettingsAccessMode.CAREGIVER_PIN) {
-        mode = SettingsAccessMode.CAREGIVER_PIN
-    }
-    Text("A separate recovery secret is required and should be stored safely elsewhere.")
-    if (mode == SettingsAccessMode.CAREGIVER_PIN) {
-        SecretField("6-digit PIN", pin) { pin = it }
-        SecretField("Confirm PIN", confirmation) { confirmation = it }
-        SecretField("Recovery secret", recovery) { recovery = it }
-    }
-    PrimaryButton("Save access method") {
-        if (mode == SettingsAccessMode.DATE_QUESTION) onDateQuestion()
-        else onPin(pin, confirmation, recovery)
+
+    OnboardingStepScaffold(
+        title = OnboardingStep.SETTINGS_ACCESS.title(),
+        stepIndex = 3,
+        message = message,
+        dock = {
+            ClaroPrimaryButton(
+                label = "Save access method",
+                onClick = {
+                    if (mode == SettingsAccessMode.DATE_QUESTION) {
+                        onDateQuestion()
+                    } else {
+                        onPin(pin, confirmation, recovery)
+                    }
+                },
+            )
+        },
+    ) {
+        AccessSetupFields(
+            mode = mode,
+            onModeChange = { mode = it },
+            pin = pin,
+            onPinChange = { pin = it },
+            confirmation = confirmation,
+            onConfirmationChange = { confirmation = it },
+            recovery = recovery,
+            onRecoveryChange = { recovery = it },
+        )
     }
 }
 
 @Composable
 private fun PeopleSetupStep(
     preferences: ClaroPreferences,
-    onSave: (Int, Boolean, Boolean) -> Unit,
+    message: String?,
+    onOpenPeopleSetup: () -> Unit,
+    onContinue: () -> Unit,
 ) {
-    var favorites by rememberSaveable {
-        mutableIntStateOf(preferences.onboarding.favoriteSlotsAssigned)
-    }
-    var one by rememberSaveable { mutableStateOf(preferences.onboarding.speedDialOneAssigned) }
-    var two by rememberSaveable { mutableStateOf(preferences.onboarding.speedDialTwoAssigned) }
-    Text("Assign up to four photo contacts. Missing optional assignments remain visible after setup.")
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = { favorites = (favorites - 1).coerceAtLeast(0) }) {
-            Text("Remove")
+    val assigned = preferences.onboarding.favoriteSlotsAssigned
+    val speedOne = preferences.onboarding.speedDialOneAssigned
+    val speedTwo = preferences.onboarding.speedDialTwoAssigned
+
+    OnboardingStepScaffold(
+        title = OnboardingStep.PEOPLE_AND_SPEED_DIAL.title(),
+        stepIndex = 4,
+        message = message,
+        dock = {
+            ClaroPrimaryButton(
+                label = "Open contacts & speed dial",
+                icon = ClaroIconKind.CONTACT,
+                onClick = onOpenPeopleSetup,
+            )
+            ClaroSecondaryButton(
+                label = if (assigned > 0) "Continue" else "Continue with setup incomplete",
+                onClick = onContinue,
+            )
+        },
+    ) {
+        Text(
+            text = "Assign real Android contacts to the four Home portrait slots and optional Hold 1 / Hold 2 keys.",
+            color = ClaroColors.Ink,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(ClaroColors.RowSurface, RoundedCornerShape(6.dp))
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            val sampleNames = listOf("Slot 1", "Slot 2", "Slot 3", "Slot 4")
+            sampleNames.forEachIndexed { index, label ->
+                val isAssigned = index < assigned
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    ClaroAvatar(
+                        name = if (isAssigned) label else null,
+                        size = 48.dp,
+                        paletteSeed = index,
+                        isUnassigned = !isAssigned,
+                    )
+                    Text(
+                        text = if (isAssigned) "Set" else "Open",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isAssigned) ClaroColors.Green else ClaroColors.Muted,
+                    )
+                }
+            }
         }
-        Text("$favorites of 4 assigned", modifier = Modifier.align(Alignment.CenterVertically))
-        OutlinedButton(onClick = { favorites = (favorites + 1).coerceAtMost(4) }) {
-            Text("Add")
-        }
+        ClaroInfoCard(
+            text = buildString {
+                if (assigned > 0) {
+                    append("$assigned of 4 Home people configured. ")
+                } else {
+                    append("No Home people configured yet — unassigned slots stay visible as Add person. ")
+                }
+                append("Hold 1: ${if (speedOne) "assigned" else "not set"} · ")
+                append("Hold 2: ${if (speedTwo) "assigned" else "not set"}.")
+            },
+            tone = if (assigned == 4) ClaroBannerTone.SUCCESS else ClaroBannerTone.INFO,
+        )
+        Text(
+            text = "Holding 1 or 2 places a call immediately without an extra confirmation screen.",
+            color = ClaroColors.Muted,
+            fontSize = 18.sp,
+            lineHeight = 23.sp,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
     }
-    ToggleRow("Hold 1 assigned", one) { one = it }
-    ToggleRow("Hold 2 assigned", two) { two = it }
-    PrimaryButton("Save people and speed dial") { onSave(favorites, one, two) }
 }
 
 @Composable
 private fun SosSetupStep(
     agreed: Boolean,
-    onSave: (Boolean) -> Unit,
+    message: String?,
+    onOpenSosSetup: () -> Unit,
+    onContinue: () -> Unit,
 ) {
-    var checked by rememberSaveable { mutableStateOf(agreed) }
-    Text("SOS calls one trusted person for help. It does not notify a monitoring service or emergency dispatch.")
-    ToggleRow("Recipient agreed to receive a test call", checked) { checked = it }
-    Text("A real caregiver test remains untested until completed with consent.")
-    PrimaryButton("Save SOS readiness") { onSave(checked) }
+    OnboardingStepScaffold(
+        title = OnboardingStep.SOS_CONTACT.title(),
+        stepIndex = 5,
+        message = message,
+        dock = {
+            ClaroPrimaryButton(
+                label = "Configure trusted person",
+                icon = ClaroIconKind.SOS,
+                onClick = onOpenSosSetup,
+            )
+            ClaroSecondaryButton(
+                label = if (agreed) "Continue" else "Continue with SOS incomplete",
+                onClick = onContinue,
+            )
+        },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(84.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(ClaroColors.PaleRed),
+                contentAlignment = Alignment.Center,
+            ) {
+                ClaroIcon(
+                    kind = ClaroIconKind.SOS,
+                    tint = ClaroColors.Red,
+                    size = 52.dp,
+                )
+            }
+            Text(
+                text = "SOS calls one trusted person after a 5-second countdown. It is not a monitoring service or emergency dispatch, and sends no SMS or location.",
+                color = ClaroColors.Ink,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            ClaroInfoCard(
+                text = if (agreed) {
+                    "Trusted recipient recorded with agreement. Run a consented test call separately."
+                } else {
+                    "SOS is not configured. No SOS call can start until a real recipient agrees."
+                },
+                tone = if (agreed) ClaroBannerTone.SUCCESS else ClaroBannerTone.WARNING,
+            )
+        }
+    }
 }
 
 @Composable
 private fun ReadinessChecklist(
     readiness: Map<ReadinessCapability, CapabilityStatus>,
-    onStatus: (ReadinessCapability, CapabilityStatus) -> Unit,
+    message: String?,
+    onRequest: (ReadinessCapability) -> Unit,
     onContinue: () -> Unit,
 ) {
-    ReadinessRows(readiness, onStatus)
-    Text("Each Android role or permission is requested separately in context. Missing access keeps native fallback guidance visible.")
-    PrimaryButton("Continue to handover", onContinue)
-}
-
-@Composable
-private fun ReadinessRows(
-    readiness: Map<ReadinessCapability, CapabilityStatus>,
-    onStatus: (ReadinessCapability, CapabilityStatus) -> Unit,
-) {
-    ReadinessCapability.entries.forEach { capability ->
-        val status = readiness[capability] ?: CapabilityStatus.NEEDS_ATTENTION
-        Card(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(capability.displayName(), modifier = Modifier.semantics { heading() })
-                Text(status.displayName())
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { onStatus(capability, CapabilityStatus.READY) }) {
-                        Text("Fake grant")
-                    }
-                    OutlinedButton(
-                        onClick = { onStatus(capability, CapabilityStatus.NEEDS_ATTENTION) },
-                    ) {
-                        Text("Needs repair")
-                    }
-                }
-            }
-        }
+    OnboardingStepScaffold(
+        title = OnboardingStep.ROLE_READINESS.title(),
+        stepIndex = 6,
+        message = message,
+        dock = {
+            ClaroPrimaryButton(
+                label = "Continue to handover",
+                onClick = onContinue,
+            )
+        },
+    ) {
+        ReadinessRows(
+            readiness = readiness,
+            onRequest = onRequest,
+        )
+        ClaroInfoCard(
+            text = "Each Android role or permission is requested separately. Missing access keeps native fallback actions visible.",
+            tone = ClaroBannerTone.INFO,
+        )
     }
 }
 
 @Composable
 private fun HandoverChecklist(
     checked: Set<HandoverCheck>,
+    message: String?,
     onChecked: (HandoverCheck, Boolean) -> Unit,
+    onOpenAppsSetup: () -> Unit,
+    onOpenPlans: () -> Unit,
     onFinish: () -> Unit,
 ) {
-    Text("Record observed tests separately from granted permissions.")
-    HandoverCheck.entries.forEach { item ->
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = ClaroDimensions.SecondaryTarget),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Checkbox(
-                checked = item in checked,
-                onCheckedChange = { onChecked(item, it) },
+    val allChecked = checked.size == HandoverCheck.entries.size
+
+    OnboardingStepScaffold(
+        title = OnboardingStep.HANDOVER.title(),
+        stepIndex = 7,
+        message = message,
+        dock = {
+            ClaroSecondaryButton(
+                label = "Optional plans",
+                onClick = onOpenPlans,
             )
-            Text(item.displayName())
-        }
-    }
-    Text("Unchecked items remain honestly marked as not tested.")
-    PrimaryButton("Finish setup", onFinish)
-}
-
-@Composable
-private fun SettingsRow(title: String, detail: String, onClick: () -> Unit) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 80.dp),
+            ClaroPrimaryButton(
+                label = "Finish setup",
+                icon = ClaroIconKind.CHECK,
+                onClick = onFinish,
+            )
+        },
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.Start,
-        ) {
-            Text(title)
-            Text(detail)
+        Text(
+            text = "Verify real service behavior together. Unchecked items remain honestly marked not tested.",
+            color = ClaroColors.Ink,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+        ClaroInfoCard(
+            text = if (allChecked) {
+                "All ${HandoverCheck.entries.size} handover checks observed."
+            } else {
+                "${checked.size} of ${HandoverCheck.entries.size} handover checks observed."
+            },
+            tone = if (allChecked) ClaroBannerTone.SUCCESS else ClaroBannerTone.INFO,
+        )
+        Column(modifier = Modifier.fillMaxWidth()) {
+            HandoverCheck.entries.forEach { item ->
+                val isChecked = item in checked
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 60.dp)
+                        .background(ClaroColors.RowSurface)
+                        .toggleable(
+                            value = isChecked,
+                            role = Role.Checkbox,
+                            onValueChange = { onChecked(item, it) },
+                        )
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Checkbox(
+                        checked = isChecked,
+                        onCheckedChange = null,
+                        colors = CheckboxDefaults.colors(checkedColor = ClaroColors.Blue),
+                    )
+                    Text(
+                        text = item.displayName(),
+                        color = ClaroColors.Ink,
+                        fontSize = 21.sp,
+                        lineHeight = 26.sp,
+                        fontWeight = if (isChecked) FontWeight.Bold else FontWeight.Medium,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                HorizontalDivider(thickness = 1.dp, color = ClaroColors.Border)
+            }
         }
+        ClaroRowButton(
+            title = "Allowed apps & Home tiles",
+            subtitle = "Choose optional extra apps for Home",
+            leading = {
+                ClaroIcon(
+                    kind = ClaroIconKind.APPS,
+                    tint = ClaroColors.Blue,
+                    size = 30.dp,
+                )
+            },
+            onClick = onOpenAppsSetup,
+        )
     }
 }
 
 @Composable
-private fun ChoiceRow(label: String, selected: Boolean, onClick: () -> Unit) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = ClaroDimensions.PrimaryTarget),
-        border = if (selected) BorderStroke(3.dp, ClaroColors.Blue) else null,
+private fun OnboardingStepScaffold(
+    title: String,
+    stepIndex: Int?,
+    message: String?,
+    dock: (@Composable ColumnScope.() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    ClaroScreenScaffold(
+        title = title,
+        modifier = Modifier.testTag("onboarding-screen"),
+        bannerText = message,
+        bannerTone = messageBannerTone(message),
+        dock = dock,
     ) {
-        RadioButton(selected = selected, onClick = onClick)
-        Text(label, modifier = Modifier.weight(1f))
+        if (stepIndex != null) {
+            OnboardingProgressBar(
+                stepIndex = stepIndex,
+                totalSteps = 7,
+            )
+        }
+        content()
     }
 }
 
 @Composable
-private fun ToggleRow(label: String, checked: Boolean, onChecked: (Boolean) -> Unit) {
+private fun OnboardingProgressBar(
+    stepIndex: Int,
+    totalSteps: Int,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = ClaroDimensions.PrimaryTarget),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+            .background(Color.White)
+            .padding(horizontal = 6.dp, vertical = 5.dp)
+            .semantics {
+                contentDescription = "Setup step $stepIndex of $totalSteps"
+            },
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
-        Text(label, modifier = Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = onChecked)
+        repeat(totalSteps) { index ->
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(7.dp)
+                    .background(
+                        if (index < stepIndex) ClaroColors.Blue else Color(0xFFDCE4EF),
+                    ),
+            )
+        }
     }
 }
 
 @Composable
-private fun SecretField(label: String, value: String, onValueChange: (String) -> Unit) {
+private fun VisualModeGrid(
+    selected: VisualMode?,
+    stackVertically: Boolean,
+    onSelect: (VisualMode) -> Unit,
+) {
+    if (stackVertically) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            VisualModeCard(
+                mode = VisualMode.TOUCH,
+                selected = selected == VisualMode.TOUCH,
+                onSelect = { onSelect(VisualMode.TOUCH) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            VisualModeCard(
+                mode = VisualMode.CLASSIC,
+                selected = selected == VisualMode.CLASSIC,
+                onSelect = { onSelect(VisualMode.CLASSIC) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            VisualModeCard(
+                mode = VisualMode.TOUCH,
+                selected = selected == VisualMode.TOUCH,
+                onSelect = { onSelect(VisualMode.TOUCH) },
+                modifier = Modifier.weight(1f),
+            )
+            VisualModeCard(
+                mode = VisualMode.CLASSIC,
+                selected = selected == VisualMode.CLASSIC,
+                onSelect = { onSelect(VisualMode.CLASSIC) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun VisualModeCard(
+    mode: VisualMode,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val label = mode.localizedDisplayName()
+    Card(
+        onClick = onSelect,
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) ClaroColors.PaleBlue else Color.White,
+        ),
+        border = BorderStroke(
+            width = if (selected) 3.dp else 2.dp,
+            color = if (selected) ClaroColors.Blue else ClaroColors.Border,
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(7.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                SelectionDot(selected = selected)
+                Text(
+                    text = label,
+                    color = ClaroColors.Ink,
+                    fontSize = 19.sp,
+                    lineHeight = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.semantics { heading() },
+                )
+            }
+            ModePreview(mode = mode)
+            Text(
+                text = if (mode == VisualMode.TOUCH) {
+                    "Photo contacts & 2-column tiles"
+                } else {
+                    "Fixed keypad, D-pad & Call/Home"
+                },
+                color = ClaroColors.Muted,
+                fontSize = 15.sp,
+                lineHeight = 19.sp,
+                minLines = 2,
+            )
+            Text(
+                text = if (selected) "✓ Selected" else "Tap to choose",
+                color = if (selected) ClaroColors.Blue else ClaroColors.Muted,
+                fontSize = 16.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ModePreview(mode: VisualMode) {
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        if (mode == VisualMode.TOUCH) {
+            TouchShellPreview()
+        } else {
+            ClassicShellPreview()
+        }
+    }
+}
+
+@Composable
+private fun TouchShellPreview() {
+    val samplePeople = listOf("Mira", "Daniel", "Leah", "Noah")
+    val tileRows = listOf(
+        listOf(
+            Triple(ClaroColors.PaleGreen, ClaroColors.Green, ClaroIconKind.PHONE),
+            Triple(ClaroColors.PaleBlue, ClaroColors.Blue, ClaroIconKind.MESSAGES),
+        ),
+        listOf(
+            Triple(ClaroColors.PaleOrange, ClaroColors.Orange, ClaroIconKind.CAMERA),
+            Triple(ClaroColors.PaleViolet, ClaroColors.Violet, ClaroIconKind.GALLERY),
+        ),
+        listOf(
+            Triple(ClaroColors.PaleRed, ClaroColors.Red, ClaroIconKind.SOS),
+            Triple(ClaroColors.AppsPale, ClaroColors.AppsInk, ClaroIconKind.APPS),
+        ),
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(206.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .border(3.dp, ClaroColors.Charcoal, RoundedCornerShape(10.dp))
+            .background(ClaroColors.Charcoal)
+            .padding(3.dp)
+            .clearAndSetSemantics {},
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(24.dp)
+                .background(ClaroColors.Charcoal)
+                .padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(24.dp)
+                    .height(8.dp)
+                    .border(1.dp, Color.White)
+                    .padding(1.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(18.dp)
+                        .background(Color(0xFF3BE564)),
+                )
+            }
+            Text(
+                text = "9:41",
+                color = Color.White,
+                fontSize = 11.sp,
+                lineHeight = 12.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            ClaroIcon(
+                kind = ClaroIconKind.SETTINGS,
+                tint = Color.White,
+                size = 12.dp,
+            )
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(38.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            samplePeople.forEachIndexed { index, name ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize()
+                        .background(Color(0xFFF0F3F8)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    ClaroAvatar(
+                        name = name,
+                        size = 28.dp,
+                        paletteSeed = index,
+                    )
+                }
+            }
+        }
+        tileRows.forEach { row ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(43.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                row.forEach { (bg, fg, iconKind) ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxSize()
+                            .background(bg),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        ClaroIcon(
+                            kind = iconKind,
+                            tint = fg,
+                            size = 24.dp,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ClassicShellPreview() {
+    val samplePeople = listOf("Mira", "Daniel", "Leah", "Noah")
+    val keypadRows = listOf(
+        listOf("1", "2", "3"),
+        listOf("4", "5", "6"),
+        listOf("7", "8", "9"),
+        listOf("*", "0", "#"),
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(206.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .border(3.dp, ClaroColors.Charcoal, RoundedCornerShape(10.dp))
+            .background(ClaroColors.Charcoal)
+            .padding(3.dp)
+            .clearAndSetSemantics {},
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(84.dp)
+                .clip(RoundedCornerShape(topStart = 7.dp, topEnd = 7.dp))
+                .background(Color.White)
+                .padding(horizontal = 4.dp, vertical = 3.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "9:41",
+                    color = ClaroColors.Ink,
+                    fontSize = 13.sp,
+                    lineHeight = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "Wed 11",
+                    color = ClaroColors.Muted,
+                    fontSize = 9.sp,
+                    lineHeight = 10.sp,
+                )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(34.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                samplePeople.forEachIndexed { index, name ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxSize()
+                            .background(Color(0xFFF0F3F8)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        ClaroAvatar(
+                            name = name,
+                            size = 24.dp,
+                            paletteSeed = index,
+                        )
+                    }
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(20.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize()
+                        .background(ClaroColors.PaleBlue, RoundedCornerShape(2.dp)),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    ClaroIcon(
+                        kind = ClaroIconKind.MESSAGES,
+                        tint = ClaroColors.Blue,
+                        size = 11.dp,
+                    )
+                    Text(
+                        text = "SMS",
+                        color = ClaroColors.Blue,
+                        fontSize = 8.sp,
+                        lineHeight = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize()
+                        .background(ClaroColors.Red, RoundedCornerShape(2.dp)),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    ClaroIcon(
+                        kind = ClaroIconKind.SOS,
+                        tint = Color.White,
+                        size = 11.dp,
+                    )
+                    Text(
+                        text = "SOS",
+                        color = Color.White,
+                        fontSize = 8.sp,
+                        lineHeight = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(44.dp),
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .background(Color(0xFF435066), RoundedCornerShape(3.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    ClaroIcon(
+                        kind = ClaroIconKind.ARROW_LEFT,
+                        tint = Color.White,
+                        size = 11.dp,
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .background(ClaroColors.Green, RoundedCornerShape(3.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    ClaroIcon(
+                        kind = ClaroIconKind.PHONE,
+                        tint = Color.White,
+                        size = 12.dp,
+                    )
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .width(48.dp)
+                    .fillMaxHeight()
+                    .background(Color(0xFF3A4659), RoundedCornerShape(10.dp))
+                    .border(1.dp, Color(0xFF8997AA), RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                ClaroIcon(
+                    kind = ClaroIconKind.ARROW_UP,
+                    tint = Color.White,
+                    size = 8.dp,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 2.dp),
+                )
+                ClaroIcon(
+                    kind = ClaroIconKind.ARROW_DOWN,
+                    tint = Color.White,
+                    size = 8.dp,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 2.dp),
+                )
+                ClaroIcon(
+                    kind = ClaroIconKind.ARROW_LEFT,
+                    tint = Color.White,
+                    size = 8.dp,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 2.dp),
+                )
+                ClaroIcon(
+                    kind = ClaroIconKind.ARROW_RIGHT,
+                    tint = Color.White,
+                    size = 8.dp,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 2.dp),
+                )
+                Box(
+                    modifier = Modifier
+                        .width(22.dp)
+                        .height(16.dp)
+                        .background(Color(0xFF61738B), RoundedCornerShape(4.dp))
+                        .border(1.dp, Color(0xFFB6C4D6), RoundedCornerShape(4.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "OK",
+                        color = Color.White,
+                        fontSize = 8.sp,
+                        lineHeight = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .background(Color(0xFF435066), RoundedCornerShape(3.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    ClaroIcon(
+                        kind = ClaroIconKind.APPS,
+                        tint = Color.White,
+                        size = 11.dp,
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .background(ClaroColors.Red, RoundedCornerShape(3.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    ClaroIcon(
+                        kind = ClaroIconKind.HOME,
+                        tint = Color.White,
+                        size = 12.dp,
+                    )
+                }
+            }
+        }
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            keypadRows.forEach { row ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    row.forEach { digit ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxSize()
+                                .background(Color(0xFF344054), RoundedCornerShape(3.dp))
+                                .border(0.5.dp, Color(0xFF66758C), RoundedCornerShape(3.dp)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = digit,
+                                color = Color.White,
+                                fontSize = 9.sp,
+                                lineHeight = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LanguageDisplayFields(
+    language: AppLanguage,
+    onLanguageChange: (AppLanguage) -> Unit,
+    textSize: TextSize,
+    onTextSizeChange: (TextSize) -> Unit,
+    highContrast: Boolean,
+    onHighContrastChange: (Boolean) -> Unit,
+) {
+    SectionLabel("Language")
+    AppLanguage.entries.forEach { option ->
+        ChoiceRow(
+            label = option.displayName(),
+            selected = language == option,
+            onClick = { onLanguageChange(option) },
+        )
+    }
+    Spacer(Modifier.height(4.dp))
+    SectionLabel("Text size")
+    TextSize.entries.forEach { option ->
+        ChoiceRow(
+            label = option.displayName(),
+            selected = textSize == option,
+            onClick = { onTextSizeChange(option) },
+        )
+    }
+    Spacer(Modifier.height(4.dp))
+    ToggleRow(
+        label = "High contrast",
+        checked = highContrast,
+        onChecked = onHighContrastChange,
+    )
+    Spacer(Modifier.height(4.dp))
+    LanguageLivePreviewCard(
+        language = language,
+        textSize = textSize,
+        highContrast = highContrast,
+    )
+}
+
+@Composable
+private fun LanguageLivePreviewCard(
+    language: AppLanguage,
+    textSize: TextSize,
+    highContrast: Boolean,
+) {
+    val previewDirection = if (language == AppLanguage.HEBREW) {
+        LayoutDirection.Rtl
+    } else {
+        LayoutDirection.Ltr
+    }
+    val previewScale = when (textSize) {
+        TextSize.STANDARD -> 1f
+        TextSize.LARGE -> 1.15f
+        TextSize.HUGE -> 1.3f
+    }
+    val bgColor = if (highContrast) Color.White else ClaroColors.InfoBlueBg
+    val inkColor = if (highContrast) Color.Black else ClaroColors.InfoBlueInk
+    val borderColor = if (highContrast) Color.Black else ClaroColors.Blue
+
+    CompositionLocalProvider(LocalLayoutDirection provides previewDirection) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(bgColor, RoundedCornerShape(4.dp))
+                .border(2.dp, borderColor, RoundedCornerShape(4.dp))
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                text = language.previewHeading(),
+                color = inkColor,
+                fontSize = (24 * previewScale).sp,
+                lineHeight = (29 * previewScale).sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.semantics { heading() },
+            )
+            Text(
+                text = language.previewLabels(),
+                color = inkColor,
+                fontSize = (20 * previewScale).sp,
+                lineHeight = (25 * previewScale).sp,
+            )
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                Text(
+                    text = "202-555-0101 · 9:41",
+                    color = inkColor,
+                    fontSize = (19 * previewScale).sp,
+                    lineHeight = (24 * previewScale).sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccessSetupFields(
+    mode: SettingsAccessMode,
+    onModeChange: (SettingsAccessMode) -> Unit,
+    pin: String,
+    onPinChange: (String) -> Unit,
+    confirmation: String,
+    onConfirmationChange: (String) -> Unit,
+    recovery: String,
+    onRecoveryChange: (String) -> Unit,
+) {
+    ChoiceRow(
+        label = "Date question (dd/MM/YYYY)",
+        subtitle = "No secret to remember · prevents accidental taps",
+        selected = mode == SettingsAccessMode.DATE_QUESTION,
+        onClick = { onModeChange(SettingsAccessMode.DATE_QUESTION) },
+    )
+    ChoiceRow(
+        label = "Caregiver PIN",
+        subtitle = "6-digit PIN + 12+ character recovery secret",
+        selected = mode == SettingsAccessMode.CAREGIVER_PIN,
+        onClick = { onModeChange(SettingsAccessMode.CAREGIVER_PIN) },
+    )
+    if (mode == SettingsAccessMode.DATE_QUESTION) {
+        ClaroInfoCard(
+            text = "Anyone who knows today's local date (dd/MM/YYYY) can unlock Settings. There is no PIN or recovery phrase to store.",
+            tone = ClaroBannerTone.INFO,
+        )
+    } else {
+        ClaroInfoCard(
+            text = "Keep your 6-digit PIN and 12+ character recovery secret somewhere safe. Today's date cannot unlock or recover PIN mode.",
+            tone = ClaroBannerTone.WARNING,
+        )
+        ClaroPinField(
+            label = "6-digit PIN",
+            value = pin,
+            onValueChange = onPinChange,
+        )
+        ClaroPinField(
+            label = "Confirm 6-digit PIN",
+            value = confirmation,
+            onValueChange = onConfirmationChange,
+        )
+        ClaroSecretField(
+            label = "Recovery secret (12+ characters)",
+            value = recovery,
+            onValueChange = onRecoveryChange,
+            supportingText = "${recovery.length}/12 minimum characters",
+        )
+    }
+}
+
+@Composable
+private fun ReadinessRows(
+    readiness: Map<ReadinessCapability, CapabilityStatus>,
+    onRequest: (ReadinessCapability) -> Unit,
+) {
+    ReadinessCapability.entries.forEach { capability ->
+        val status = readiness[capability] ?: CapabilityStatus.NEEDS_ATTENTION
+        val statusColor = when (status) {
+            CapabilityStatus.READY -> ClaroColors.Green
+            CapabilityStatus.NEEDS_ATTENTION -> ClaroColors.Orange
+            CapabilityStatus.UNAVAILABLE -> ClaroColors.Muted
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(ClaroColors.RowSurface)
+                .padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                ClaroIcon(
+                    kind = capability.iconKind(),
+                    tint = if (status == CapabilityStatus.READY) ClaroColors.Green else ClaroColors.Blue,
+                    size = 30.dp,
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = capability.displayName(),
+                        color = ClaroColors.Ink,
+                        fontSize = 22.sp,
+                        lineHeight = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.semantics { heading() },
+                    )
+                    Text(
+                        text = status.displayName(),
+                        color = statusColor,
+                        fontSize = 18.sp,
+                        lineHeight = 22.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+            if (status != CapabilityStatus.READY) {
+                ClaroSecondaryButton(
+                    label = if (status == CapabilityStatus.UNAVAILABLE) {
+                        "Open Android settings"
+                    } else {
+                        "Allow or repair"
+                    },
+                    onClick = { onRequest(capability) },
+                )
+            }
+        }
+        HorizontalDivider(thickness = 2.dp, color = ClaroColors.Charcoal)
+    }
+}
+
+@Composable
+private fun ResetScopeCard(
+    heading: String,
+    accentColor: Color,
+    backgroundColor: Color,
+    items: List<String>,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(backgroundColor, RoundedCornerShape(4.dp))
+            .border(1.dp, accentColor, RoundedCornerShape(4.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = heading,
+            color = accentColor,
+            fontSize = 21.sp,
+            lineHeight = 25.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.semantics { heading() },
+        )
+        items.forEach { item ->
+            Text(
+                text = "• $item",
+                color = ClaroColors.Ink,
+                fontSize = 19.sp,
+                lineHeight = 24.sp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text = text,
+        color = ClaroColors.Ink,
+        fontSize = 20.sp,
+        lineHeight = 24.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier
+            .padding(horizontal = 4.dp, vertical = 2.dp)
+            .semantics { heading() },
+    )
+}
+
+@Composable
+private fun SelectionDot(selected: Boolean) {
+    Box(
+        modifier = Modifier
+            .size(20.dp)
+            .border(
+                width = 2.dp,
+                color = if (selected) ClaroColors.Blue else ClaroColors.FieldBorder,
+                shape = CircleShape,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) {
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .background(ClaroColors.Blue, CircleShape),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChoiceRow(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    subtitle: String? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = ClaroDimensions.PrimaryTarget)
+            .clip(RoundedCornerShape(4.dp))
+            .background(if (selected) ClaroColors.PaleBlue else ClaroColors.RowSurface)
+            .border(
+                width = if (selected) 3.dp else 1.dp,
+                color = if (selected) ClaroColors.Blue else ClaroColors.Border,
+                shape = RoundedCornerShape(4.dp),
+            )
+            .selectable(
+                selected = selected,
+                role = Role.RadioButton,
+                onClick = onClick,
+            )
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        SelectionDot(selected = selected)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                color = ClaroColors.Ink,
+                fontSize = 22.sp,
+                lineHeight = 27.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            )
+            if (!subtitle.isNullOrBlank()) {
+                Text(
+                    text = subtitle,
+                    color = ClaroColors.Muted,
+                    fontSize = 17.sp,
+                    lineHeight = 21.sp,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ToggleRow(
+    label: String,
+    checked: Boolean,
+    onChecked: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 66.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(ClaroColors.Surface)
+            .border(1.dp, ClaroColors.Border, RoundedCornerShape(4.dp))
+            .toggleable(
+                value = checked,
+                role = Role.Switch,
+                onValueChange = onChecked,
+            )
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            color = ClaroColors.Ink,
+            fontSize = 23.sp,
+            lineHeight = 28.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier.weight(1f),
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = null,
+        )
+    }
+}
+
+@Composable
+private fun PinIndicatorDots(filledCount: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+            .semantics {
+                contentDescription = "${filledCount.coerceIn(0, 6)} of 6 PIN digits entered"
+            },
+        horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        repeat(6) { index ->
+            val filled = index < filledCount
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .background(
+                        color = if (filled) ClaroColors.Blue else Color.Transparent,
+                        shape = CircleShape,
+                    )
+                    .border(2.dp, ClaroColors.Blue, CircleShape),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ClaroDateField(
+    value: String,
+    onValueChange: (String) -> Unit,
+) {
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        OutlinedTextField(
+            value = TextFieldValue(
+                text = value,
+                selection = TextRange(value.length),
+            ),
+            onValueChange = { next ->
+                onValueChange(formatDateDigits(next.text))
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("dd/MM/YYYY") },
+            supportingText = {
+                Text("2-digit day, 2-digit month, 4-digit year")
+            },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Number,
+                imeAction = ImeAction.Done,
+            ),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                fontWeight = FontWeight.Bold,
+            ),
+            colors = claroTextFieldColors(),
+            singleLine = true,
+        )
+    }
+}
+
+@Composable
+private fun ClaroPinField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+) {
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = { raw ->
+                onValueChange(raw.filter(Char::isDigit).take(6))
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(label) },
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.NumberPassword,
+                imeAction = ImeAction.Done,
+            ),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                fontWeight = FontWeight.Bold,
+            ),
+            colors = claroTextFieldColors(),
+            singleLine = true,
+        )
+    }
+}
+
+@Composable
+private fun ClaroSecretField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    supportingText: String? = null,
+) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth(),
         label = { Text(label) },
+        supportingText = supportingText?.let { note -> { Text(note) } },
         visualTransformation = PasswordVisualTransformation(),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Password,
+            imeAction = ImeAction.Done,
+        ),
+        textStyle = MaterialTheme.typography.bodyLarge,
+        colors = claroTextFieldColors(),
         singleLine = true,
     )
 }
 
 @Composable
-private fun PrimaryButton(label: String, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = ClaroDimensions.PrimaryTarget),
-        colors = ButtonDefaults.buttonColors(containerColor = ClaroColors.Blue),
-    ) {
-        Text(label)
+private fun claroTextFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = ClaroColors.Blue,
+    unfocusedBorderColor = ClaroColors.FieldBorder,
+    focusedContainerColor = Color.White,
+    unfocusedContainerColor = Color.White,
+    focusedTextColor = ClaroColors.Ink,
+    unfocusedTextColor = ClaroColors.Ink,
+)
+
+private fun formatDateDigits(raw: String): String {
+    val digits = raw.filter(Char::isDigit).take(8)
+    return buildString {
+        append(digits.take(2))
+        if (digits.length > 2) {
+            append('/')
+            append(digits.substring(2, minOf(4, digits.length)))
+        }
+        if (digits.length > 4) {
+            append('/')
+            append(digits.substring(4, digits.length))
+        }
     }
 }
 
-@Composable
-private fun ClaroScreen(
-    title: String,
-    message: String? = null,
-    content: @Composable () -> Unit,
-) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(ClaroDimensions.ScreenPadding),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item {
-            Text(
-                title,
-                color = Color.White,
-                style = androidx.compose.material3.MaterialTheme.typography.titleLarge,
-                modifier = Modifier.semantics { heading() },
-            )
-        }
-        message?.let {
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Text(it, modifier = Modifier.padding(12.dp))
-                }
-            }
-        }
-        item { ClaroScreenContent(content) }
-        item { Spacer(Modifier.height(24.dp)) }
+private fun messageBannerTone(message: String?): ClaroBannerTone {
+    if (message.isNullOrBlank()) return ClaroBannerTone.INFO
+    val lower = message.lowercase()
+    return when {
+        "changed" in lower || "saved" in lower -> ClaroBannerTone.SUCCESS
+        "try again in" in lower || "paused" in lower || "will change after" in lower ->
+            ClaroBannerTone.WARNING
+        else -> ClaroBannerTone.ERROR
     }
-}
-
-@Composable
-private fun ClaroScreenContent(content: @Composable () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        content = { content() },
-    )
 }
 
 private fun OnboardingStep.title() = when (this) {
@@ -735,10 +2299,16 @@ private fun AppLanguage.displayName() = when (this) {
     AppLanguage.HEBREW -> "עברית"
 }
 
-private fun AppLanguage.previewText() = when (this) {
-    AppLanguage.ENGLISH -> "Call family · Messages · Settings"
-    AppLanguage.SPANISH -> "Llamar a la familia · Mensajes · Configuración"
-    AppLanguage.HEBREW -> "שיחה למשפחה · הודעות · הגדרות"
+private fun AppLanguage.previewHeading() = when (this) {
+    AppLanguage.ENGLISH -> "Home"
+    AppLanguage.SPANISH -> "Inicio"
+    AppLanguage.HEBREW -> "בית"
+}
+
+private fun AppLanguage.previewLabels() = when (this) {
+    AppLanguage.ENGLISH -> "Phone · Messages · Settings"
+    AppLanguage.SPANISH -> "Teléfono · Mensajes · Configuración"
+    AppLanguage.HEBREW -> "טלפון · הודעות · הגדרות"
 }
 
 private fun TextSize.displayName() = when (this) {
@@ -747,12 +2317,27 @@ private fun TextSize.displayName() = when (this) {
     TextSize.HUGE -> "Huge"
 }
 
-private fun ReadinessCapability.displayName() =
-    name.lowercase().replaceFirstChar(Char::uppercase)
+private fun ReadinessCapability.displayName() = when (this) {
+    ReadinessCapability.HOME -> "Default home"
+    ReadinessCapability.PHONE -> "Default phone"
+    ReadinessCapability.MESSAGES -> "Default SMS"
+    ReadinessCapability.CONTACTS -> "Contacts"
+    ReadinessCapability.NOTIFICATIONS -> "Notifications"
+    ReadinessCapability.MEDIA -> "Photos"
+}
+
+private fun ReadinessCapability.iconKind() = when (this) {
+    ReadinessCapability.HOME -> ClaroIconKind.HOME
+    ReadinessCapability.PHONE -> ClaroIconKind.PHONE
+    ReadinessCapability.MESSAGES -> ClaroIconKind.MESSAGES
+    ReadinessCapability.CONTACTS -> ClaroIconKind.CONTACT
+    ReadinessCapability.NOTIFICATIONS -> ClaroIconKind.CLOCK
+    ReadinessCapability.MEDIA -> ClaroIconKind.GALLERY
+}
 
 private fun CapabilityStatus.displayName() = when (this) {
-    CapabilityStatus.READY -> "Granted; service test still separate"
-    CapabilityStatus.NEEDS_ATTENTION -> "Needs attention"
+    CapabilityStatus.READY -> "Allowed · service test separate"
+    CapabilityStatus.NEEDS_ATTENTION -> "Access needed"
     CapabilityStatus.UNAVAILABLE -> "Unavailable on this device"
 }
 
@@ -769,5 +2354,5 @@ private fun HandoverCheck.displayName() = when (this) {
 
 private fun readinessSummary(preferences: ClaroPreferences): String {
     val ready = preferences.onboarding.readiness.values.count { it == CapabilityStatus.READY }
-    return "$ready of ${ReadinessCapability.entries.size} capabilities granted"
+    return "$ready of ${ReadinessCapability.entries.size} allowed"
 }

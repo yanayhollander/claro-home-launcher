@@ -6,6 +6,7 @@ import com.clarohome.core.model.BatteryStatus
 import com.clarohome.core.model.CellularAvailability
 import com.clarohome.core.model.CellularStatus
 import com.clarohome.core.model.FavoritePerson
+import com.clarohome.core.model.FavoriteState
 import com.clarohome.core.model.HomeRoleState
 import com.clarohome.core.model.HomeSnapshot
 import com.clarohome.core.model.HomeTile
@@ -23,51 +24,89 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 @Singleton
-class FakeHomeRepository @Inject constructor() : HomeRepository {
+class LocalHomeRepository @Inject constructor() : HomeRepository {
     private val state = MutableStateFlow(
         HomeSnapshot(
-            greeting = "Good evening",
-            dayAndDate = "Wed 11 Nov",
-            time = "9:41",
-            battery = BatteryStatus(82, isCharging = false),
-            cellular = CellularStatus(CellularAvailability.AVAILABLE, signalLevel = 3),
-            favorites = listOf(
-                FavoritePerson("mira", "Mira", "+1 555 0101"),
-                FavoritePerson("daniel", "Daniel", "+1 555 0102"),
-                FavoritePerson("leah", "Leah", "+1 555 0103"),
-                FavoritePerson("noah", "Noah", "+1 555 0104"),
-            ),
+            greeting = "",
+            dayAndDate = "",
+            time = "",
+            battery = BatteryStatus(0, isCharging = false),
+            cellular = CellularStatus(CellularAvailability.UNKNOWN),
+            favorites = List(4) { index ->
+                FavoritePerson(
+                    id = "favorite-$index",
+                    displayName = "Add person",
+                    state = FavoriteState.UNASSIGNED,
+                )
+            },
             tiles = listOf(
                 HomeTile(
                     "phone",
                     "Phone",
                     TileAccent.GREEN,
                     HomeTileKind.PHONE,
-                    BadgeValue.Known(1),
+                    BadgeValue.Unknown,
                 ),
                 HomeTile(
                     "messages",
                     "Messages",
                     TileAccent.BLUE,
                     HomeTileKind.MESSAGES,
-                    BadgeValue.Known(1),
+                    BadgeValue.Unknown,
                 ),
                 HomeTile("camera", "Camera", TileAccent.ORANGE, HomeTileKind.CAMERA),
-                HomeTile("gallery", "Gallery", TileAccent.BLUE, HomeTileKind.GALLERY),
+                HomeTile("gallery", "Gallery", TileAccent.VIOLET, HomeTileKind.GALLERY),
                 HomeTile("sos", "SOS", TileAccent.RED, HomeTileKind.SOS),
-                HomeTile("apps", "Apps", TileAccent.VIOLET, HomeTileKind.APPS),
+                HomeTile("apps", "Apps", TileAccent.BLUE, HomeTileKind.APPS),
             ),
-            installedApps = listOf(
-                InstalledApp("com.android.calculator2", "Calculator", isAllowed = true, isFavorite = true),
-                InstalledApp("com.android.chrome", "Browser", isAllowed = true),
-                InstalledApp("com.google.android.apps.maps", "Maps", isAllowed = true),
-                InstalledApp("com.example.weather", "Weather", isAllowed = true, isAvailable = false),
-            ),
-            homeRole = HomeRoleState.AVAILABLE,
+            installedApps = emptyList(),
+            homeRole = HomeRoleState.UNKNOWN,
         ),
     )
 
     override val home: Flow<HomeSnapshot> = state.asStateFlow()
+
+    override suspend fun setFavorite(slot: Int, person: FavoritePerson) {
+        if (slot !in 0..3) return
+        state.value = state.value.copy(
+            favorites = state.value.favorites.mapIndexed { index, current ->
+                if (index == slot) person else current
+            },
+        )
+    }
+
+    override suspend fun clearFavorite(slot: Int) {
+        if (slot !in 0..3) return
+        state.value = state.value.copy(
+            favorites = state.value.favorites.mapIndexed { index, current ->
+                if (index == slot) {
+                    FavoritePerson(
+                        id = "favorite-$slot",
+                        displayName = "Add person",
+                        state = FavoriteState.UNASSIGNED,
+                    )
+                } else {
+                    current
+                }
+            },
+        )
+    }
+
+    override suspend fun reset() {
+        val current = state.value
+        val clearedApps = current.installedApps.map {
+            it.copy(isAllowed = false, isFavorite = false, isOnHome = false)
+        }
+        state.value = current.copy(
+            favorites = List(4) { index ->
+                FavoritePerson(
+                    id = "favorite-$index",
+                    displayName = "Add person",
+                    state = FavoriteState.UNASSIGNED,
+                )
+            },
+        ).withApps(clearedApps)
+    }
 
     override suspend fun setInstalledApps(apps: List<InstalledApp>) {
         val current = state.value
@@ -164,5 +203,5 @@ class FakeHomeRepository @Inject constructor() : HomeRepository {
 @InstallIn(SingletonComponent::class)
 abstract class HomeDataModule {
     @Binds
-    abstract fun bindHomeRepository(repository: FakeHomeRepository): HomeRepository
+    abstract fun bindHomeRepository(repository: LocalHomeRepository): HomeRepository
 }

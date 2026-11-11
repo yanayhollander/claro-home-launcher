@@ -62,7 +62,7 @@ object BillingObservabilityProviders {
         configuration: VendorConfiguration,
         revenueCat: dagger.Lazy<RevenueCatBillingRepository>,
     ): BillingRepository =
-        if (configuration.revenueCatAvailable) revenueCat.get() else FakeBillingRepository()
+        if (configuration.revenueCatAvailable) revenueCat.get() else DisabledBillingRepository()
 
     @Provides
     fun provideBillingGateway(repository: BillingRepository): BillingGateway =

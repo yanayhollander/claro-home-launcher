@@ -8,6 +8,7 @@ import com.clarohome.core.model.CellularStatus
 import com.clarohome.core.model.HomeRoleState
 import com.clarohome.core.model.HomeSnapshot
 import com.clarohome.core.model.InstalledApp
+import com.clarohome.core.model.FavoritePerson
 import com.clarohome.core.model.PlatformReadiness
 import com.clarohome.core.model.VisualMode
 import kotlinx.coroutines.flow.Flow
@@ -29,6 +30,9 @@ interface CriticalActivityRepository {
 interface HomeRepository {
     val home: Flow<HomeSnapshot>
     suspend fun setInstalledApps(apps: List<InstalledApp>)
+    suspend fun setFavorite(slot: Int, person: FavoritePerson)
+    suspend fun clearFavorite(slot: Int)
+    suspend fun reset()
     suspend fun setAppAllowed(packageName: String, allowed: Boolean)
     suspend fun setAppOnHome(packageName: String, onHome: Boolean)
     suspend fun setHomeRoleState(state: HomeRoleState)

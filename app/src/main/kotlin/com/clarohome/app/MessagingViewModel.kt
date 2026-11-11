@@ -65,6 +65,10 @@ class MessagingViewModel @Inject constructor(
     fun searchInbox(query: String) = coordinator.searchInbox(query)
     fun openConversation(id: Long) = coordinator.openConversation(id)
     fun startNewMessage() = coordinator.startNewMessage()
+    fun openRecipientPicker() = coordinator.openRecipientPicker()
+    fun cancelRecipientPicker() = coordinator.cancelRecipientPicker()
+    fun updateRecipientInput(raw: String) = coordinator.updateRecipientInput(raw)
+    fun clearAllDrafts() = coordinator.clearAllDrafts()
     fun searchRecipients(query: String) = coordinator.searchRecipients(query)
     fun loadMoreRecipients() = coordinator.loadMoreRecipients()
     fun chooseContactNumber(contact: ClaroContact, number: ContactNumber) =

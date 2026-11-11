@@ -325,6 +325,13 @@ class OnboardingSettingsManager @Inject constructor(
 
     suspend fun cancelDeferredModeSwitch() = update { it.copy(pendingVisualMode = null) }
 
+    suspend fun resetAll() {
+        mutex.withLock {
+            unlockedUntilElapsedMillis = 0L
+            repository.save(ClaroPreferences())
+        }
+    }
+
     suspend fun setReadiness(
         capability: ReadinessCapability,
         status: CapabilityStatus,

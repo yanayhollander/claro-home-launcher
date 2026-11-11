@@ -7,10 +7,10 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
-class FakeHomeRepositoryTest {
+class LocalHomeRepositoryTest {
     @Test
-    fun fixtureHasFourPeopleAndSixCoreTiles() = runTest {
-        FakeHomeRepository().home.test {
+    fun initialStateHasFourUnassignedSlotsAndSixCoreTiles() = runTest {
+        LocalHomeRepository().home.test {
             val home = awaitItem()
             assertThat(home.favorites).hasSize(4)
             assertThat(home.tiles.map { it.id }).containsExactly(
@@ -27,7 +27,7 @@ class FakeHomeRepositoryTest {
 
     @Test
     fun roleLossMakesAuthoritativeCountsUnknown() = runTest {
-        val repository = FakeHomeRepository()
+        val repository = LocalHomeRepository()
 
         repository.setHomeRoleState(HomeRoleState.AVAILABLE)
 
@@ -42,7 +42,7 @@ class FakeHomeRepositoryTest {
 
     @Test
     fun customizedAppIsAddedAfterProtectedCoreTiles() = runTest {
-        val repository = FakeHomeRepository()
+        val repository = LocalHomeRepository()
         repository.setInstalledApps(
             listOf(
                 com.clarohome.core.model.InstalledApp(
@@ -52,6 +52,7 @@ class FakeHomeRepositoryTest {
                 ),
             ),
         )
+        repository.setAppAllowed("com.android.calculator2", allowed = true)
         repository.setAppOnHome("com.android.calculator2", onHome = true)
 
         repository.home.test {

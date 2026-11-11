@@ -1,31 +1,32 @@
 package com.clarohome.presentation.touch
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -33,9 +34,20 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.clarohome.core.design.ClaroAvatar
+import com.clarohome.core.design.ClaroBannerTone
+import com.clarohome.core.design.ClaroBatteryMeter
+import com.clarohome.core.design.ClaroCellularBars
 import com.clarohome.core.design.ClaroColors
 import com.clarohome.core.design.ClaroDimensions
+import com.clarohome.core.design.ClaroIcon
+import com.clarohome.core.design.ClaroIconKind
+import com.clarohome.core.design.ClaroInfoCard
+import com.clarohome.core.design.ClaroPrimaryButton
 import com.clarohome.core.model.BadgeValue
 import com.clarohome.core.model.CellularAvailability
 import com.clarohome.core.model.FavoritePerson
@@ -44,7 +56,6 @@ import com.clarohome.core.model.HomeRoleState
 import com.clarohome.core.model.HomeSnapshot
 import com.clarohome.core.model.HomeTile
 import com.clarohome.core.model.HomeTileKind
-import com.clarohome.core.model.TileAccent
 import com.clarohome.feature.launcher.home.HomeCustomizationPolicy
 
 data class TouchHomeContentModel(
@@ -71,9 +82,13 @@ fun TouchHomeScreen(
     onRepairHomeRole: () -> Unit,
     onReturnToCall: () -> Unit,
 ) {
+    val coreTiles = home.tiles.take(6)
+    val extraTiles = home.tiles.drop(6)
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
+            .testTag("touch-home")
             .background(ClaroColors.Charcoal),
         verticalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
     ) {
@@ -87,17 +102,16 @@ fun TouchHomeScreen(
         }
         home.activeCall?.let { activeCall ->
             item {
-                Button(
-                    onClick = onReturnToCall,
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = ClaroDimensions.PrimaryTarget)
                         .padding(horizontal = ClaroDimensions.TileGap),
-                    colors = ButtonDefaults.buttonColors(containerColor = ClaroColors.Green),
                 ) {
-                    Text(
-                        "Return to call · ${activeCall.displayName} · ${activeCall.stateLabel}",
-                        textAlign = TextAlign.Center,
+                    ClaroPrimaryButton(
+                        label = "Return to call · ${activeCall.displayName}",
+                        onClick = onReturnToCall,
+                        containerColor = ClaroColors.Green,
+                        icon = ClaroIconKind.PHONE,
                     )
                 }
             }
@@ -105,35 +119,25 @@ fun TouchHomeScreen(
         item {
             FavoriteStrip(home.favorites, onFavoriteSelected)
         }
-        items(home.tiles.chunked(2), key = { row -> row.joinToString { it.id } }) { row ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = ClaroDimensions.TileGap),
-                horizontalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
-            ) {
-                row.forEach { tile ->
-                    HomeTileCard(
-                        tile = tile,
-                        onClick = { onTileSelected(tile) },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                if (row.size == 1) {
-                    Spacer(Modifier.weight(1f))
-                }
-            }
+        items(coreTiles.chunked(2), key = { row -> "core-${row.joinToString { it.id }}" }) { row ->
+            TileGridRow(row = row, onTileSelected = onTileSelected)
         }
-        item {
-            Text(
-                "More apps continue below",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                color = Color.White,
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.bodyLarge,
-            )
+        if (extraTiles.isNotEmpty()) {
+            item(key = "scroll-cue") {
+                Text(
+                    text = "⌄",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { contentDescription = "More apps below" },
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    lineHeight = 20.sp,
+                    textAlign = TextAlign.Center,
+                )
+            }
+            items(extraTiles.chunked(2), key = { row -> "extra-${row.joinToString { it.id }}" }) { row ->
+                TileGridRow(row = row, onTileSelected = onTileSelected)
+            }
         }
     }
 }
@@ -143,56 +147,92 @@ private fun TouchStatusHeader(
     home: HomeSnapshot,
     onUseClassicMode: () -> Unit,
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .heightIn(min = 112.dp)
+            .background(ClaroColors.Charcoal)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                home.dayAndDate,
-                modifier = Modifier.semantics { heading() },
-                color = Color.White,
-                style = MaterialTheme.typography.titleLarge,
-            )
-            Text(home.time, color = Color.White, style = MaterialTheme.typography.titleLarge)
-        }
-        Column(
-            modifier = Modifier.weight(1f),
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                LinearProgressIndicator(
-                    progress = { home.battery.percentage / 100f },
-                    modifier = Modifier
-                        .width(92.dp)
-                        .semantics {
-                            contentDescription = buildString {
-                                append("Battery ${home.battery.percentage} percent")
-                                if (home.battery.isCharging) append(", charging")
-                            }
-                        },
-                    color = ClaroColors.Green,
-                    trackColor = Color.White,
-                )
-                Text(" ${home.battery.percentage}%", color = Color.White)
-            }
-            Text(
-                home.cellular.accessibleLabel(),
-                modifier = Modifier.semantics {
-                    contentDescription = home.cellular.accessibleLabel()
-                },
-                color = Color.White,
-            )
-            Button(
-                onClick = onUseClassicMode,
-                modifier = Modifier.heightIn(min = ClaroDimensions.SecondaryTarget),
-                contentPadding = ButtonDefaults.ContentPadding,
+            ClaroBatteryMeter(battery = home.battery)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("Classic style")
+                ClaroCellularBars(cellular = home.cellular)
+                home.cellular.unavailableLabel()?.let { networkLabel ->
+                    Text(
+                        text = networkLabel,
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        lineHeight = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = home.dayAndDate.ifBlank { "Claro" },
+                    modifier = Modifier.semantics { heading() },
+                    color = Color.White,
+                    fontSize = 26.sp,
+                    lineHeight = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "${home.battery.percentage}%",
+                    color = Color(0xFFE0E6F0),
+                    fontSize = 15.sp,
+                    lineHeight = 20.sp,
+                )
+            }
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                Text(
+                    text = home.time,
+                    color = Color.White,
+                    fontSize = 36.sp,
+                    lineHeight = 38.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(Color(0xFF384354))
+                    .clickable(
+                        role = Role.Button,
+                        onClickLabel = "Settings",
+                        onClick = onUseClassicMode,
+                    )
+                    .semantics {
+                        contentDescription = "Settings"
+                        role = Role.Button
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                ClaroIcon(
+                    kind = ClaroIconKind.SETTINGS,
+                    tint = Color.White,
+                    size = 28.dp,
+                )
             }
         }
     }
@@ -206,28 +246,27 @@ private fun RoleRepairCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp)
-            .background(Color(0xFFFFF3CD), RoundedCornerShape(8.dp))
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = ClaroDimensions.TileGap),
+        verticalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
     ) {
-        Text(
-            when (roleState) {
+        ClaroInfoCard(
+            text = when (roleState) {
                 HomeRoleState.AVAILABLE -> "Claro is not your Home app yet."
                 HomeRoleState.UNAVAILABLE -> "This device cannot make Claro the Home app."
                 HomeRoleState.UNKNOWN -> "Home app status is unavailable."
                 HomeRoleState.GRANTED -> ""
             },
-            color = ClaroColors.Charcoal,
+            tone = ClaroBannerTone.WARNING,
         )
-        Button(
+        ClaroPrimaryButton(
+            label = if (roleState == HomeRoleState.AVAILABLE) {
+                "Choose Claro as Home"
+            } else {
+                "Open Home settings"
+            },
             onClick = onRepairHomeRole,
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = ClaroDimensions.PrimaryTarget),
-        ) {
-            Text(if (roleState == HomeRoleState.AVAILABLE) "Choose Claro as Home" else "Open Home settings")
-        }
+            containerColor = ClaroColors.Blue,
+        )
     }
 }
 
@@ -236,18 +275,32 @@ private fun FavoriteStrip(
     favorites: List<FavoritePerson>,
     onFavoriteSelected: (FavoritePerson) -> Unit,
 ) {
+    val visibleFavorites = List(4) { index ->
+        favorites.getOrNull(index) ?: FavoritePerson(
+            id = "favorite-$index",
+            displayName = "Add person",
+            state = FavoriteState.UNASSIGNED,
+        )
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = ClaroDimensions.TileGap),
         horizontalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
     ) {
-        favorites.take(4).forEach { person ->
+        visibleFavorites.forEachIndexed { index, person ->
+            val unassigned = person.state == FavoriteState.UNASSIGNED
+            val shortName = if (unassigned) {
+                "+"
+            } else {
+                person.displayName.trim().split(Regex("\\s+")).firstOrNull()?.ifBlank { "+" } ?: "+"
+            }
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .heightIn(min = 88.dp)
-                    .background(Color(0xFFF4F7FB))
+                    .heightIn(min = 84.dp)
+                    .clip(RoundedCornerShape(1.dp))
+                    .background(Color(0xFFF0F3F8))
                     .clickable(
                         role = Role.Button,
                         onClickLabel = person.favoriteActionLabel(),
@@ -256,29 +309,51 @@ private fun FavoriteStrip(
                         contentDescription = person.favoriteDescription()
                         role = Role.Button
                     }
-                    .padding(4.dp),
+                    .padding(horizontal = 2.dp, vertical = 3.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+                verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .background(Color(0xFFDCE8F3), RoundedCornerShape(8.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        if (person.state == FavoriteState.READY) "●" else "+",
-                        color = ClaroColors.Charcoal,
-                        style = MaterialTheme.typography.titleLarge,
-                    )
-                }
+                ClaroAvatar(
+                    name = person.displayName,
+                    size = 51.dp,
+                    paletteSeed = index,
+                    isUnassigned = unassigned,
+                )
                 Text(
-                    person.displayName,
-                    color = ClaroColors.Charcoal,
+                    text = shortName,
+                    color = ClaroColors.Ink,
+                    fontSize = 19.sp,
+                    lineHeight = 21.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun TileGridRow(
+    row: List<HomeTile>,
+    onTileSelected: (HomeTile) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = ClaroDimensions.TileGap),
+        horizontalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
+    ) {
+        row.forEach { tile ->
+            HomeTileCard(
+                tile = tile,
+                onClick = { onTileSelected(tile) },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        if (row.size == 1) {
+            Spacer(Modifier.weight(1f))
         }
     }
 }
@@ -292,40 +367,56 @@ private fun HomeTileCard(
     val description = HomeCustomizationPolicy.badgeLabel(tile.label, tile.badge)
     Box(
         modifier = modifier
-            .heightIn(min = 132.dp)
-            .background(tile.accent.paleColor())
+            .heightIn(min = 160.dp)
+            .clip(RoundedCornerShape(1.dp))
+            .background(tile.kind.tileBackgroundColor())
             .clickable(role = Role.Button, onClick = onClick)
             .semantics {
                 contentDescription = description
                 role = Role.Button
-            }
-            .padding(8.dp),
+            },
         contentAlignment = Alignment.Center,
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
+        if (tile.kind == HomeTileKind.SOS) {
             Text(
-                tile.kind.glyph(),
-                color = tile.accent.strongColor(),
-                style = MaterialTheme.typography.titleLarge,
+                text = tile.label.ifBlank { "SOS" },
+                color = ClaroColors.Red,
+                fontSize = 54.sp,
+                lineHeight = 58.sp,
+                fontWeight = FontWeight.Black,
+                letterSpacing = (-2).sp,
                 textAlign = TextAlign.Center,
+                modifier = Modifier.padding(8.dp),
             )
-            Text(
-                tile.label,
-                color = ClaroColors.Charcoal,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.bodyLarge,
-            )
+        } else {
+            Column(
+                modifier = Modifier.padding(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
+            ) {
+                ClaroIcon(
+                    kind = tile.kind.iconKind(),
+                    tint = tile.kind.tileIconTint(),
+                    size = if (tile.kind == HomeTileKind.INSTALLED_APP) 54.dp else 68.dp,
+                )
+                Text(
+                    text = tile.kind.displayLabel(tile.label),
+                    color = ClaroColors.Ink,
+                    fontSize = 22.sp,
+                    lineHeight = 25.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         tile.badge?.let { badge ->
             BadgeBubble(
-                badge,
-                Modifier
+                badge = badge,
+                modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(4.dp),
+                    .padding(6.dp),
             )
         }
     }
@@ -339,11 +430,19 @@ private fun BadgeBubble(badge: BadgeValue, modifier: Modifier = Modifier) {
     }
     Box(
         modifier = modifier
-            .size(36.dp)
-            .background(ClaroColors.Red, CircleShape),
+            .defaultMinSize(minWidth = 32.dp, minHeight = 32.dp)
+            .background(ClaroColors.Red, CircleShape)
+            .border(2.dp, Color.White, CircleShape)
+            .padding(horizontal = 6.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, color = Color.White, fontWeight = FontWeight.Bold)
+        Text(
+            text = text,
+            color = Color.White,
+            fontSize = 18.sp,
+            lineHeight = 20.sp,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 
@@ -357,36 +456,50 @@ private fun FavoritePerson.favoriteDescription(): String = when (state) {
     FavoriteState.PHOTO_UNAVAILABLE -> "$displayName, photo unavailable"
 }
 
-private fun com.clarohome.core.model.CellularStatus.accessibleLabel(): String = when (availability) {
-    CellularAvailability.AVAILABLE -> "Cellular signal ${signalLevel ?: 0} of 4"
+private fun com.clarohome.core.model.CellularStatus.unavailableLabel(): String? = when (availability) {
+    CellularAvailability.AVAILABLE -> null
     CellularAvailability.NO_SIM -> "No SIM"
-    CellularAvailability.NO_SERVICE -> "No cellular service"
+    CellularAvailability.NO_SERVICE -> "No signal"
     CellularAvailability.AIRPLANE_MODE -> "Airplane mode"
-    CellularAvailability.UNKNOWN -> "Cellular status unavailable"
+    CellularAvailability.UNKNOWN -> "Signal unknown"
 }
 
-private fun HomeTileKind.glyph(): String = when (this) {
-    HomeTileKind.PHONE -> "☎"
-    HomeTileKind.MESSAGES -> "✉"
-    HomeTileKind.CAMERA -> "●"
-    HomeTileKind.GALLERY -> "▣"
-    HomeTileKind.SOS -> "SOS"
-    HomeTileKind.APPS -> "••\n••"
-    HomeTileKind.INSTALLED_APP -> "▦"
+private fun HomeTileKind.tileBackgroundColor(): Color = when (this) {
+    HomeTileKind.PHONE -> ClaroColors.PaleGreen
+    HomeTileKind.MESSAGES -> ClaroColors.PaleBlue
+    HomeTileKind.CAMERA -> ClaroColors.PaleOrange
+    HomeTileKind.GALLERY -> ClaroColors.PaleViolet
+    HomeTileKind.SOS -> ClaroColors.PaleRed
+    HomeTileKind.APPS -> ClaroColors.AppsPale
+    HomeTileKind.INSTALLED_APP -> Color(0xFFF2F4F8)
 }
 
-private fun TileAccent.strongColor(): Color = when (this) {
-    TileAccent.GREEN -> ClaroColors.Green
-    TileAccent.BLUE -> ClaroColors.Blue
-    TileAccent.ORANGE -> ClaroColors.Orange
-    TileAccent.RED -> ClaroColors.Red
-    TileAccent.VIOLET -> ClaroColors.Violet
+private fun HomeTileKind.tileIconTint(): Color = when (this) {
+    HomeTileKind.PHONE -> ClaroColors.Green
+    HomeTileKind.MESSAGES -> ClaroColors.Blue
+    HomeTileKind.CAMERA -> ClaroColors.Orange
+    HomeTileKind.GALLERY -> ClaroColors.Violet
+    HomeTileKind.SOS -> ClaroColors.Red
+    HomeTileKind.APPS -> ClaroColors.AppsInk
+    HomeTileKind.INSTALLED_APP -> ClaroColors.Blue
 }
 
-private fun TileAccent.paleColor(): Color = when (this) {
-    TileAccent.GREEN -> Color(0xFFEAF7EF)
-    TileAccent.BLUE -> Color(0xFFEAF1FC)
-    TileAccent.ORANGE -> Color(0xFFFFF2E7)
-    TileAccent.RED -> Color(0xFFFFECEF)
-    TileAccent.VIOLET -> Color(0xFFF1ECFC)
+private fun HomeTileKind.iconKind(): ClaroIconKind = when (this) {
+    HomeTileKind.PHONE -> ClaroIconKind.PHONE
+    HomeTileKind.MESSAGES -> ClaroIconKind.MESSAGES
+    HomeTileKind.CAMERA -> ClaroIconKind.CAMERA
+    HomeTileKind.GALLERY -> ClaroIconKind.GALLERY
+    HomeTileKind.SOS -> ClaroIconKind.SOS
+    HomeTileKind.APPS -> ClaroIconKind.APPS
+    HomeTileKind.INSTALLED_APP -> ClaroIconKind.APPS
+}
+
+private fun HomeTileKind.displayLabel(fallback: String): String = when (this) {
+    HomeTileKind.PHONE -> fallback.ifBlank { "Phone" }
+    HomeTileKind.MESSAGES -> fallback.ifBlank { "Messages" }
+    HomeTileKind.CAMERA -> fallback.ifBlank { "Camera" }
+    HomeTileKind.GALLERY -> fallback.ifBlank { "Gallery" }
+    HomeTileKind.SOS -> fallback.ifBlank { "SOS" }
+    HomeTileKind.APPS -> fallback.ifBlank { "Apps" }
+    HomeTileKind.INSTALLED_APP -> fallback
 }

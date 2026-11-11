@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 
 @Singleton
-class FakePlatformReadinessRepository @Inject constructor() : PlatformReadinessRepository {
+class DefaultPlatformReadinessRepository @Inject constructor() : PlatformReadinessRepository {
     override suspend fun current() = PlatformReadiness(
         home = CapabilityStatus.NEEDS_ATTENTION,
         phone = CapabilityStatus.NEEDS_ATTENTION,
@@ -32,7 +32,7 @@ class FakePlatformReadinessRepository @Inject constructor() : PlatformReadinessR
 }
 
 @Singleton
-class FakeCriticalActivityRepository @Inject constructor() : CriticalActivityRepository {
+class DefaultCriticalActivityRepository @Inject constructor() : CriticalActivityRepository {
     override val activeActivities: Flow<Set<CriticalActivity>> = flowOf(emptySet())
 }
 
@@ -54,7 +54,7 @@ class DefaultStartupRecoveryCoordinator @Inject constructor(
 abstract class PlatformBindingsModule {
     @Binds
     abstract fun bindReadiness(
-        repository: FakePlatformReadinessRepository,
+        repository: DefaultPlatformReadinessRepository,
     ): PlatformReadinessRepository
 
     @Binds
@@ -64,7 +64,7 @@ abstract class PlatformBindingsModule {
 
     @Binds
     abstract fun bindCriticalActivityRepository(
-        repository: FakeCriticalActivityRepository,
+        repository: DefaultCriticalActivityRepository,
     ): CriticalActivityRepository
 }
 

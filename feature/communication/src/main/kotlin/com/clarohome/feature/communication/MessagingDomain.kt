@@ -242,6 +242,7 @@ interface MessageDraftStore {
     suspend fun get(id: String): MessageDraft?
     suspend fun save(draft: MessageDraft)
     suspend fun delete(id: String)
+    suspend fun clearAll() = Unit
 }
 
 interface SmsTransport {
@@ -444,18 +445,72 @@ class MessagingCoordinator(
     }
 
     fun startNewMessage() {
-        val draft = MessageDraft(id = newDraftId(), updatedAtMillis = clock.nowMillis())
+        val existing = mutableState.value.draft
+        val draft = if (existing.conversationId == null && existing.id.isNotBlank()) {
+            existing
+        } else {
+            MessageDraft(id = newDraftId(), updatedAtMillis = clock.nowMillis())
+        }
         mutableState.value = mutableState.value.copy(
-            route = MessagingRoute.RECIPIENTS,
+            route = MessagingRoute.COMPOSE,
             selectedConversation = null,
             messages = emptyList(),
             draft = draft,
-            recipientQuery = "",
+            recipientQuery = draft.recipient?.number.orEmpty(),
             contacts = emptyList(),
             sendFailure = null,
             unknownOutcome = false,
+            statusMessage = null,
         )
         scope.launch { draftStore.save(draft) }
+    }
+
+    fun openRecipientPicker() {
+        val query = mutableState.value.draft.recipient?.number
+            ?: mutableState.value.recipientQuery
+        mutableState.value = mutableState.value.copy(
+            route = MessagingRoute.RECIPIENTS,
+            recipientQuery = query,
+            statusMessage = null,
+        )
+        searchRecipients(query)
+    }
+
+    fun cancelRecipientPicker() {
+        mutableState.value = mutableState.value.copy(
+            route = MessagingRoute.COMPOSE,
+            statusMessage = null,
+        )
+    }
+
+    fun updateRecipientInput(raw: String) {
+        val trimmed = raw.trim()
+        val recipient = if (trimmed.isBlank()) {
+            null
+        } else {
+            MessageRecipient(number = normalizePhoneNumber(trimmed))
+        }
+        val draft = mutableState.value.draft.copy(
+            recipient = recipient,
+            updatedAtMillis = clock.nowMillis(),
+        )
+        mutableState.value = mutableState.value.copy(
+            recipientQuery = raw,
+            draft = draft,
+            statusMessage = null,
+        )
+        persistDraft(draft)
+    }
+
+    fun clearAllDrafts() {
+        val fresh = MessageDraft(id = newDraftId(), updatedAtMillis = clock.nowMillis())
+        mutableState.value = mutableState.value.copy(
+            route = MessagingRoute.INBOX,
+            draft = fresh,
+            recipientQuery = "",
+            statusMessage = null,
+        )
+        scope.launch { draftStore.clearAll() }
     }
 
     fun searchRecipients(query: String) {

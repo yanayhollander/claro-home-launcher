@@ -406,6 +406,10 @@ class SharedPreferencesMessageDraftStore @Inject constructor(
         preferences.edit { remove(id) }
     }
 
+    override suspend fun clearAll() {
+        preferences.edit { clear() }
+    }
+
     private fun MessageDraft.encode(): String = listOf(
         conversationId?.toString().orEmpty(),
         recipient?.number.orEmpty(),

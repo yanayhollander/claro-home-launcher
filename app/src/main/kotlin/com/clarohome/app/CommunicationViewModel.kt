@@ -114,6 +114,65 @@ class CommunicationViewModel @Inject constructor(
         viewModelScope.launch { coordinator.openHistoryEntry(id) }
     }
 
+    fun saveAssignment(slot: String, contact: com.clarohome.feature.communication.ClaroContact, number: ContactNumber) {
+        viewModelScope.launch { coordinator.saveAssignment(slot, contact, number) }
+    }
+
+    fun clearAssignment(slot: String) {
+        viewModelScope.launch { coordinator.clearAssignment(slot) }
+    }
+
+    fun clearAllAssignments() {
+        viewModelScope.launch {
+            listOf("1", "2", "sos").forEach { coordinator.clearAssignment(it) }
+        }
+    }
+
+    fun saveContact(
+        existingLookupKey: String?,
+        name: String,
+        primaryNumber: String,
+        secondaryNumber: String,
+        onResult: (com.clarohome.feature.communication.ContactWriteResult) -> Unit,
+    ) {
+        viewModelScope.launch {
+            val numbers = buildList {
+                if (primaryNumber.isNotBlank()) {
+                    add(ContactNumber(primaryNumber.trim(), "Mobile"))
+                }
+                if (secondaryNumber.isNotBlank()) {
+                    add(ContactNumber(secondaryNumber.trim(), "Home"))
+                }
+            }
+            val mutation = com.clarohome.feature.communication.ContactMutation(
+                displayName = name.trim(),
+                numbers = numbers,
+            )
+            val result = if (existingLookupKey == null) {
+                coordinator.addContact(mutation)
+            } else {
+                coordinator.editContact(existingLookupKey, mutation)
+            }
+            if (result is com.clarohome.feature.communication.ContactWriteResult.Saved) {
+                coordinator.loadContacts(state.value.contactQuery, restart = true)
+            }
+            onResult(result)
+        }
+    }
+
+    fun deleteSelectedContact(
+        lookupKey: String,
+        onResult: (com.clarohome.feature.communication.ContactWriteResult) -> Unit,
+    ) {
+        viewModelScope.launch {
+            val result = coordinator.deleteContact(lookupKey)
+            if (result is com.clarohome.feature.communication.ContactWriteResult.Saved) {
+                coordinator.loadContacts(state.value.contactQuery, restart = true)
+            }
+            onResult(result)
+        }
+    }
+
     fun handleDialIntent(intent: Intent?) {
         if (intent?.action !in setOf(Intent.ACTION_DIAL, Intent.ACTION_VIEW)) return
         val number = intent?.data?.takeIf { it.scheme == "tel" }?.schemeSpecificPart.orEmpty()

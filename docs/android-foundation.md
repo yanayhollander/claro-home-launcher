@@ -24,7 +24,10 @@ app
   ports. Feature code depends on these ports, never vendor SDKs.
 - `core:data`: Room, typed Proto DataStore, deterministic fake repositories, and
   migration/schema ownership.
-- `core:design`: accessible typography, color, spacing, and target-size tokens.
+- `core:design`: accessible typography, color, spacing, target-size tokens,
+  storyboard SVG vector icons (`ClaroIcons`), illustrated portraits
+  (`ClaroAvatar`), battery/signal meters, headers, info cards, rows, and docked
+  screen scaffolds (`ClaroComponents`).
 - `core:platform`: replaceable Android platform adapters and Hilt bindings.
 - `core:testing`: shared unit-test dependencies and future deterministic fixtures.
 - `presentation:*`: Touch Home and Classic Phone shells consuming the same
@@ -92,10 +95,45 @@ allowlisted launcher activities and does not claim to resize, lock, or control
 third-party apps.
 
 Protected settings are the only route to phone-style changes, allowed-app/Home
-customization, SOS configuration, membership and diagnostics. Mode switching
-preserves the shared repositories and defers while a call, SOS countdown/call or
-purchase is critical. Billing and diagnostics are not consulted by phone,
-messaging, Home or SOS eligibility.
+customization, contact creation/editing/deletion, SOS recipient configuration
+and caregiver test calls, local Claro reset, membership, and diagnostics. Senior
+SOS never exposes recipient inputs or test controls; tapping `Settings` from
+SOS, `Edit apps` from Apps, or `Add person`/`Edit`/`Delete` from Contacts routes
+through the configured Date (`dd/MM/YYYY`) or 6-digit Caregiver PIN gate and
+continues directly to the intended destination after unlock. Mode switching
+preserves the shared repositories, defers while a call, SOS countdown/call or
+purchase is critical, and automatically applies once blockers clear. `Reset
+Claro` clears local Claro preferences, favorites, speed dials, drafts, SOS
+state, and consent (blocked during an active call) while leaving device
+contacts, SMS, photos, and Google Play subscriptions untouched. Billing uses
+`DisabledBillingRepository` when `CLARO_REVENUECAT_PUBLIC_KEY` is absent so
+unconfigured builds never invent fake plans or grant trial/lifetime access;
+billing and diagnostics are never consulted by phone, messaging, Home or SOS
+eligibility.
+
+The production debug application does not seed storyboard people, phone numbers,
+missed calls, unread messages, allowed apps, photos, plans or entitlements.
+Unconfigured values render as Add person, unknown counts, empty lists or explicit
+configuration-required states. Storyboard fixtures exist only in tests and
+screenshots.
+
+Role and permission readiness is read from Android after launch and every resume:
+
+- HOME, DIALER and SMS are requested separately with `RoleManager`.
+- restricted call-log/phone and SMS permissions are requested only after the
+  corresponding role is held;
+- Contacts and Android 13+ notifications have separate contextual requests;
+- a denied request remains Needs attention, and a repeated request after
+  permanent denial opens the app settings page;
+- media uses the system picker/scoped ownership path and does not invent a
+  storage permission grant.
+
+The onboarding and product surfaces use the storyboard palette and hierarchy:
+white content, charcoal headers/deck, Claro blue `#075BD8`, call green `#078534`,
+danger red `#CC1731`, 3-4dp dense separators and 64dp primary targets. Visual mode
+selection requires an explicit choice and previews the two actual shell
+structures. Native Compose reflows for system insets and font scaling, so exact
+browser pixels are not copied when that would break accessibility.
 
 ## Billing and diagnostics configuration
 
@@ -142,7 +180,8 @@ emulator data, or build directories into repository or session artifact storage.
 Set `ANDROID_HOME` or `ANDROID_SDK_ROOT` to an SDK containing Android 37, then run:
 
 ```sh
-./gradlew :app:assembleDebug test lint
+./gradlew clean :app:assembleDebug test lint
+./gradlew :app:installDebug :app:connectedDebugAndroidTest
 ```
 
 Use an existing emulator/device when UI or platform validation is needed. The
@@ -157,3 +196,16 @@ dual-SIM/default-account behavior, emergency handoff, Bluetooth/proximity/call
 waiting, camera/picker URI restoration, RevenueCat sandbox products and Play
 policy declarations. Instrumented tests should run only on an approved existing
 device/emulator and cannot prove carrier, OEM or store behavior.
+
+Automated emulator screenshots are written by `StoryboardRegressionTest` and
+`MainActivityLaunchTest` under the app external-files Pictures directory and
+captured in `artifacts/android-review/` (`1.4 MB` across 19 PNGs). They verify
+cold-start onboarding, side-by-side visual-mode previews, honest role/permission
+repair without fake grants, Touch Home and Classic Home shells, Touch/Classic
+dialer and call outcomes, SMS inbox and composer, senior SOS protection,
+protected date challenge, and unconfigured membership state. Direct desktop
+window-manager UI binding to `qemu-system-aarch64` remains unsupported by local
+Computer Use, so live emulator verification runs through Android Gradle
+instrumentation (`createAndroidComposeRule<MainActivity>()`); carrier,
+lock-screen, Bluetooth, dual-SIM and Play purchase screens remain
+physical-device/store gates rather than simulated success.

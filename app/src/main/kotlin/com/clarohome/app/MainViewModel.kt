@@ -20,6 +20,8 @@ import com.clarohome.core.model.CapabilityStatus
 import com.clarohome.core.model.ClaroPreferences
 import com.clarohome.core.model.CriticalActivity
 import com.clarohome.core.model.HandoverCheck
+import com.clarohome.core.model.FavoritePerson
+import com.clarohome.core.model.FavoriteState
 import com.clarohome.core.model.HomeSnapshot
 import com.clarohome.core.model.OnboardingStep
 import com.clarohome.core.model.ReadinessCapability
@@ -120,8 +122,8 @@ class MainViewModel @Inject constructor(
     init {
         restoreSos()
         viewModelScope.launch {
+            syncLauncherState()
             startup.value = recoveryCoordinator.recover()
-            refreshLauncherState()
         }
         viewModelScope.launch { billingRepository.refresh() }
     }
@@ -254,6 +256,21 @@ class MainViewModel @Inject constructor(
         message.value = null
     }
 
+    fun retryDeferredModeSwitch(
+        runtimeBlockers: Set<CriticalActivity>,
+        onApplied: (VisualMode) -> Unit,
+    ) {
+        viewModelScope.launch {
+            val result = settingsManager.retryDeferredModeSwitch(
+                uiState.value.activeActivities + runtimeBlockers,
+            )
+            if (result is ModeSwitchResult.Applied) {
+                message.value = null
+                onApplied(result.mode)
+            }
+        }
+    }
+
     fun clearMessage() {
         message.value = null
     }
@@ -264,16 +281,20 @@ class MainViewModel @Inject constructor(
 
     fun refreshLauncherState() {
         viewModelScope.launch {
-            homeRepository.setHomeRoleState(homeRoleController.currentState())
-            homeRepository.setInstalledApps(installedAppCatalog.discoverEligibleApps())
-            launcherStatusReader.read().let { status ->
-                homeRepository.setStatus(
-                    dayAndDate = status.dayAndDate,
-                    time = status.time,
-                    battery = status.battery,
-                    cellular = status.cellular,
-                )
-            }
+            syncLauncherState()
+        }
+    }
+
+    private suspend fun syncLauncherState() {
+        homeRepository.setHomeRoleState(homeRoleController.currentState())
+        homeRepository.setInstalledApps(installedAppCatalog.discoverEligibleApps())
+        launcherStatusReader.read().let { status ->
+            homeRepository.setStatus(
+                dayAndDate = status.dayAndDate,
+                time = status.time,
+                battery = status.battery,
+                cellular = status.cellular,
+            )
         }
     }
 
@@ -286,6 +307,68 @@ class MainViewModel @Inject constructor(
     fun setAppAllowed(packageName: String, allowed: Boolean) {
         viewModelScope.launch {
             homeRepository.setAppAllowed(packageName, allowed)
+        }
+    }
+
+    fun setFavorite(slot: Int, id: String, name: String, number: String, photoUri: String?) {
+        viewModelScope.launch {
+            val before = uiState.value.home?.favorites.orEmpty()
+            homeRepository.setFavorite(
+                slot,
+                FavoritePerson(
+                    id = id,
+                    displayName = name,
+                    phoneNumber = number,
+                    photoUri = photoUri,
+                    state = if (photoUri == null) {
+                        FavoriteState.PHOTO_UNAVAILABLE
+                    } else {
+                        FavoriteState.READY
+                    },
+                ),
+            )
+            updatePeopleSetupProgress(
+                before.mapIndexed { index, favorite ->
+                    if (index == slot) favorite.copy(phoneNumber = number) else favorite
+                },
+            )
+        }
+    }
+
+    fun clearFavorite(slot: Int) {
+        viewModelScope.launch {
+            val before = uiState.value.home?.favorites.orEmpty()
+            homeRepository.clearFavorite(slot)
+            updatePeopleSetupProgress(
+                before.mapIndexed { index, favorite ->
+                    if (index == slot) favorite.copy(phoneNumber = null) else favorite
+                },
+            )
+        }
+    }
+
+    fun setSpeedDialConfigured(slot: String, configured: Boolean) {
+        viewModelScope.launch {
+            val onboarding = uiState.value.preferences.onboarding
+            settingsManager.updateSetupAssignments(
+                favoriteSlotsAssigned = onboarding.favoriteSlotsAssigned,
+                speedDialOneAssigned = if (slot == "1") configured else onboarding.speedDialOneAssigned,
+                speedDialTwoAssigned = if (slot == "2") configured else onboarding.speedDialTwoAssigned,
+                sosRecipientAgreed = onboarding.sosRecipientAgreed,
+            )
+        }
+    }
+
+    fun resetClaroLocalData(onResetComplete: () -> Unit) {
+        viewModelScope.launch {
+            homeRepository.reset()
+            sosCoordinator.configure(null)
+            publishSos()
+            consentController.reset()
+            settingsManager.resetAll()
+            refreshLauncherState()
+            message.value = null
+            onResetComplete()
         }
     }
 
@@ -308,6 +391,15 @@ class MainViewModel @Inject constructor(
         }
         sosCoordinator.configure(contact)
         publishSos()
+        viewModelScope.launch {
+            val onboarding = uiState.value.preferences.onboarding
+            settingsManager.updateSetupAssignments(
+                favoriteSlotsAssigned = onboarding.favoriteSlotsAssigned,
+                speedDialOneAssigned = onboarding.speedDialOneAssigned,
+                speedDialTwoAssigned = onboarding.speedDialTwoAssigned,
+                sosRecipientAgreed = contact?.recipientConsented == true,
+            )
+        }
     }
 
     fun startSos(testMode: Boolean, nowElapsedMillis: Long) {
@@ -406,6 +498,17 @@ class MainViewModel @Inject constructor(
             ),
         )
         mutableSosState.value = sosCoordinator.state
+    }
+
+    private suspend fun updatePeopleSetupProgress(favorites: List<FavoritePerson>) {
+        val current = uiState.value
+        val assigned = favorites.count { it.phoneNumber != null }
+        settingsManager.updateSetupAssignments(
+            favoriteSlotsAssigned = assigned,
+            speedDialOneAssigned = current.preferences.onboarding.speedDialOneAssigned,
+            speedDialTwoAssigned = current.preferences.onboarding.speedDialTwoAssigned,
+            sosRecipientAgreed = current.preferences.onboarding.sosRecipientAgreed,
+        )
     }
 }
 

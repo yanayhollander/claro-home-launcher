@@ -3,21 +3,23 @@ package com.clarohome.feature.billing.observability
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -25,15 +27,31 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
-import com.clarohome.core.design.ClaroDimensions
+import androidx.compose.ui.unit.sp
+import com.clarohome.core.design.ClaroBannerTone
+import com.clarohome.core.design.ClaroColors
+import com.clarohome.core.design.ClaroInfoCard
+import com.clarohome.core.design.ClaroPrimaryButton
+import com.clarohome.core.design.ClaroScreenScaffold
+import com.clarohome.core.design.ClaroSecondaryButton
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+
+private val PlanUnselectedBg = Color(0xFFF5F7FA)
+private val PlanUnselectedBorder = Color(0xFFC4CEDE)
+private val PlanSelectedBg = Color(0xFFEDF3FF)
 
 @Composable
 fun BillingObservabilityScreen(
@@ -45,82 +63,93 @@ fun BillingObservabilityScreen(
     onRestore: () -> Unit,
     onConsentChange: (DiagnosticsConsent) -> Unit,
     onWithdrawConsent: () -> Unit,
-    onResetDiagnostics: () -> Unit,
+    onResetDiagnostics: () -> Unit = {},
 ) {
     val context = LocalContext.current
+    var selectedPlanId by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingPlan by remember { mutableStateOf<StorePlan?>(null) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(ClaroDimensions.ScreenPadding),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ClaroScreenScaffold(
+        title = if (classicShell) "Membership" else "Membership & privacy",
+        modifier = Modifier.testTag("billing-screen"),
+        dock = {
+            ClaroSecondaryButton(
+                label = if (classicShell) "Back to phone" else "Back",
+                onClick = onBack,
+            )
+        },
     ) {
-        Text(if (classicShell) "Caregiver membership" else "Membership and privacy")
-        Text("Claro Home, Phone, Messages and SOS always remain free.")
+        ClaroInfoCard(
+            text = "Calls, messages, SOS and your home stay free.",
+            tone = ClaroBannerTone.INFO,
+        )
+
         MembershipCard(state.membership)
-        PurchaseResultCard(state.purchaseResult)
-        PlansCard(
+        PurchaseResultBanner(state.purchaseResult)
+
+        PlansSection(
             plans = state.plans,
             membership = state.membership,
+            selectedPlanId = selectedPlanId,
+            onSelectPlan = { selectedPlanId = it.id },
+            onReviewPlan = { pendingPlan = it },
             onRefresh = onRefresh,
-            onSelectPlan = { pendingPlan = it },
         )
-        Button(
+
+        ClaroSecondaryButton(
+            label = "Restore purchases",
             onClick = onRestore,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(ClaroDimensions.PrimaryTarget),
-        ) {
-            Text("Restore purchases")
-        }
-        HorizontalDivider()
-        Text("Optional diagnostics")
-        Text("Off by default. Purchases still use Google Play and RevenueCat when configured.")
-        ConsentRow(
-            label = "Share product analytics",
+        )
+
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 6.dp),
+            thickness = 2.dp,
+            color = ClaroColors.Charcoal,
+        )
+
+        Text(
+            text = "Optional diagnostics",
+            color = ClaroColors.Ink,
+            fontSize = 24.sp,
+            lineHeight = 29.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+        )
+        Text(
+            text = "Off by default. Change your choices anytime.",
+            color = ClaroColors.Muted,
+            fontSize = 18.sp,
+            lineHeight = 23.sp,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+        ConsentToggleRow(
+            label = "Usage analytics",
             checked = state.consent.analytics,
             onCheckedChange = {
                 onConsentChange(state.consent.copy(analytics = it))
             },
         )
-        ConsentRow(
-            label = "Share crash reports",
+        ConsentToggleRow(
+            label = "Crash reports",
             checked = state.consent.crashReports,
             onCheckedChange = {
                 onConsentChange(state.consent.copy(crashReports = it))
             },
         )
-        Text(
-            "Diagnostics never include names, phone numbers, messages, contacts, photos, " +
-                "dialed digits, recovery values or SOS destinations.",
+        ClaroInfoCard(
+            text = "Diagnostics never include names, phone numbers, messages, contacts, photos, dialed digits, recovery values or SOS destinations.",
+            tone = ClaroBannerTone.INFO,
         )
-        Button(
+        ClaroSecondaryButton(
+            label = "Turn both off",
             onClick = onWithdrawConsent,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(ClaroDimensions.PrimaryTarget),
-        ) {
-            Text("Withdraw diagnostics consent")
+        )
+        if (state.consent.analytics || state.consent.crashReports) {
+            ClaroSecondaryButton(
+                label = "Reset diagnostics settings",
+                onClick = onResetDiagnostics,
+            )
         }
-        Button(
-            onClick = onResetDiagnostics,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(ClaroDimensions.PrimaryTarget),
-        ) {
-            Text("Reset diagnostics settings")
-        }
-        Button(
-            onClick = onBack,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(ClaroDimensions.PrimaryTarget),
-        ) {
-            Text(if (classicShell) "Back to phone" else "Back home")
-        }
-        Spacer(Modifier.height(16.dp))
     }
 
     pendingPlan?.let { plan ->
@@ -159,99 +188,216 @@ fun BillingObservabilityScreen(
 
 @Composable
 private fun MembershipCard(membership: MembershipState) {
-    Card(Modifier.fillMaxWidth()) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(3.dp),
+        color = PlanUnselectedBg,
+        border = BorderStroke(1.dp, PlanUnselectedBorder),
+    ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text("Current membership")
-            Text(membership.title())
-            Text(membership.detail())
+            Text(
+                text = "Current membership",
+                color = ClaroColors.Muted,
+                fontSize = 17.sp,
+                lineHeight = 21.sp,
+            )
+            Text(
+                text = membership.title(),
+                color = ClaroColors.Ink,
+                fontSize = 24.sp,
+                lineHeight = 29.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = membership.detail(),
+                color = ClaroColors.Ink,
+                fontSize = 19.sp,
+                lineHeight = 24.sp,
+            )
         }
     }
 }
 
 @Composable
-private fun PurchaseResultCard(result: PurchaseResult) {
-    if (result == PurchaseResult.Idle) return
-    Card(Modifier.fillMaxWidth()) {
-        Text(
-            text = when (result) {
-                PurchaseResult.Idle -> ""
-                PurchaseResult.Purchasing -> "Waiting for Google Play"
-                PurchaseResult.Pending -> "Purchase pending. Premium starts only after verification."
-                PurchaseResult.Canceled -> "Purchase canceled. Nothing was charged by Claro."
-                is PurchaseResult.Verified -> "Purchase verified."
-                is PurchaseResult.Failed -> "Purchase not completed: ${result.reason.readableName()}."
-            },
-            modifier = Modifier.padding(16.dp),
+private fun PurchaseResultBanner(result: PurchaseResult) {
+    when (result) {
+        PurchaseResult.Idle -> Unit
+        PurchaseResult.Purchasing -> ClaroInfoCard(
+            text = "Waiting for Google Play…",
+            tone = ClaroBannerTone.INFO,
+        )
+        PurchaseResult.Pending -> ClaroInfoCard(
+            text = "Purchase pending. Premium starts only after verification.",
+            tone = ClaroBannerTone.WARNING,
+        )
+        PurchaseResult.Canceled -> ClaroInfoCard(
+            text = "Purchase canceled. Nothing was charged by Claro.",
+            tone = ClaroBannerTone.INFO,
+        )
+        is PurchaseResult.Verified -> ClaroInfoCard(
+            text = "Purchase verified.",
+            tone = ClaroBannerTone.SUCCESS,
+        )
+        is PurchaseResult.Failed -> ClaroInfoCard(
+            text = "Purchase not completed: ${result.reason.readableName()}.",
+            tone = ClaroBannerTone.ERROR,
         )
     }
 }
 
 @Composable
-private fun PlansCard(
+private fun PlansSection(
     plans: PlansState,
     membership: MembershipState,
-    onRefresh: () -> Unit,
+    selectedPlanId: String?,
     onSelectPlan: (StorePlan) -> Unit,
+    onReviewPlan: (StorePlan) -> Unit,
+    onRefresh: () -> Unit,
 ) {
-    Text("Plans")
+    Text(
+        text = "Plans",
+        color = ClaroColors.Ink,
+        fontSize = 24.sp,
+        lineHeight = 29.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+    )
     when (plans) {
-        PlansState.Loading -> Text("Loading localized Google Play plans...")
+        PlansState.Loading -> ClaroInfoCard(
+            text = "Loading localized Google Play plans…",
+            tone = ClaroBannerTone.INFO,
+        )
         is PlansState.Unavailable -> {
-            Card(Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(plans.reason.readableName())
-                    Text("Continue free is always available.")
-                    Button(onClick = onRefresh) { Text("Retry") }
-                }
+            ClaroInfoCard(
+                text = plans.reason.readableName(),
+                tone = ClaroBannerTone.WARNING,
+            )
+            if (plans.reason != PlansUnavailableReason.CONFIGURATION_MISSING) {
+                ClaroSecondaryButton(
+                    label = "Retry",
+                    onClick = onRefresh,
+                )
             }
         }
-        is PlansState.Available -> plans.plans
-            .filterNot {
+        is PlansState.Available -> {
+            val visiblePlans = plans.plans.filterNot {
                 membership == MembershipState.Lifetime &&
                     it.productKind == ProductKind.LIFETIME
             }
-            .forEach { plan ->
-            Card(Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(plan.title)
-                    Text(plan.localizedPrice)
-                    plan.localizedPeriod?.let { Text(it) }
-                    when (plan.trialEligibility) {
-                        TrialEligibility.ELIGIBLE ->
-                            Text("${plan.trialDays ?: 7}-day trial available")
-                        TrialEligibility.INELIGIBLE ->
-                            Text("Google Play does not show a trial for this account")
-                        TrialEligibility.UNKNOWN ->
-                            Text("Google Play confirms trial eligibility at enrollment")
-                        TrialEligibility.NOT_APPLICABLE ->
-                            Text("One-time purchase; no subscription or renewal")
-                    }
-                    Text(plan.renewalText)
-                    Button(
-                        onClick = { onSelectPlan(plan) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(ClaroDimensions.PrimaryTarget),
-                    ) {
-                        Text("Choose ${plan.title}")
-                    }
-                }
+            val activePlan = visiblePlans.firstOrNull { it.id == selectedPlanId }
+                ?: visiblePlans.firstOrNull()
+
+            visiblePlans.forEach { plan ->
+                val selected = activePlan?.id == plan.id
+                PlanOptionCard(
+                    plan = plan,
+                    selected = selected,
+                    onClick = { onSelectPlan(plan) },
+                )
+            }
+
+            if (activePlan != null) {
+                ClaroPrimaryButton(
+                    label = "Review ${activePlan.title}",
+                    onClick = { onReviewPlan(activePlan) },
+                    containerColor = ClaroColors.Blue,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun ConsentRow(
+private fun PlanOptionCard(
+    plan: StorePlan,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(3.dp),
+        color = if (selected) PlanSelectedBg else PlanUnselectedBg,
+        border = BorderStroke(
+            width = 2.dp,
+            color = if (selected) ClaroColors.Blue else PlanUnselectedBorder,
+        ),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
+        ) {
+            if (selected) {
+                Box(
+                    modifier = Modifier
+                        .width(4.dp)
+                        .fillMaxHeight()
+                        .background(ClaroColors.Blue),
+                )
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 10.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = plan.title,
+                        color = ClaroColors.Ink,
+                        fontSize = 25.sp,
+                        lineHeight = 30.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = listOfNotNull(plan.localizedPrice, plan.localizedPeriod)
+                            .joinToString(" "),
+                        color = ClaroColors.Ink,
+                        style = TextStyle(
+                            fontSize = 21.sp,
+                            lineHeight = 25.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            textDirection = TextDirection.Ltr,
+                        ),
+                    )
+                }
+                Text(
+                    text = when (plan.trialEligibility) {
+                        TrialEligibility.ELIGIBLE ->
+                            "${plan.trialDays ?: 7}-day trial available"
+                        TrialEligibility.INELIGIBLE ->
+                            "Google Play does not show a trial for this account"
+                        TrialEligibility.UNKNOWN ->
+                            "Google Play confirms trial eligibility at enrollment"
+                        TrialEligibility.NOT_APPLICABLE ->
+                            "One-time purchase · no subscription or renewal"
+                    },
+                    color = ClaroColors.Muted,
+                    fontSize = 18.sp,
+                    lineHeight = 22.sp,
+                )
+                Text(
+                    text = plan.renewalText,
+                    color = ClaroColors.Muted,
+                    fontSize = 18.sp,
+                    lineHeight = 22.sp,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConsentToggleRow(
     label: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
@@ -259,12 +405,25 @@ private fun ConsentRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(ClaroDimensions.PrimaryTarget),
+            .heightIn(min = 66.dp)
+            .background(ClaroColors.Surface)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, modifier = Modifier.widthIn(max = 260.dp))
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Text(
+            text = label,
+            color = ClaroColors.Ink,
+            fontSize = 22.sp,
+            lineHeight = 27.sp,
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 8.dp),
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+        )
     }
 }
 
@@ -308,7 +467,7 @@ private fun Instant?.displayDate(): String {
 
 private fun PlansUnavailableReason.readableName(): String = when (this) {
     PlansUnavailableReason.CONFIGURATION_MISSING ->
-        "Store products are not configured. Fake plans are available in development."
+        "Store products are not configured. Purchases are unavailable; core features remain free."
     PlansUnavailableReason.OFFLINE -> "Internet is needed to load or buy plans."
     PlansUnavailableReason.STORE_UNAVAILABLE -> "Google Play is unavailable."
     PlansUnavailableReason.NO_PRODUCTS -> "No approved plans are available."
