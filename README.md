@@ -33,6 +33,29 @@ Dialer and the Home Phone tile remain unchanged. Single-number contacts in these
 options open call confirmation directly; multiple-number contacts still require
 an explicit number choice. Keypad long-press shortcuts remain available.
 
+### Missed and unanswered calls
+
+`#missed-call` shows who called and when, with Call back, Message and Home.
+Open it from Phone's missed/recent history, the missed Home Phone badge, or the
+classic Menu. Private callers show no callback/message action without a number.
+`#call-unanswered` distinguishes an outgoing call with no answer and offers
+Try again, Message and Home. Neither outcome shows a connected-call duration.
+
+Use the incoming screen's external **missed** preview control (after choosing
+known, unknown or private), or the active-call screen's **no answer** control.
+Both screens are also available directly in the sidebar and comparison selector.
+These are simulated outcomes, not an actual ring timeout or carrier callback.
+
+Home shows persistent missed-call and unread-message counts: large tappable
+notification shortcuts beside the clock in 2G mode, and Phone/Messages tile badges
+in touch mode. They open the relevant call or inbox; opening the inbox alone
+does not mark messages read. Reading a missed call clears only that call's count,
+and opening another person's conversation does not clear Mira's unread message.
+Permission denial shows `?` instead of a guessed count. An unanswered outgoing
+call does not increase the incoming missed-call count. Simulating a missed
+incoming call returns Home with a new indication and retains earlier call records.
+Home preview controls can show missed calls, unread messages or cleared alerts.
+
 ### Separate 2G phone version
 
 The **Original / 2G phone** switch above the storyboard navigation keeps both

@@ -66,6 +66,8 @@
     ["calling", "Phone & messages", "Keep the conversation simple.", "Large, labeled controls remain within reach.", "CALL-01/02", "Try speaker, mute and Home. An active demo call stays accessible."],
     ["incoming", "Phone & messages", "A familiar voice is calling.", "Answer and decline without learning a swipe.", "CALL-01", "Answer the fictional incoming call, or review an unknown caller."],
     ["call-ended", "Phone & messages", "An obvious next step.", "Review the connected call duration, then return home, call again or write a message. The sample duration matches the active call preview.", "CALL-02", "Call back or send a follow-up; no real phone is contacted."],
+    ["missed-call", "Phone & messages", "See who called.", "A missed incoming call is not a failed outgoing call.", "CALL-02", "Call back or write a message. Private callers have no callback number."],
+    ["call-unanswered", "Phone & messages", "They did not answer.", "An unanswered outgoing call has no connected duration.", "CALL-02", "Try calling again, write a message or return Home."],
     ["call-failed", "Phone & messages", "An honest, useful explanation.", "No service is different from no internet.", "CALL-02/03", "Change the failure reason and try the simulated native handoff."],
     ["messages", "Phone & messages", "Messages without the clutter.", "Big names, readable previews and visible unread messages.", "SMS-01/04", "Read Mira’s message, or write a new one."],
     ["conversation", "Phone & messages", "Room for every word.", "A simple conversation with honest delivery status.", "SMS-01/03/04", "Reply, review the recipient and send a demo message."],
@@ -123,6 +125,7 @@
     readiness: { Home: "Not checked", Phone: "Not checked", Messages: "Not checked", Contacts: "Not checked", Notifications: "Not checked", Media: "Not checked" },
     handover: false, digits: "", recipient: "202-555-0101", body: "", selected: "mira", numberIndex: 0,
     target: { name: "Mira", number: "202-555-0101" }, messages: [], unread: true,
+    missedCalls: [{ id: 1, name: "Mira", number: "202-555-0101", when: "Today · 09:20", unread: true }], selectedMissedId: 1,
     activeCall: false, callState: "Connected", muted: false, speaker: false, held: false, dialTab: "keypad", phoneTabs: {}, network: "available", sosArmed: false, classicTones: "",
     membership: "Free", plan: "monthly", photos: [{ id: 1, title: "Morning hills", owned: false }, { id: 2, title: "A quiet afternoon", owned: false }, { id: 3, title: "Garden light", owned: true }, { id: 4, title: "Weekend walk", owned: false }],
     photoIndex: 0, search: "", appFilter: "all", error: "", notice: "", attempts: 0, cooldown: 0, recoveryAttempts: 0, recoveryCooldown: 0,
@@ -132,15 +135,17 @@
   let countdownTimer, holdTimer, holdButton, holdStart, inactivityTimer, countdown = 5, draft = null, accessModeDraft = null;
   let classicInput = null, classicNumeric = false, multiTap = null;
   const variants = {
-    home: ["standard", "missed", "no SIM", "no signal", "airplane mode", "signal unknown", "unassigned", "active call", "huge text"],
+    home: ["standard", "missed", "unread messages", "notifications cleared", "no SIM", "no signal", "airplane mode", "signal unknown", "unassigned", "active call", "huge text"],
     dialer: ["standard", "empty recents", "unassigned", "permission denied", "no signal"],
     ...Object.fromEntries(Object.keys(dialerOptions).map(id => [id, ["standard", "empty contacts", "empty recents", "unassigned", "permission denied", "no signal"]])),
     contacts: ["standard", "empty", "permission denied"],
     "contact-detail": ["standard", "save failure", "write denied"],
     "call-confirm": ["standard", "no SIM"],
-    calling: ["connected", "dialing", "ringing", "on hold", "Bluetooth", "call waiting"],
-    incoming: ["known", "unknown", "private"],
+    calling: ["connected", "dialing", "ringing", "on hold", "Bluetooth", "call waiting", "no answer"],
+    incoming: ["known", "unknown", "private", "missed"],
     "call-ended": ["ended", "missed", "declined", "canceled"],
+    "missed-call": ["standard", "unknown", "private"],
+    "call-unanswered": ["no answer"],
     "call-failed": ["no signal", "no SIM", "invalid number", "account unavailable", "permission denied", "unknown failure"],
     messages: ["standard", "empty", "permission denied", "MMS / group"],
     conversation: ["standard", "sending", "sent", "delivery unknown", "delivery confirmed", "MMS", "download error"],
@@ -194,6 +199,11 @@
     return contact && number ? { ...contact, number } : null;
   };
   const selectedContact = () => state.contacts.find(c => c.id === state.selected) || state.contacts[0];
+  const selectedMissedCall = () => state.missedCalls.find(call => call.id === state.selectedMissedId) || state.missedCalls[0];
+  const notificationCounts = () => ({
+    missed: state.readiness.Phone.startsWith("Denied") ? null : state.missedCalls.filter(call => call.unread).length,
+    messages: state.readiness.Messages.startsWith("Denied") ? null : Number(state.unread)
+  });
   const todayDate = () => {
     const now = new Date();
     return `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
@@ -247,7 +257,11 @@
       variant = (variants[id] || ["standard"])[0]; draft = null; state.search = ""; state.external = ""; state.confirm = ""; state.error = ""; state.notice = "";
     }
     route = id;
-    if (["call-ended", "call-failed", "sos-failed"].includes(id)) state.activeCall = false;
+    if (["call-ended", "call-failed", "call-unanswered", "sos-failed"].includes(id)) { state.activeCall = false; state.held = false; }
+    if (id === "missed-call") {
+      const missed = selectedMissedCall();
+      if (!state.readiness.Phone.startsWith("Denied")) missed.unread = false;
+    }
     if (["calling", "sos-active"].includes(id)) state.activeCall = true;
     if (id === "home-edit") draft = draft || state.preferenceDrafts[id] || { extra: [...state.extra], allowed: [...state.allowed] };
     if (id === "display") draft = draft || state.preferenceDrafts[id] || { large: state.large, contrast: state.contrast };
@@ -265,6 +279,7 @@
     }
     const safeParent = { calling: "dialer", "call-confirm": "dialer", "call-ended": "dialer", "call-failed": "dialer", conversation: "messages", compose: "messages", "message-confirm": "compose", "message-failed": "compose", "contact-detail": "contacts", photo: "gallery", "sos-countdown": "sos", "sos-active": "sos", "sos-failed": "sos", "pin-recovery": "pin", purchase: "plans" };
     const previous = history.state?.claro && history.state.parent;
+    if (["missed-call", "call-unanswered"].includes(route) && (!previous || ["calling", "incoming"].includes(previous))) { navigate("dialer", true); return; }
     if (previous && previous !== "sos-countdown") { cleanup(); history.back(); }
     else navigate(safeParent[route] || "home", true);
   }
@@ -278,6 +293,8 @@
     calling: ["end-call"],
     incoming: ["answer", "decline"],
     "call-ended": ["go:home", "retry-call", "target-message"],
+    "missed-call": ["retry-call", "target-message", "go:home"],
+    "call-unanswered": ["retry-call", "target-message", "go:home"],
     "call-failed": ["retry-call", "native"],
     messages: ["go:compose"],
     conversation: ["reply", "go:messages"],
@@ -469,16 +486,52 @@
   const emergency = () => button("Emergency call", "emergency", "secondary emergency-action");
   const permissionWarning = feature => `${info(`${esc(feature)} access needed.`, "warning")}${button(`Open ${esc(feature)}`, "native", "primary")}${goButton("Settings", "permissions")}`;
   const noticeExternal = () => state.external ? `<div class="external-panel" role="region" aria-label="${esc(state.external)}">${heading(state.external)}${button("Back to Claro", "external-back", "primary")}</div>` : "";
+  function recentCallRows(missedOnly = false) {
+    return state.missedCalls.map(missed => {
+      const contact = state.contacts.find(c => c.numbers.includes(missed.number));
+      return row(missed.name, `${missed.unread ? "● " : ""}${t("missed")} · ${missed.when}`, "open-missed-call", `data-call-id="${missed.id}"`, avatar(contact));
+    }).join("") +
+      (missedOnly ? "" : state.contacts.slice(1, 3).map((c, i) => row(c.name, `${t("recent")} · 9:${21 + i}`, "recent-call", `data-id="${c.id}"`, avatar(c))).join(""));
+  }
+  function homeNotifications() {
+    const counts = notificationCounts();
+    const alerts = [
+      { count: counts.missed, label: t("missed"), description: "missed calls", symbol: "phone", destination: counts.missed === null ? "dialer" : "missed-call" },
+      { count: counts.messages, label: t("messages"), description: "unread messages", symbol: "messages", destination: "messages" }
+    ].filter(alert => alert.count === null || alert.count > 0);
+    if (!alerts.length) return "";
+    return `<div class="home-notifications" role="group" aria-label="Notifications">${alerts.map(alert =>
+      button(`${icon(alert.symbol)}<span class="alert-label">${esc(alert.label)}</span><strong class="notification-count" aria-hidden="true">${alert.count ?? "?"}</strong>`, "go", `row-button home-notification ${alert.symbol}-notification`,
+        `data-route="${alert.destination}" aria-label="${esc(alert.count === null ? `${alert.description}: access needed, count unknown` : `${alert.count} ${alert.description}`)}"`)
+    ).join("")}</div>`;
+  }
+  function callOutcomeTarget() {
+    if (route !== "missed-call") return state.target;
+    if (variant === "unknown") return { name: "Unknown caller", number: "202-555-0199" };
+    if (variant === "private") return { name: "Private number", number: "Withheld" };
+    return selectedMissedCall();
+  }
+  function callOutcome(title, callLabel, missed = false) {
+    if (missed && state.readiness.Phone.startsWith("Denied")) return heading(title) + permissionWarning("Phone");
+    const target = callOutcomeTarget();
+    const contact = state.contacts.find(c => c.numbers.includes(target.number));
+    const canCall = validNumber(target.number);
+    return heading(title) + avatar(contact, true) +
+      `<h3 class="call-name">${esc(target.name)}</h3><p dir="ltr">${esc(canCall ? target.number : "Number withheld")}</p>` +
+      (missed ? `<p class="helper">${esc(selectedMissedCall().when)}</p>` : "") +
+      (canCall ? button(`${icon("phone")} ${callLabel}`, "retry-call", "primary") + button("Message", "target-message") : "") +
+      goButton("Home", "home");
+  }
   function classicHome() {
-    return `<div class="classic-clock"><time dir="ltr">9:41</time><p>${esc(new Date().toLocaleDateString(({ en: "en-GB", es: "es", he: "he" })[state.language], { weekday: "short", day: "numeric", month: "short" }))}</p></div>
+    return `<div class="classic-home-header"><div class="classic-clock"><time dir="ltr">9:41</time><p>${esc(new Date().toLocaleDateString(({ en: "en-GB", es: "es", he: "he" })[state.language], { weekday: "short", day: "numeric", month: "short" }))}</p></div>${homeNotifications()}</div>
       <div class="speed-dials">${state.favorites.map((value, i) => { const contact = variant === "unassigned" && i === 3 ? null : resolve(value); return button(`${avatar(contact)}<span>${esc(contact?.name || "+")}</span>`, contact ? "favorite" : "unassigned", "speed-dial", `data-slot="${i}" aria-label="${esc(contact ? `Call ${contact.name}` : t("add"))}"`); }).join("")}</div>
-      <div class="classic-home-links">${goButton(`${icon("messages")} ${esc(t("messages"))}${state.unread ? '<span aria-label="Unread messages">●</span>' : ""}`, "messages")}${goButton(`${icon("sos")} SOS`, "sos", "danger")}</div>`;
+      <div class="classic-home-links">${goButton(`${icon("messages")} ${esc(t("messages"))}`, "messages")}${goButton(`${icon("sos")} SOS`, "sos", "danger")}</div>`;
   }
   function classicDialer() {
     if (variant === "permission denied" || state.readiness.Phone.startsWith("Denied")) return heading(t("phone")) + permissionWarning("Phone") + emergency();
     return heading(t("phone")) + `<div class="dial-display" dir="ltr" aria-live="polite">${esc(state.digits || t("type"))}</div>` +
       goButton(`${icon("contact")} ${esc(t("contacts"))}`, "contacts") +
-      state.contacts.slice(0, 3).map((contact, i) => row(contact.name, `${i === 0 ? t("missed") : t("recent")} · 9:${20 + i}`, "recent-call", `data-id="${contact.id}"`, avatar(contact))).join("") + emergency();
+      recentCallRows() + emergency();
   }
   function classicTarget() {
     if (classicOptionsOpen) return null;
@@ -638,6 +691,8 @@
     const call = $("classic-call"), end = $("classic-end");
     call.innerHTML = `${icon("phone")}<span>${route === "incoming" ? "Answer" : "Call"}</span>`;
     call.disabled = Boolean(state.external) || classicOptionsOpen || Boolean(state.contactMode) || route === "sos-countdown" ||
+      (!state.activeCall && ["missed-call", "call-unanswered"].includes(route) && !validNumber(callOutcomeTarget().number)) ||
+      (!state.activeCall && route === "missed-call" && state.readiness.Phone.startsWith("Denied")) ||
       (state.activeCall && ["calling", "sos-active"].includes(route)) || (Boolean(input) && !["dialer", "contacts"].includes(route));
     end.innerHTML = `${icon("end")}<span>${esc(route === "incoming" ? "Decline" : state.activeCall ? "End" : t("home"))}</span>`;
     $("classic-back").textContent = t("back");
@@ -761,9 +816,9 @@
     if (state.activeCall) { navigate(route === "sos-active" ? "sos-active" : "calling"); return; }
     if (route === "call-confirm") { actions["place-call"](); return; }
     if (route === "contact-detail" && !state.contactMode) { actions["contact-call"](); return; }
-    if (["call-ended", "call-failed"].includes(route)) { actions["retry-call"](); return; }
+    if (["call-ended", "call-failed", "missed-call", "call-unanswered"].includes(route)) { actions["retry-call"](); return; }
     if (route === "dialer" && state.digits) { actions.dial(); return; }
-    if (classicSelected && ["contact", "phone-contact", "recent-call", "favorite"].includes(classicSelected.dataset.action)) {
+    if (classicSelected && ["contact", "phone-contact", "recent-call", "open-missed-call", "favorite"].includes(classicSelected.dataset.action)) {
       if (classicSelected.dataset.action === "contact") actions["phone-contact"](classicSelected);
       else actions[classicSelected.dataset.action](classicSelected);
       return;
@@ -798,7 +853,7 @@
         (!contacts.length ? info(state.search ? "No matches." : "No contacts yet.") : "") + emergency();
     }
     if (tab === "recent") return header +
-      (variant === "empty recents" ? info("No calls yet.") : state.contacts.slice(0, 3).map((c, i) => row(c.name, `${i === 0 ? t("missed") : t("call")} · 9:${20 + i}`, "recent-call", `data-id="${c.id}"`, avatar(c))).join("")) + emergency();
+      (variant === "empty recents" ? info("No calls yet.") : recentCallRows()) + emergency();
     const keys = variant === "unassigned" ? ["", ""] : state.keys;
     return header +
       `<div class="dial-display-row"><div class="dial-display" dir="ltr" aria-live="polite">${esc(state.digits || t("type"))}</div>${button(icon("backspace"), "backspace", "secondary", `aria-label="Delete last digit" ${state.digits ? "" : "disabled"}`)}</div>
@@ -811,18 +866,21 @@
   const screens = {
     "classic-menu": () => heading("Menu") + [
       [t("contacts"), "contacts", "contact"], [t("phone"), "dialer", "phone"], [t("messages"), "messages", "messages"],
+      ["Missed calls", "missed-call", "phone"],
       [t("camera"), "camera", "camera"], [t("gallery"), "gallery", "gallery"], ["SOS", "sos", "sos"], [t("apps"), "apps", "apps"], [t("settings"), "settings", "settings"]
     ].map(([label, destination, symbol]) => row(label, "", "go", `data-route="${destination}"`, icon(symbol))).join(""),
     home: () => {
       const noSignal = state.network !== "available";
+      const counts = notificationCounts();
       const dates = { en: ["WED 11", "NOV 2026"], es: ["MIÉ 11", "NOV 2026"], he: ["יום ד׳ 11", "נוב׳ 2026"] };
       return `<header class="home-dashboard-header"><div class="status-instruments"><div class="battery-meter" role="img" aria-label="${esc(t("battery"))} 82 percent"><span class="battery-fill" style="width:82%"></span></div><div class="cell-signal ${noSignal ? "unavailable" : ""}" role="img" aria-label="${esc(t("signal"))}: ${esc(noSignal ? state.network : t("ready"))}">${Array.from({ length: 5 }, () => "<i></i>").join("")}${noSignal ? '<span aria-hidden="true">×</span>' : ""}</div>${noSignal ? `<span class="network-unavailable">${esc(({ "no SIM": "No SIM", "no signal": "No signal", "airplane mode": "Airplane mode", "signal unknown": "Signal unknown" })[state.network] || state.network)}</span>` : ""}</div><div class="home-date-time"><div><strong class="header-day">${dates[state.language][0]}</strong><span class="header-month">${dates[state.language][1]}</span></div><time class="header-time" dir="ltr">9:41</time>${button(icon("settings"), "go", "gear-button", `data-route="settings" aria-label="${esc(t("settings"))}"`)}</div></header>
         ${(state.activeCall || variant === "active call") ? goButton(`${icon("phone")} ${esc(t("call"))}`, "calling", "primary compact") : ""}
         <div class="speed-dials">${state.favorites.map((v, i) => { const c = variant === "unassigned" && i === 3 ? null : resolve(v); return button(`${avatar(c)}<span>${esc(c?.name.split(/\s+/)[0] || "+")}</span>`, c ? "favorite" : "unassigned", "speed-dial", `data-slot="${i}" aria-label="${esc(c ? `${t("callPerson")} ${c.name}` : t("add"))}"`); }).join("")}</div>
         <div class="tile-grid core-tiles">${["phone", "messages", "camera", "gallery", "sos", "apps"].map((name, i) => {
-          const denied = state.readiness[name === "phone" ? "Phone" : "Messages"].startsWith("Denied");
-          const badge = (name === "messages" && state.unread) || (name === "phone" && variant === "missed");
-          return button(`${name === "sos" ? '<span class="sos-word" aria-hidden="true">SOS</span>' : icon(name)}${badge ? `<span class="tile-badge" aria-label="${denied ? "Access unavailable, count unknown" : name === "messages" ? "1 unread message" : "1 missed call"}">${denied ? "?" : "1"}</span>` : ""}`, "go", `home-tile ${name}-tile`, `data-route="${i === 0 ? "dialer" : name}" aria-label="${esc(t(name))}" title="${esc(t(name))}"`);
+          const count = name === "phone" ? counts.missed : name === "messages" ? counts.messages : 0;
+          const hasBadge = count === null || count > 0;
+          const countLabel = count === null ? "Access needed, count unknown" : `${count} ${name === "phone" ? "missed calls" : "unread messages"}`;
+          return button(`${name === "sos" ? '<span class="sos-word" aria-hidden="true">SOS</span>' : icon(name)}${hasBadge ? `<span class="tile-badge" aria-hidden="true">${count ?? "?"}</span>` : ""}`, "go", `home-tile ${name}-tile`, `data-route="${i === 0 ? counts.missed > 0 ? "missed-call" : "dialer" : name}" aria-label="${esc(t(name))}${hasBadge ? `, ${esc(countLabel)}` : ""}" title="${esc(t(name))}"`);
         }).join("")}</div>
         <p class="scroll-cue" role="img" aria-label="${esc(t("more"))}"><span aria-hidden="true">⌄</span></p><div class="tile-grid extra-tiles">${state.extra.map(a => button(`${icon("apps")}<span>${esc(a)}</span>`, "app", "home-tile", `data-app="${esc(a)}"`)).join("")}</div>${noticeExternal()}`;
     },
@@ -831,7 +889,7 @@
       const tab = state.dialTab;
       const tabs = `<div class="tab-row" role="group" aria-label="Phone views">${["keypad", "recent", "missed"].map(v => button(esc(t(v)), "dial-tab", v === tab ? "selected" : "", `data-tab="${v}" aria-pressed="${v === tab}"`)).join("")}</div>`;
       const keys = variant === "unassigned" ? ["", ""] : state.keys;
-      if (tab !== "keypad") return heading(t("phone")) + tabs + (variant === "empty recents" ? info("No calls yet.") : state.contacts.slice(0, tab === "missed" ? 1 : 3).map((c, i) => row(c.name, `${tab === "missed" ? t("missed") : t("call")} · 9:${20 + i}`, "recent-call", `data-id="${c.id}"`, avatar(c))).join("")) + emergency();
+      if (tab !== "keypad") return heading(t("phone")) + tabs + (variant === "empty recents" ? info("No calls yet.") : recentCallRows(tab === "missed")) + emergency();
       return heading(t("phone")) + tabs + `<div class="dial-display" dir="ltr" aria-live="polite">${esc(state.digits || t("type"))}</div><div class="hold-hints">${keys.map((v, i) => { const c = resolve(v); return button(`<bdi>${i + 1}</bdi> · ${esc(c?.name || "—")}`, "key-call", "secondary compact", `data-key="${i}" aria-label="${esc(t("call"))} ${esc(c?.name || "Not assigned")}"`); }).join("")}</div>
         <div class="dialpad" dir="ltr">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"].map((n, i) => button(`${n}<small>${["", "ABC", "DEF", "GHI", "JKL", "MNO", "PQRS", "TUV", "WXYZ", "", "+", ""][i]}</small>`, "digit", "dial-key", `data-digit="${n}" aria-label="${n}${n === "1" || n === "2" ? ". Hold for speed dial" : ""}"`)).join("")}</div>
         <div class="dial-actions">${button(icon("phone"), "dial", "primary", `aria-label="${esc(t("call"))}"`)}${button(icon("backspace"), "backspace", "secondary", 'aria-label="Delete last digit"')}</div>${goButton(`${icon("contact")} ${esc(t("contacts"))}`, "contacts")}${emergency()}`;
@@ -872,6 +930,8 @@
     "call-ended": () => heading(`Call ${variant}`) + `<h3>${esc(state.target.name)}</h3><p dir="ltr">${esc(state.target.number)}</p>` +
       (variant === "ended" ? `<p class="call-duration" role="group" aria-label="Call duration">${icon("clock")}<bdi dir="ltr">${sampleCallDuration}</bdi></p>` : "") +
       button("Call again", "retry-call", "primary") + button("Message", "target-message") + goButton("Home", "home"),
+    "missed-call": () => callOutcome("Missed call", "Call back", true),
+    "call-unanswered": () => callOutcome("No answer", "Try again"),
     "call-failed": () => heading("Call not connected") + info(`${esc(variant)}. Check mobile service.`, "error") + `<p>${esc(state.target.name)} · <bdi>${esc(state.target.number)}</bdi></p>` + button("Try again", "retry-call", "primary") + button("Open Phone", "native") + goButton("Settings", "permissions") + emergency() + noticeExternal(),
     messages: () => {
       if (variant === "permission denied" || state.readiness.Messages.startsWith("Denied")) return heading(t("messages")) + permissionWarning("Messages") + noticeExternal();
@@ -1032,6 +1092,10 @@
   function setTarget(contact, number) {
     state.target = { name: contact?.name || number || "Unknown person", number: number || contact?.numbers[0] || "" };
   }
+  function setIncomingTarget() {
+    if (variant === "known") setTarget(state.contacts.find(c => c.id === "mira"), "202-555-0101");
+    else state.target = { name: variant === "private" ? "Private number" : "Unknown caller", number: variant === "private" ? "Withheld" : "202-555-0199" };
+  }
   function confirmCall(contact, number) {
     setTarget(contact, number); navigate("call-confirm");
   }
@@ -1111,13 +1175,27 @@
     "classic-ok": classicOK,
     go: el => {
       if (el.dataset.discard) { delete state.preferenceDrafts[route]; draft = null; const form = phone.querySelector("form[data-form]"); if (form) delete state.formDrafts[form.dataset.form]; }
+      if (el.dataset.route === "missed-call") state.selectedMissedId = (state.missedCalls.find(call => call.unread) || state.missedCalls[0]).id;
       navigate(el.dataset.route);
     },
     back,
     lock: () => { lock(); navigate("home"); },
     refresh: () => render(),
     variant: el => {
+      if (route === "incoming" && el.dataset.variant === "missed") {
+        setIncomingTarget();
+        const id = Math.max(...state.missedCalls.map(call => call.id)) + 1;
+        state.missedCalls.unshift({ id, ...state.target, when: `Today · ${new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`, unread: true });
+        state.selectedMissedId = id;
+        state.activeCall = false; state.held = false;
+        navigate("home"); return;
+      }
+      if (route === "calling" && el.dataset.variant === "no answer") { navigate("call-unanswered"); return; }
+      if (route === "call-ended" && el.dataset.variant === "missed") { navigate("missed-call"); return; }
       cleanup(); variant = el.dataset.variant; state.error = ""; state.notice = ""; state.confirm = ""; state.external = "";
+      if (route === "home" && variant === "missed") state.missedCalls[0].unread = true;
+      if (route === "home" && variant === "unread messages") state.unread = true;
+      if (route === "home" && variant === "notifications cleared") { state.missedCalls.forEach(call => { call.unread = false; }); state.unread = false; }
       if (dialerOptions[route]) {
         if (variant === "standard") state.phoneTabs[route] = dialerOptions[route].initialTab;
         if (variant === "empty contacts") state.phoneTabs[route] = "contacts";
@@ -1198,15 +1276,29 @@
     dtmf: el => { state.digits = (state.digits + el.dataset.digit).slice(-20); render(); },
     "answer-waiting": () => { setTarget(state.contacts.find(c => c.id === "daniel"), "202-555-0103"); variant = "connected"; state.held = false; state.notice = "Answered. First call on hold."; render(); },
     "decline-waiting": () => { variant = "connected"; state.notice = "Call declined."; render(); },
-    "end-call": () => { state.activeCall = false; state.held = false; navigate("call-ended"); },
-    answer: () => { setTarget(variant === "known" ? state.contacts.find(c => c.id === "mira") : null, variant === "private" ? "Withheld" : variant === "known" ? "202-555-0101" : "202-555-0199"); state.activeCall = true; state.callState = "Connected"; navigate("calling"); },
+    "end-call": () => { const canceled = ["dialing", "ringing"].includes(variant); state.activeCall = false; state.held = false; navigate("call-ended"); if (canceled) { variant = "canceled"; render(); } },
+    answer: () => { setIncomingTarget(); state.activeCall = true; state.callState = "Connected"; navigate("calling"); },
     decline: () => {
-      setTarget(variant === "known" ? state.contacts.find(c => c.id === "mira") : null, variant === "private" ? "Withheld" : variant === "known" ? "202-555-0101" : "202-555-0199");
+      setIncomingTarget();
       state.activeCall = false; navigate("call-ended"); variant = "declined"; render();
     },
-    "retry-call": () => navigate("call-confirm"),
-    "target-message": () => { state.recipient = state.target.number; navigate("compose"); },
-    "open-conversation": el => { const c = state.contacts.find(p => p.id === el.dataset.id); setTarget(c, c.numbers[0]); state.unread = false; navigate("conversation"); },
+    "retry-call": () => {
+      if (state.activeCall) { navigate("calling"); state.notice = "End your current call first."; render(); return; }
+      const target = callOutcomeTarget();
+      if (!validNumber(target.number)) { state.error = "No number available to call."; render(); return; }
+      setTarget(target, target.number); navigate("call-confirm");
+    },
+    "target-message": () => {
+      const target = callOutcomeTarget();
+      if (!validNumber(target.number)) { state.error = "No number available to message."; render(); return; }
+      state.recipient = target.number; navigate("compose");
+    },
+    "open-missed-call": el => {
+      const missed = state.missedCalls.find(call => call.id === Number(el.dataset.callId));
+      if (!missed) { state.error = "Call is unavailable."; render(); return; }
+      state.selectedMissedId = missed.id; navigate("missed-call");
+    },
+    "open-conversation": el => { const c = state.contacts.find(p => p.id === el.dataset.id); setTarget(c, c.numbers[0]); if (c.id === "mira") state.unread = false; navigate("conversation"); },
     "mms-thread": () => { state.target = { name: "Family group", number: "202-555-0101" }; navigate("conversation"); variant = "MMS"; render(); },
     reply: () => { state.recipient = state.target.number; navigate("compose"); },
     "choose-recipient": () => { state.picker = "message"; navigate("contacts"); },

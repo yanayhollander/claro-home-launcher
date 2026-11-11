@@ -1,7 +1,7 @@
 # Claro Home Launcher — Product Requirements Document
 
-**Status:** Proposed baseline for owner review; planning only  
-**Version:** 1.1 · **Date:** 11 November 2026  
+**Status:** Approved implementation baseline  
+**Version:** 2.0 · **Date:** 11 November 2026  
 **Audience:** Product owner, designer/storyboard author, Android engineering, accessibility and release QA
 
 ## 1. Product intent and decision authority
@@ -10,7 +10,7 @@ Claro helps a grandfather moving from a 2G feature phone use an Android phone co
 
 The product is an original, icon- and photo-led experience with dense, high-contrast tiles, **not a visual clone of BIG Launcher**. Large targets alone are insufficient: incoming calls, messaging, errors, permission loss and subscription expiry must remain understandable.
 
-This document defines the required target and its validation plan. It does **not** authorize Android implementation. Native development starts only after owner review and approval of the next phase. The HTML storyboard is a simulation, not a working launcher, calling service or billing integration.
+This document defines the required target and authorizes phased Android implementation. The HTML storyboard remains the visual and behavioral reference; it is not itself a working launcher, calling service or billing integration.
 
 ### 1.1 Confirmed direction
 
@@ -20,9 +20,11 @@ This document defines the required target and its validation plan. It does **not
 - Allowlisted app menu, customizable additional home tiles and protected preferences. During setup, choose a **today's-date question (dd/MM/YYYY)** with no remembered secret, or a **caregiver PIN** with separate recovery. The date question is only an accidental-change barrier, not a secure caregiver lock.
 - Free download; a **seven-day free premium trial** through explicit eligible Play subscription enrollment; monthly/yearly subscriptions afterward; lifetime sold separately as a one-time purchase.
 - Language response preserved verbatim: **“english, spanish and hebrew and right to left support planned”**. Plan English, Spanish, Hebrew and RTL; the storyboard is English with representative language previews.
-- RevenueCat for purchase/entitlement integration; Firebase Analytics and Crashlytics for privacy-reviewed measurement and reliability.
+- One Android application package containing both visual modes and the shared launcher, phone, contacts, messaging, SOS, media, app-menu, settings and membership capabilities.
+- Onboarding requires a large visual choice between **Touch Home** and **Classic Phone**. The protected **Settings → Phone style** screen can change that choice later after preview and confirmation. Switching preserves contacts, drafts, favorites, speed dials, SOS setup, roles, membership and accessibility preferences. Defer switching during an active call, SOS countdown/call, purchase flow or destructive confirmation.
+- RevenueCat for purchases/entitlements; Mixpanel for product analytics; Firebase Analytics for a minimal approved operational funnel and Crashlytics for reliability. All telemetry is consent-gated, schema-allowlisted and prohibited from collecting names, numbers, message text, contact identifiers, photos, dialed digits, recovery secrets or exact SOS destinations.
 
-No commercial prices, Android minimum, store approval, SDK configuration or completed usability testing are asserted here.
+Confirmed Android baseline: **Android 10+ (`minSdk 29`)**. Build against and target the latest stable SDK accepted by Google Play at implementation time; as of this PRD, plan `targetSdk 36` to satisfy the 31 August 2026 new-app/update requirement and use `compileSdk 36` or newer stable compatibility verified by the scaffold. No commercial prices, store approval, production SDK credentials or completed usability testing are asserted here.
 
 ### 1.2 Sources and interpretation
 
@@ -33,6 +35,34 @@ Design implications: visible status and missed events; large answer/end-call con
 **Product decisions take precedence over research recommendations:** the intent-only route is an early validation phase, not the final messaging scope. Photo speed dials, basic customization and safety configuration are not removed after expiry. No caregiver companion app, backend alerting service or remote dashboard is approved.
 
 **Technical clarification:** do not interpret the research's `MANAGE_OWN_CALLS`/`ConnectionService` discussion as a blanket requirement for replacing the SIM-call UI. Claro's default-phone target uses `InCallService`, Telecom and the dialer role; self-managed/VoIP connection ownership is a separate architecture, not this product's requirement. Emergency routing and full handler obligations must be verified against current primary documentation during the spike. [P1–P4]
+
+### 1.3 Visual source of truth
+
+The screenshots below are implementation references captured directly from the interactive storyboard. They define hierarchy, relative sizing, placement and interaction intent, not literal Android pixel values. Native Compose screens must preserve the information architecture and senior-facing simplicity while respecting system insets, font scaling, accessibility semantics and device constraints.
+
+| Touch Home | Classic Phone |
+|---|---|
+| ![Touch Home](assets/storyboard/touch-home.png) | ![Classic Home](assets/storyboard/classic-home.png) |
+
+| Touch dialer | Classic dialer |
+|---|---|
+| ![Touch dialer](assets/storyboard/touch-dialer.png) | ![Classic dialer](assets/storyboard/classic-dialer.png) |
+
+| Active call | Missed call |
+|---|---|
+| ![Classic active call](assets/storyboard/classic-active-call.png) | ![Classic missed call](assets/storyboard/classic-missed-call.png) |
+
+| Messages | Compose |
+|---|---|
+| ![Messages inbox](assets/storyboard/messages-inbox.png) | ![Message composer](assets/storyboard/message-compose.png) |
+
+| Protected settings | SOS |
+|---|---|
+| ![Protected settings](assets/storyboard/protected-settings.png) | ![SOS](assets/storyboard/sos.png) |
+
+The four Classic control arrangements remain review material. The production baseline is **D — Integrated pad** unless owner usability review selects another arrangement:
+
+![Classic control comparison](assets/storyboard/classic-layout-comparison.png)
 
 ## 2. People, problems and proposed outcomes
 
@@ -90,9 +120,18 @@ Out of MVP: monitored emergency response, automatic dispatch, medical/fall detec
 
 ## 4. Experience and accessibility contract
 
-**Separate classic 2G concept (alternate version).**
+### 4.1 Two production visual modes
 
-The original touch storyboard remains the default. A separate
+Both visual modes are required production experiences backed by the same domain state and Android platform adapters:
+
+- **Touch Home:** large touch tiles, four familiar contacts and bottom action dock.
+- **Classic Phone:** permanent 12-key keypad, four stable outer keys and connected directional pad.
+
+The mode is a local presentation preference, not a separate app, account, entitlement or data store. Feature availability and safety behavior must remain equivalent. A screen may use different composition/navigation in each mode, but must resolve to the same domain action and outcome. Automated contract tests must run shared feature journeys against both presentation shells.
+
+**Classic Phone requirements.**
+
+The original touch storyboard and Classic Phone storyboard are both required. A
 `?version=classic#home` concept uses a fixed 12-key pad across **all Claro-owned
 screens**, not just Phone. Keep large numeric targets (64px in the HTML preview),
 and only four large outer controls around one connected four-way pad with center
@@ -110,7 +149,8 @@ Do not repeat action buttons in a separate action dock.
 B, wide softkeys above navigation/call keys; C, wide softkeys below them; and D,
 wide corner keys with navigation fitted between them. D replaces the tall stacked
 arrangement, recovering 102px of display height without shrinking numeric targets;
-its controls are only 32px taller than A. A is the default concept, not a final production decision.
+its controls are only 32px taller than A. **D — Integrated pad** is the implementation
+baseline; A–C remain comparison alternatives until usability testing is complete.
 All four share the storyboard's behavior and 12-key pad. A common scene selector
 resets four independent interactive previews to the same screen. Scaled comparison
 frames are for arrangement review; use full-size previews to judge touch targets.
@@ -135,6 +175,8 @@ to the original six-tile design. Existing assignments, free access, SMS safety,
 settings-access methods and SOS limits still apply. Text fields support basic
 English ABC multi-tap in the prototype (# switches ABC/123, 0 is space); full
 localized input and OS-keyboard integration remain native design work.
+
+Touch Home and Classic Phone must both show authoritative missed-call and unread-message counts. Opening the inbox alone does not clear a message; opening the relevant unread conversation does. Opening a missed-call record clears only that record. Unknown counts show a repair state rather than zero. The Classic shortcuts remain beside the clock to preserve vertical space.
 
 Numbers from idle Home open number entry without placing a call. Green retains
 call confirmation, with no duplicate on-screen Call or Cancel buttons: the fixed
@@ -176,7 +218,10 @@ The review shell provides a **Phone only** toggle outside the phone for clean sc
 ## 5. Onboarding, readiness and fallback
 
 **REQ-SETUP-01 — Caregiver-guided first use.**  
-Acceptance: Welcome explains “simpler home, phone and messages,” external camera boundaries and trusted-contact SOS limits. Offer use-free/skip-premium at equal clarity. Setup can be completed independently or with a caregiver and covers language/display preview, date-question versus caregiver-PIN choice (credentials/recovery only for PIN), four favorite contacts, key 1/2 assignments, SOS recipient agreement, app allowlist, role/permission readiness and a handover checklist. Setup is resumable after interruption; missing optional setup is shown honestly, not marked complete.
+Acceptance: Welcome explains “simpler home, phone and messages,” external camera boundaries and trusted-contact SOS limits. Offer use-free/skip-premium at equal clarity. Before capability prompts, show side-by-side visual previews and require a choice between **Touch Home** and **Classic Phone**; default recommendation copy may explain the differences but cannot preselect through a deceptive confirm action. Setup can be completed independently or with a caregiver and covers visual mode, language/display preview, date-question versus caregiver-PIN choice (credentials/recovery only for PIN), four favorite contacts, key 1/2 assignments, SOS recipient agreement, app allowlist, role/permission readiness and a handover checklist. Setup is resumable after interruption; missing optional setup is shown honestly, not marked complete.
+
+**REQ-SETUP-05 — Reversible visual-mode choice.**  
+Acceptance: protected Settings exposes **Phone style** with screenshots, a concise difference summary and Preview/Apply/Cancel. Applying preserves all user data and returns Home in the selected mode. Do not switch during an active call, SOS flow, purchase confirmation, unsaved destructive operation or external system activity; explain the blocker and allow retry afterward. Switching never changes Android roles, subscriptions, language, text size, contacts, drafts, favorites, speed-dial keys or SOS configuration. Rollback to the previous shell after a rendering/startup failure.
 
 **REQ-SETUP-02 — Request capabilities in context.**  
 Acceptance: check role availability with `RoleManager`; request HOME, DIALER and SMS individually with plain-language explanation. Request the applicable default-handler role **before** its restricted runtime SMS/call-log permissions. Request contacts read/write only for implemented contact features; media via picker/owned content first; notifications when their benefit is explained; no location permission in MVP. Denial, “don't ask again,” role unavailable and later revocation have explicit repair guidance and safe navigation. System prompts are shown as external/system UI in the storyboard. [P1–P5]
@@ -193,6 +238,8 @@ Acceptance: after OS settings, camera, purchase dialogs, role requests, interrup
 
 **REQ-HOME-01 — Required content.**  
 Acceptance: show day/date/time, a compact **horizontal battery bar** with percentage/charging state, **stepped cellular signal bars** and the six core labeled tiles in the confirmed order initially. Keep the header neutral and compact so tiles and portraits dominate. Signal must distinguish available/no SIM/no service/airplane mode/unknown with accessible names and non-color cues, using actual accessible OS data; do not invent bars or require unjustified sensitive permission just to draw them. No internet is not the same as no mobile calling/SMS service. Missed-call and unread-message badges reflect authoritative permitted data; when unavailable, show unknown/readiness rather than a false zero.
+
+Home notification counts are tappable and remain until the corresponding missed-call entry or unread conversation is opened; entering Home or the inbox alone does not clear them. Opening one person's conversation must not clear another person's unread messages. Incoming missed calls and outgoing no-answer results remain distinct; outgoing attempts do not increase the incoming missed-call count. The classic concept exposes large icon/count shortcuts beside the clock, while touch mode uses Phone/Messages tile badges. Count unavailability must use an explicit unknown indicator and a capability-repair route.
 
 **REQ-HOME-02 — Four familiar people.**  
 Acceptance: four square photo slots show recognizable portraits and short visible names; use a recognizable person silhouette plus name when a photo is unavailable, not demo-initials annotations. Tapping an assigned person opens a large Call confirmation; unassigned slots explain “Ask your caregiver to add a person” with a protected setup route. No carousel or long-press-only assignment. Changed/deleted contacts or revoked photo access get a clear unresolved state; never call a different number because a provider ID was reused.
@@ -215,7 +262,7 @@ Acceptance: ordinary browsing/call/message are senior-accessible; Add/Edit/Delet
 Acceptance: B provides large labeled **Answer** and **Decline** buttons without mandatory swipe, caller identity/unknown state and accessible ringing feedback under OS volume/DND rules. Active UI shows actual call state, duration after connection, Mute/Speaker/Keypad/End, current audio route and supported hold/call-waiting actions. Controls reflect Telecom capability, including Bluetooth changes; unsupported actions are not faked. Do not assume every Telecom call is SIM-based. Incoming UI/notification behavior on locked screen, current OS full-screen-intent rules, background restrictions and OEM fallback must pass the spike. Unavoidable external/system call UI is identified in the storyboard's external annotation panel, not by an implementation note inside the phone.
 
 **REQ-CALL-02 — Outcomes and interruption.**  
-Acceptance: distinguish dialing/ringing/connected/on hold/ended/missed/declined/canceled/failed, using authoritative callbacks. Call ended shows the final connected-call duration beside a clock icon in large LTR digits (`mm:ss`, or `h:mm:ss` for calls of an hour or more), followed by Home, Call again and Message. Measure duration from connection to disconnection using Telecom timing, not time spent dialing/ringing or browsing the screen. Missed, declined, canceled and otherwise unconnected calls do not show a connected duration; missed calls appear in permitted history/home badge with a callback action. Failure states include no SIM/service, role/permission loss, invalid number, unavailable account and network failure with Retry, native fallback or Home as appropriate. Do not equate ringing with answered or generic disconnect with a known reason. Returning Home does not terminate the active call. Call history access remains permission- and role-scoped.
+Acceptance: distinguish dialing/ringing/connected/on hold/ended/missed/declined/canceled/unanswered/failed, using authoritative callbacks. Dedicated missed-incoming and outgoing-no-answer screens show a centered caller identity, Call back/Try again, Message and Home; private callers have no callback/message without a usable number. Call ended shows the final connected-call duration beside a clock icon in large LTR digits (`mm:ss`, or `h:mm:ss` for calls of an hour or more), followed by Home, Call again and Message. Measure duration from connection to disconnection using Telecom timing, not time spent dialing/ringing or browsing the screen. Missed, declined, canceled and otherwise unconnected calls do not show a connected duration; missed calls appear in permitted history/home badge with a callback action. Failure states include no SIM/service, role/permission loss, invalid number, unavailable account and network failure with Retry, native fallback or Home as appropriate. Do not equate ringing with answered or generic disconnect with a known reason. Returning Home does not terminate the active call. Call history access remains permission- and role-scoped.
 
 **REQ-CALL-03 — Dual SIM and emergency calls.**  
 Acceptance: voice calls and SMS use their respective OS default accounts without a Claro SIM selector or SIM label. If no usable default is configured or Android requires a choice, defer to the system's account-selection/setup flow; never silently pick another SIM or change device-wide defaults. Preserve an SMS draft if default-account setup is needed before sending. Emergency-number recognition/routing uses platform-supported mechanisms; use Telecom's documented default-dialer call route and accept preloaded emergency UI, or a native emergency-dialer handoff in fallback. No PIN, entitlement or configured SOS recipient is needed to reach the native emergency path; network/OS availability is never promised. [P2, P6]
@@ -342,6 +389,8 @@ The implementation artifact will be `index.html` plus `storyboard.js`, with a **
 | `calling` | Dialing/ringing/connected/hold, active controls/DTMF/audio routes/call waiting; return Home | CALL-01/02 |
 | `incoming` | Known/unknown/private caller; Answer/Decline; lock-screen/system-boundary annotation | CALL-01 |
 | `call-ended` | Ended/canceled/declined/missed; callback/message/Home | CALL-02 |
+| `missed-call` | Dedicated missed incoming call; centered photo/name/number/time, callback/message/Home; unknown/private; no connected duration | CALL-02 |
+| `call-unanswered` | Dedicated outgoing no-answer result; centered recipient, Try again/Message/Home; no connected duration | CALL-02 |
 | `call-failed` | No service/SIM, invalid, account unavailable, permission/role lost, unknown failure; Retry/native handoff | CALL-02/03 |
 | `messages` | Inbox/unread/search or filter/empty/no results; role denied; MMS/group summary | SMS-01/04 |
 | `conversation` | Incoming/outgoing/readable history, draft/reply, sending/sent/delivery-unknown/confirmed delivery; MMS/media/download error | SMS-01/03/04 |
@@ -379,7 +428,7 @@ Requirement IDs in the table abbreviate the `REQ-` prefix only. **UX-01/04 and A
 **Dialer design alternatives, pending selection:** the storyboard nests three
 interactive sub-options under **02 Dialer**: `dialer-contacts-first`,
 `dialer-keypad-first`, and `dialer-two-choices`. These do not replace the canonical
-`dialer`, change the 39-screen numbering, or change the Home Phone destination.
+`dialer` or change the canonical numbering. Home Phone opens an unreviewed missed call when its badge is present; otherwise it opens Phone.
 They compare a contacts-first list, a keypad with a large top Contacts button,
 and two large stacked Contacts/Dial a number choices. Single-number contact
 selection goes directly to call confirmation; multiple numbers require explicit
@@ -397,27 +446,30 @@ Review notes and option labels stay outside the phone.
 6. **Caregiver changes:** PIN incorrect/cooldown/recovery → Settings → reorder/add/remove → speed dial/contact edit → huge text/language/RTL → readiness/privacy/reset cancellation.
 7. **Membership without disruption:** Plans → eligible seven-day offer → purchase pending/success → Membership/manage → expired → Continue free → working Home/Phone/Messages/SOS; separate lifetime and offline/restore branches.
 
-## 11. Proposed engineering plan — after review only
+## 11. Engineering implementation plan
 
-### Phase 0 — approve product and prototype
+### Phase 0 — illustrated PRD and storyboard baseline
 
-Owner reviews this PRD, screen coverage, original visual direction and premium/free boundary. Build only the English HTML storyboard and representative language variants; conduct formative tests. Approval explicitly selects the bounded native spike next, not an implicit full implementation.
+Preserve the HTML storyboard, screenshots and this PRD as the design contract. Changes to implementation behavior that conflict with them require an explicit product decision and corresponding PRD/storyboard update.
 
 ### Phase 1 — policy and physical-device spike
 
 On owner-approved test hardware, verify combined HOME/DIALER/SMS role eligibility, request ordering, loss/regrant, manifest/handler components, incoming/locked-screen behavior, Telecom capability handling, SMS/MMS/provider lifecycle, emergency handoff, dual SIM and camera/picker behavior. Audit current target SDK/Play rules, restricted permissions, package visibility, media access and full-screen intent requirements.
 
-Recommend **Android 10+ (API 29+)** as an initial planning baseline because of `RoleManager`; final minimum/target SDK require device inventory and current Play target audit. Test API 29 baseline and representative current versions, including Android 13+ notification differences. Use existing suitable devices/emulators rather than assuming simulator results prove carrier behavior.
+Use **Android 10+ (`minSdk 29`)** because `RoleManager` is available and the product requires HOME, DIALER and SMS roles. Target API 36 or newer current Play requirement and compile against the newest stable SDK supported by the selected stable Android Gradle Plugin. Test API 29 baseline and representative current versions, including Android 13+ notification behavior and current full-screen incoming-call restrictions. Use existing suitable devices/emulators rather than assuming simulator results prove carrier behavior.
 
 **Gate:** documented evidence against B requirements and actual applicable Play permission declarations/reviewer feedback where obtainable. A closed-test upload is not an approval guarantee. If blocked, return options to owner; no unapproved companion architecture. Resolve SMS/MMS scope and OEM viability before expanding feature implementation.
 
 ### Phase 2 — foundations and free integrated core
 
-Proposed **Kotlin + Jetpack Compose** with state-driven screens, unidirectional state flow and testable domain operations. Separate modules/boundaries:
+Use **Kotlin + Jetpack Compose** with state-driven screens, unidirectional state flow, immutable UI state and testable domain operations. Use a single application package with Gradle feature modules:
 
 | Boundary | Responsibility |
 |---|---|
-| `app` / navigation / design system | Composition root, accessibility, localization, protected routes |
+| `app` / navigation / design system | Composition root, startup recovery, deep links, accessibility, localization and protected routes |
+| `core:model`, `core:domain`, `core:data` | Shared entities, use cases, repositories, migrations, dispatchers and result/error contracts |
+| `feature:onboarding` / `feature:settings` | Mode choice, handover, role readiness, access gate, language/display and reset |
+| `ui:touch` / `ui:classic` | Two presentation shells consuming the same domain contracts |
 | `launcher` | HOME role experience, app allowlist, tile/favorite presentation |
 | `telephony` | RoleManager/Telecom adapters, `InCallService`, call state, audio routes, emergency handoff |
 | `contacts` | Contacts Provider access, search/edit, stable assignment reconciliation |
@@ -426,13 +478,71 @@ Proposed **Kotlin + Jetpack Compose** with state-driven screens, unidirectional 
 | `media` | Camera/picker adapters, owned captures, selected-photo list/delete semantics |
 | `caregiver` / local data | Date-question/PIN mode, PIN-only recovery, rate limits, Room/DataStore, preferences/reset/migrations |
 | `billing` | RevenueCat/Play adapters and cached entitlement; never a dependency of core call/SMS/SOS eligibility |
-| `observability` | Firebase consent gate, event allowlist/redaction; no content coupling |
+| `observability` | Mixpanel and Firebase adapters behind one consent-aware event API; Crashlytics redaction; no content coupling |
 
-These are logical boundaries; exact Gradle module count is an engineering decision. Domain state machines must not call billing/network to permit safety actions. Keep platform adapters replaceable for deterministic tests; use real system providers rather than duplicate histories with conflicting truths.
+Domain state machines must not call billing/network to permit safety actions. Keep platform adapters replaceable for deterministic tests; use real system providers rather than duplicate histories with conflicting truths. Use Room only for Claro-owned metadata, cached projections and migrations; Contacts, call history and SMS providers remain authoritative where permitted. Use Proto DataStore for typed preferences and encrypted Android Keystore-backed storage for secrets; never store the date challenge as a secret.
+
+### 11.1 Toolchain and dependency policy
+
+The scaffold must resolve **latest stable production releases at implementation time**, pin them in a Gradle version catalog and enable automated dependency update proposals. No dynamic `+` versions and no alpha/beta/RC dependency without a documented blocker and owner approval.
+
+Planning baseline verified 11 November 2026:
+
+| Component | Baseline |
+|---|---|
+| Android | `minSdk 29`; `targetSdk 36`; `compileSdk 36+` stable |
+| Build | Android Gradle Plugin 9.5.x stable, Gradle 9.6.x compatibility, JDK 17 |
+| Kotlin / Compose | Kotlin compatible with RevenueCat 11.x (2.2.21 baseline); Compose BOM 2026.06.01 or newer compatible stable |
+| AndroidX | Stable Activity, Lifecycle, Navigation, Room, DataStore, WorkManager, Paging and Hilt-compatible releases from the AndroidX stable channel |
+| Firebase | Firebase Android BoM 35.1.0 baseline; Analytics and Crashlytics only |
+| Mixpanel | Android SDK 8.8.0 baseline; session replay disabled |
+| RevenueCat | purchases-android 11.2.1 baseline; RevenueCatUI optional and only if its accessibility/design can match Claro |
+| Quality | Android Lint, Compose lint, Detekt/Ktlint, dependency verification, unit tests, instrumented tests and screenshot/accessibility checks |
+
+Before merging scaffold, re-check official release notes, transitive compatibility, min/compile SDK requirements and known issues. Prefer BOMs and platform constraints. Generate Software Bill of Materials/dependency reports for release review.
+
+### 11.2 Architecture and best-practice constraints
+
+- Offline-first local operation for Home, Phone, Contacts, SMS presentation, settings and SOS initiation; no backend dependency for core actions.
+- Layered architecture with UI/data/domain boundaries, repositories, coroutines/Flow and single sources of truth.
+- Hilt dependency injection, typed navigation routes, lifecycle-aware collection and `SavedStateHandle`/persistent draft recovery.
+- No personal or message content in analytics, crash keys, logs, breadcrumbs, purchase attributes or test fixtures.
+- Feature flags may disable unfinished integrations but may not remotely disable core call/SMS/SOS behavior after release.
+- Startup verifies role state and provider access; revoked roles degrade immediately and provide repair paths.
+- Use Android system APIs for Telecom, SMS, contacts, app launch, camera/picker, battery and connectivity. Do not emulate authoritative device state.
+- Preserve functioning default-handler behavior during migrations, crashes and process death; ship rollback-safe database and preference migrations.
+- Keep secrets out of the repository. Firebase configuration, Mixpanel token and RevenueCat public SDK key use environment-specific local/CI injection. No RevenueCat secret key exists in the client.
+- Treat notifications, full-screen intents, exact alarms, foreground services, package visibility and battery optimization as policy-sensitive capabilities; request only when required and explain them.
+- Do not use accessibility services, device admin, device owner, overlay windows or notification listeners to simulate launcher/phone powers.
+
+### 11.3 Analytics, reliability and billing contracts
+
+**Mixpanel:** primary product analytics for consented, low-cardinality events such as setup step completed, visual mode selected, role readiness state, screen viewed, action outcome class and premium funnel. Disable automatic collection/session replay unless separately approved. Use anonymous installation identifier until an explicit account model exists.
+
+**Firebase Analytics:** minimal operational events needed for Firebase/Google release diagnostics, implemented through the same event abstraction. Do not send duplicate business events to both systems by default; maintain an explicit routing table.
+
+**Crashlytics:** disabled before consent except where the final privacy policy and platform rules explicitly allow strictly necessary crash reporting. Remove message/phone/contact data from exceptions and custom keys. Use release/build/visual-mode/role-state booleans only.
+
+**RevenueCat:** entitlement source for monthly/yearly premium and separate lifetime product. Purchases use Play Billing through RevenueCat; localized product/pricing/trial terms come from the store. Entitlement uncertainty defaults to retaining currently safe configuration and withholding only creation of new premium conveniences. Core features never query billing to proceed.
+
+### 11.4 Agent/session ownership
+
+Implementation uses stacked, reviewable sessions:
+
+1. **Foundation agent:** Gradle/Compose scaffold, module contracts, design system, navigation, persistence, platform abstractions, CI and fake implementations.
+2. **Onboarding + modes agent:** setup, role readiness, Touch/Classic choice, protected style switching, language/accessibility shell.
+3. **Launcher + Home agent:** HOME role, status, favorites, tiles, app allowlist, notifications and customization.
+4. **Phone + Contacts agent:** DIALER role, Telecom/InCallService, contacts, history, incoming/active/outcomes and speed dial.
+5. **Messaging agent:** SMS role, provider duties, inbox, conversations, compose, drafts, confirmation and outcomes.
+6. **Safety + Media + Apps agent:** SOS state machine, emergency handoff, camera/gallery and app launcher.
+7. **Billing + Observability agent:** RevenueCat, Mixpanel, Firebase Analytics/Crashlytics, consent/privacy and entitlement isolation.
+8. **Integration agent:** merges feature contracts, resolves migrations/navigation, runs agreed validation and records device/policy blockers.
+
+Feature agents must build on the foundation branch and may not redefine shared contracts without coordinating a foundation revision. Each owns focused tests for behavior it introduces.
 
 ### Phase 3 — caregiver enhancements and services
 
-Add approved premium conveniences, RevenueCat offerings/entitlement mapping and separate non-consumable lifetime product; configure store trial eligibility/disclosures, acknowledgment, grace/hold handling and restore tests. Integrate Firebase only behind verified consent gates and privacy-safe schemas. No existing SDK/project configuration is claimed. Secrets and server credentials are not embedded in client source.
+Add approved premium conveniences, RevenueCat offerings/entitlement mapping and separate non-consumable lifetime product; configure store trial eligibility/disclosures, acknowledgment, grace/hold handling and restore tests. Integrate Mixpanel and Firebase only behind verified consent gates and privacy-safe schemas. No existing SDK/project configuration is claimed. Secrets and server credentials are not embedded in client source.
 
 ### Phase 4 — verification, controlled pilot and release
 
@@ -464,7 +574,7 @@ Choose representative stock Android and major target-market OEM devices, includi
 |---|---|---|
 | Actual monthly/yearly/lifetime prices, currencies and regional offers | Owner decides; retrieve localized prices from Play/RevenueCat, not hardcoded copy | Before commercial storyboard finalization/store setup |
 | Final premium caregiver value | Approve concrete convenience package; never move everyday/safety essentials behind premium | Before purchase implementation |
-| Minimum Android, target devices and target SDK | Android 10+ recommendation pending inventory/current policy audit | Before native spike scope |
+| Target device inventory and OEM coverage | Minimum is confirmed as Android 10/API 29; inventory determines the physical matrix and OEM-specific blockers | Before closed pilot |
 | Combined-role Play/OEM viability | Prove applicable duties and obtain real policy/device evidence; no blanket ban/approval assumption | Before full native commitment |
 | SMS/MMS implementation and carriers | Validate complete default-handler contract and scoped rich-message UX; no silent native-SMS substitution | Before integrated release |
 | Approved SOS recipient(s), wording and test protocol | Start with one agreed trusted person; no emergency number or monitoring claim | Before handover |
