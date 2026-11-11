@@ -1,18 +1,12 @@
 package com.clarohome.core.platform
 
-import android.util.Log
-import com.clarohome.core.domain.AnalyticsEvent
-import com.clarohome.core.domain.BillingGateway
-import com.clarohome.core.domain.CrashReporter
 import com.clarohome.core.domain.CriticalActivityRepository
 import com.clarohome.core.domain.PlatformReadinessRepository
-import com.clarohome.core.domain.ProductAnalytics
 import com.clarohome.core.domain.StartupRecoveryCoordinator
 import com.clarohome.core.domain.StartupRecoveryState
 import com.clarohome.core.domain.VisualModeRepository
 import com.clarohome.core.model.CapabilityStatus
 import com.clarohome.core.model.CriticalActivity
-import com.clarohome.core.model.EntitlementState
 import com.clarohome.core.model.PlatformReadiness
 import dagger.Binds
 import dagger.Module
@@ -21,8 +15,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 
 @Singleton
@@ -55,53 +49,6 @@ class DefaultStartupRecoveryCoordinator @Inject constructor(
     }.getOrElse { StartupRecoveryState.Failed("Unable to restore local state") }
 }
 
-interface VendorAnalyticsAdapter {
-    fun track(event: AnalyticsEvent)
-}
-
-class MixpanelAnalyticsAdapter @Inject constructor() : VendorAnalyticsAdapter {
-    override fun track(event: AnalyticsEvent) = Unit
-}
-
-class FirebaseAnalyticsAdapter @Inject constructor() : VendorAnalyticsAdapter {
-    override fun track(event: AnalyticsEvent) = Unit
-}
-
-@Singleton
-class DisabledProductAnalytics @Inject constructor(
-    private val mixpanel: MixpanelAnalyticsAdapter,
-    private val firebase: FirebaseAnalyticsAdapter,
-) : ProductAnalytics {
-    override fun track(event: AnalyticsEvent) {
-        mixpanel.track(event)
-        firebase.track(event)
-    }
-}
-
-@Singleton
-class DebugProductAnalytics @Inject constructor() : ProductAnalytics {
-    override fun track(event: AnalyticsEvent) {
-        Log.d("ClaroAnalytics", "${event.name}:${event.outcome}")
-    }
-}
-
-@Singleton
-class FirebaseCrashlyticsAdapter @Inject constructor() : CrashReporter {
-    override fun record(exception: Throwable) = Unit
-}
-
-@Singleton
-class DebugCrashReporter @Inject constructor() : CrashReporter {
-    override fun record(exception: Throwable) {
-        Log.e("ClaroCrashReporter", exception.message, exception)
-    }
-}
-
-@Singleton
-class RevenueCatBillingAdapter @Inject constructor() : BillingGateway {
-    override val entitlement: Flow<EntitlementState> = flowOf(EntitlementState.FREE)
-}
-
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class PlatformBindingsModule {
@@ -119,15 +66,6 @@ abstract class PlatformBindingsModule {
     abstract fun bindCriticalActivityRepository(
         repository: FakeCriticalActivityRepository,
     ): CriticalActivityRepository
-
-    @Binds
-    abstract fun bindAnalytics(analytics: DisabledProductAnalytics): ProductAnalytics
-
-    @Binds
-    abstract fun bindCrashReporter(reporter: FirebaseCrashlyticsAdapter): CrashReporter
-
-    @Binds
-    abstract fun bindBilling(gateway: RevenueCatBillingAdapter): BillingGateway
 }
 
 @Module

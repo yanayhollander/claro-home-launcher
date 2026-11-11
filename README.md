@@ -188,7 +188,10 @@ The repository also contains a modular Kotlin and Jetpack Compose application
 scaffold. It preserves the static storyboard and establishes replaceable
 data/platform/vendor boundaries, persisted Touch/Classic visual mode, typed
 navigation, startup recovery, deterministic fake data, and accessible placeholder
-homes without implementing production phone, SMS, billing, or telemetry flows.
+homes. The caregiver membership surface now includes fake plans by default and
+configuration-gated RevenueCat, Mixpanel, Firebase Analytics, and Crashlytics
+adapters with explicit default-off diagnostics consent. Production phone and SMS
+flows remain unimplemented.
 
 See [Android foundation](docs/android-foundation.md) for the module graph,
 dependency policy, and local build commands.
@@ -197,5 +200,5 @@ dependency policy, and local build commands.
 
 The storyboard is deliberately dependency-free HTML, CSS and JavaScript. It does
 not initialize RevenueCat or Firebase, ship API credentials, collect analytics,
-load third-party fonts or connect to a backend. The native app is a separate
-implementation phase after review of this plan and storyboard.
+load third-party fonts or connect to a backend. Native vendor adapters require
+environment-injected public configuration and never affect the storyboard.
