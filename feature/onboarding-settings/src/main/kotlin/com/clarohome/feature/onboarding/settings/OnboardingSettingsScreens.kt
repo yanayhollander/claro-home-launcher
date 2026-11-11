@@ -230,6 +230,9 @@ fun SettingsHubScreen(
     onDisplayLanguage: () -> Unit,
     onAccessMethod: () -> Unit,
     onReadiness: () -> Unit,
+    onHomeAndApps: () -> Unit,
+    onPeopleAndSafety: () -> Unit,
+    onMembershipPrivacy: () -> Unit,
     onLockAndExit: () -> Unit,
 ) {
     ClaroScreen(title = stringResource(R.string.settings)) {
@@ -258,12 +261,21 @@ fun SettingsHubScreen(
             onClick = onReadiness,
         )
         SettingsRow(
+            title = "Home and apps",
+            detail = "Allowed apps and additional Home tiles",
+            onClick = onHomeAndApps,
+        )
+        SettingsRow(
             title = "People and safety",
             detail = "${preferences.onboarding.favoriteSlotsAssigned}/4 people · " +
                 if (preferences.onboarding.sosRecipientAgreed) "SOS agreed" else "SOS needs setup",
-            onClick = {},
+            onClick = onPeopleAndSafety,
         )
-        SettingsRow("Privacy and reset", "Protected local controls", onClick = {})
+        SettingsRow(
+            "Membership and privacy",
+            "Core features remain free · diagnostics off by default",
+            onClick = onMembershipPrivacy,
+        )
         PrimaryButton("Lock settings and go Home", onLockAndExit)
     }
 }

@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
+import androidx.annotation.Keep
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.clarohome.core.design.ClaroColors
 import com.clarohome.core.design.ClaroDimensions
@@ -70,6 +71,7 @@ import com.clarohome.feature.safety.media.apps.SosCallOutcome
 import com.clarohome.feature.safety.media.apps.SosState
 import kotlinx.coroutines.delay
 
+@Keep
 enum class SafetyMediaAppsDestination {
     SOS,
     CAMERA,
@@ -567,6 +569,7 @@ private fun AppsScreen(
                                     "${result.app.label} is missing or disabled. Ask a caregiver to repair the allowlist."
                                 ExternalAppLaunchResult.BlockedBySystem ->
                                     "Android blocked ${result.app.label} from opening."
+                                else -> "Android could not open ${result.app.label}."
                             }
                             is AllowedAppOpenResult.Missing ->
                                 "${result.app.label} is missing or disabled."

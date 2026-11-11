@@ -1,11 +1,18 @@
 package com.clarohome.app
 
 import android.content.Intent
+import android.app.Activity
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.clarohome.core.domain.EmergencyNumberDetector
+import com.clarohome.core.domain.ExternalAppLaunchResult
+import com.clarohome.core.domain.ExternalAppLauncher
 import com.clarohome.core.domain.HomeRepository
 import com.clarohome.core.domain.ClaroPreferencesRepository
 import com.clarohome.core.domain.CriticalActivityRepository
+import com.clarohome.core.domain.NativeEmergencyDialerGateway
+import com.clarohome.core.domain.PhoneCallGateway
 import com.clarohome.core.domain.StartupRecoveryCoordinator
 import com.clarohome.core.domain.StartupRecoveryState
 import com.clarohome.core.model.AppLanguage
@@ -24,6 +31,17 @@ import com.clarohome.feature.onboarding.settings.OnboardingSettingsManager
 import com.clarohome.feature.launcher.home.HomeRoleController
 import com.clarohome.feature.launcher.home.InstalledAppCatalog
 import com.clarohome.feature.launcher.home.LauncherStatusReader
+import com.clarohome.feature.billing.observability.BillingObservabilityUiState
+import com.clarohome.feature.billing.observability.BillingRepository
+import com.clarohome.feature.billing.observability.ClaroEvent
+import com.clarohome.feature.billing.observability.ConsentAwareObservability
+import com.clarohome.feature.billing.observability.ConsentController
+import com.clarohome.feature.billing.observability.DiagnosticsConsent
+import com.clarohome.feature.safety.media.apps.PersistedSosState
+import com.clarohome.feature.safety.media.apps.SosCallOutcome
+import com.clarohome.feature.safety.media.apps.SosCoordinator
+import com.clarohome.feature.safety.media.apps.SosState
+import com.clarohome.feature.safety.media.apps.TrustedContact
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,10 +57,12 @@ data class MainUiState(
     val home: HomeSnapshot? = null,
     val activeActivities: Set<CriticalActivity> = emptySet(),
     val message: String? = null,
+    val billingObservability: BillingObservabilityUiState = BillingObservabilityUiState(),
 )
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
+    private val savedStateHandle: SavedStateHandle,
     private val preferencesRepository: ClaroPreferencesRepository,
     private val criticalActivityRepository: CriticalActivityRepository,
     private val recoveryCoordinator: StartupRecoveryCoordinator,
@@ -51,18 +71,46 @@ class MainViewModel @Inject constructor(
     private val homeRoleController: HomeRoleController,
     private val installedAppCatalog: InstalledAppCatalog,
     private val launcherStatusReader: LauncherStatusReader,
+    phoneCallGateway: PhoneCallGateway,
+    emergencyNumberDetector: EmergencyNumberDetector,
+    private val emergencyDialerGateway: NativeEmergencyDialerGateway,
+    private val externalAppLauncher: ExternalAppLauncher,
+    private val billingRepository: BillingRepository,
+    private val consentController: ConsentController,
+    private val observability: ConsentAwareObservability,
 ) : ViewModel() {
     private val startup = MutableStateFlow<StartupRecoveryState>(StartupRecoveryState.Recovering)
     private val message = MutableStateFlow<String?>(null)
+    private val sosCoordinator = SosCoordinator(phoneCallGateway, emergencyNumberDetector)
+    private val mutableSosState = MutableStateFlow<SosState>(SosState.Unset())
+
+    val sosState: StateFlow<SosState> = mutableSosState
+    private val billingObservability = combine(
+        consentController.consent,
+        billingRepository.plans,
+        billingRepository.membership,
+        billingRepository.purchaseResult,
+    ) { consent, plans, membership, purchaseResult ->
+        BillingObservabilityUiState(consent, plans, membership, purchaseResult)
+    }
 
     val uiState: StateFlow<MainUiState> = combine(
         startup,
         preferencesRepository.preferences,
         homeRepository.home,
         criticalActivityRepository.activeActivities,
-        message,
-    ) { recovery, preferences, home, activeActivities, statusMessage ->
-        MainUiState(recovery, preferences, home, activeActivities, statusMessage)
+        combine(message, billingObservability) { statusMessage, billing ->
+            statusMessage to billing
+        },
+    ) { recovery, preferences, home, activeActivities, status ->
+        MainUiState(
+            startup = recovery,
+            preferences = preferences,
+            home = home,
+            activeActivities = activeActivities,
+            message = status.first,
+            billingObservability = status.second,
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
@@ -70,10 +118,12 @@ class MainViewModel @Inject constructor(
     )
 
     init {
+        restoreSos()
         viewModelScope.launch {
             startup.value = recoveryCoordinator.recover()
             refreshLauncherState()
         }
+        viewModelScope.launch { billingRepository.refresh() }
     }
 
     fun advanceOnboarding(next: OnboardingStep) {
@@ -177,11 +227,15 @@ class MainViewModel @Inject constructor(
 
     fun lockSettings() = settingsManager.lock()
 
-    fun applyVisualMode(mode: VisualMode, onApplied: () -> Unit) {
+    fun applyVisualMode(
+        mode: VisualMode,
+        runtimeBlockers: Set<CriticalActivity>,
+        onApplied: () -> Unit,
+    ) {
         viewModelScope.launch {
             when (val result = settingsManager.requestModeSwitch(
                 mode,
-                uiState.value.activeActivities,
+                uiState.value.activeActivities + runtimeBlockers,
             )) {
                 is ModeSwitchResult.Applied -> {
                     message.value = null
@@ -239,6 +293,119 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             homeRepository.setAppOnHome(packageName, onHome)
         }
+    }
+
+    fun configureSos(name: String, destination: String, consented: Boolean) {
+        val contact = if (name.isBlank() || destination.isBlank()) {
+            null
+        } else {
+            TrustedContact(
+                contactId = "trusted-contact",
+                displayName = name.trim(),
+                destination = destination.trim(),
+                recipientConsented = consented,
+            )
+        }
+        sosCoordinator.configure(contact)
+        publishSos()
+    }
+
+    fun startSos(testMode: Boolean, nowElapsedMillis: Long) {
+        if (!sosCoordinator.start(nowElapsedMillis, testMode)) return
+        publishSos()
+        viewModelScope.launch {
+            while (sosCoordinator.state is SosState.CountingDown) {
+                kotlinx.coroutines.delay(200)
+                sosCoordinator.advance(android.os.SystemClock.elapsedRealtime())
+                publishSos()
+            }
+        }
+    }
+
+    fun cancelSos() {
+        sosCoordinator.cancel()
+        publishSos()
+    }
+
+    fun interruptSos() {
+        sosCoordinator.interrupt()
+        publishSos()
+    }
+
+    fun updateSosCallOutcome(outcome: SosCallOutcome) {
+        sosCoordinator.onCallOutcome(outcome)
+        publishSos()
+    }
+
+    fun openEmergencyDialer(): Boolean = emergencyDialerGateway.openEmergencyDialer()
+
+    fun launchAllowedApp(packageName: String): ExternalAppLaunchResult =
+        externalAppLauncher.launch(packageName)
+
+    fun membershipOpened() {
+        observability.track(ClaroEvent.MembershipScreenView())
+    }
+
+    fun refreshPlans() {
+        viewModelScope.launch { billingRepository.refresh() }
+    }
+
+    fun purchase(activity: Activity, planId: String) {
+        viewModelScope.launch { billingRepository.purchase(activity, planId) }
+    }
+
+    fun restorePurchases() {
+        viewModelScope.launch { billingRepository.restore() }
+    }
+
+    fun updateConsent(consent: DiagnosticsConsent) {
+        viewModelScope.launch { consentController.update(consent) }
+    }
+
+    fun withdrawConsent() {
+        viewModelScope.launch { consentController.withdrawAll() }
+    }
+
+    fun resetDiagnostics() {
+        viewModelScope.launch { consentController.reset() }
+    }
+
+    fun sosRemainingSeconds(nowElapsedMillis: Long): Int =
+        sosCoordinator.remainingSeconds(nowElapsedMillis)
+
+    private fun publishSos() {
+        mutableSosState.value = sosCoordinator.state
+        val snapshot = sosCoordinator.snapshot()
+        savedStateHandle["sos_name"] = snapshot.contact?.displayName
+        savedStateHandle["sos_number"] = snapshot.contact?.destination
+        savedStateHandle["sos_consent"] = snapshot.contact?.recipientConsented ?: false
+        savedStateHandle["sos_deadline"] = snapshot.countdownDeadlineElapsedMillis
+        savedStateHandle["sos_activation"] = snapshot.activationId
+        savedStateHandle["sos_test"] = snapshot.testMode
+    }
+
+    private fun restoreSos() {
+        val name = savedStateHandle.get<String>("sos_name")
+        val number = savedStateHandle.get<String>("sos_number")
+        val contact = if (name != null && number != null) {
+            TrustedContact(
+                contactId = "trusted-contact",
+                displayName = name,
+                destination = number,
+                recipientConsented = savedStateHandle["sos_consent"] ?: false,
+            )
+        } else {
+            null
+        }
+        sosCoordinator.restore(
+            PersistedSosState(
+                contact = contact,
+                countdownDeadlineElapsedMillis = savedStateHandle["sos_deadline"],
+                activationId = savedStateHandle["sos_activation"] ?: 0,
+                testMode = savedStateHandle["sos_test"] ?: false,
+            ),
+        )
+        mutableSosState.value = sosCoordinator.state
     }
 }
 

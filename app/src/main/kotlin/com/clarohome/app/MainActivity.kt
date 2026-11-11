@@ -1,13 +1,16 @@
 package com.clarohome.app
 
+import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -34,7 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModelProvider
@@ -44,13 +47,17 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import com.clarohome.core.design.ClaroColors
 import com.clarohome.core.design.ClaroTheme
 import com.clarohome.core.domain.StartupRecoveryState
 import com.clarohome.core.model.AppLanguage
+import com.clarohome.core.model.CapabilityStatus
+import com.clarohome.core.model.HomeRoleState
 import com.clarohome.core.model.HomeTile
 import com.clarohome.core.model.HomeTileKind
 import com.clarohome.core.model.OnboardingStep
+import com.clarohome.core.model.ReadinessCapability
 import com.clarohome.core.model.VisualMode
 import com.clarohome.feature.onboarding.settings.AccessGateScreen
 import com.clarohome.feature.onboarding.settings.AccessMethodSettingsScreen
@@ -61,8 +68,19 @@ import com.clarohome.feature.onboarding.settings.PhoneStyleSettingsScreen
 import com.clarohome.feature.onboarding.settings.PinRecoveryScreen
 import com.clarohome.feature.onboarding.settings.ReadinessSettingsScreen
 import com.clarohome.feature.onboarding.settings.SettingsHubScreen
+import com.clarohome.feature.billing.observability.BillingObservabilityScreen
+import com.clarohome.feature.billing.observability.PurchaseResult
+import com.clarohome.feature.communication.CommunicationRoute
+import com.clarohome.feature.communication.CommunicationUiState
+import com.clarohome.feature.communication.CallerIdentity
+import com.clarohome.feature.communication.MessagingUiState
+import com.clarohome.feature.safety.media.apps.SosState
 import com.clarohome.presentation.classic.ClassicPhoneScreen
+import com.clarohome.presentation.classic.ClassicCommunicationScreen
+import com.clarohome.presentation.classic.ClassicMessagingScreen
 import com.clarohome.presentation.touch.TouchHomeScreen
+import com.clarohome.presentation.touch.TouchCommunicationScreen
+import com.clarohome.presentation.touch.TouchMessagingScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
@@ -80,13 +98,53 @@ import kotlinx.serialization.Serializable
 @Serializable private data object DisplayLanguageRoute
 @Serializable private data object AccessMethodRoute
 @Serializable private data object ReadinessRoute
+@Serializable private data object PhoneRoute
+@Serializable private data object MessagesRoute
+@Serializable private data class SafetyRoute(val destination: SafetyMediaAppsDestination)
+@Serializable private data object MembershipRoute
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private val communicationViewModel by viewModels<CommunicationViewModel>()
+    private val messagingViewModel by viewModels<MessagingViewModel>()
+    private val phonePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) {
+        communicationViewModel.refreshQualification()
+        communicationViewModel.openContacts()
+    }
+    private val phoneRoleLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) {
+        communicationViewModel.refreshQualification()
+        requestPhonePermissions()
+    }
+    private val messagePermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) {
+        messagingViewModel.refreshQualification()
+        messagingViewModel.openInbox()
+    }
+    private val smsRoleLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) {
+        messagingViewModel.refreshQualification()
+        requestMessagePermissions()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        communicationViewModel.handleDialIntent(intent)
+        messagingViewModel.handleSendToIntent(intent)
         enableEdgeToEdge()
-        setContent { ClaroApp() }
+        setContent {
+            ClaroApp(
+                communicationViewModel = communicationViewModel,
+                messagingViewModel = messagingViewModel,
+                onRepairPhone = ::repairPhoneAccess,
+                onRepairMessages = ::repairMessagesAccess,
+            )
+        }
     }
 
     override fun onStop() {
@@ -99,12 +157,77 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        communicationViewModel.handleDialIntent(intent)
+        messagingViewModel.handleSendToIntent(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        communicationViewModel.refreshQualification()
+        messagingViewModel.refreshQualification()
+    }
+
+    private fun repairPhoneAccess() {
+        val roleRequest = communicationViewModel.roleRequestIntent()
+        if (!communicationViewModel.state.value.qualification.roleHeld && roleRequest != null) {
+            phoneRoleLauncher.launch(roleRequest)
+        } else {
+            requestPhonePermissions()
+        }
+    }
+
+    private fun requestPhonePermissions() {
+        val permissions = mutableListOf(
+            Manifest.permission.CALL_PHONE,
+            Manifest.permission.ANSWER_PHONE_CALLS,
+            Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.READ_CALL_LOG,
+            Manifest.permission.WRITE_CALL_LOG,
+            Manifest.permission.READ_CONTACTS,
+            Manifest.permission.WRITE_CONTACTS,
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions += Manifest.permission.POST_NOTIFICATIONS
+        }
+        phonePermissionLauncher.launch(permissions.toTypedArray())
+    }
+
+    private fun repairMessagesAccess() {
+        val roleRequest = messagingViewModel.roleRequestIntent()
+        if (!messagingViewModel.state.value.qualification.roleHeld && roleRequest != null) {
+            smsRoleLauncher.launch(roleRequest)
+        } else {
+            requestMessagePermissions()
+        }
+    }
+
+    private fun requestMessagePermissions() {
+        val permissions = mutableListOf(
+            Manifest.permission.SEND_SMS,
+            Manifest.permission.RECEIVE_SMS,
+            Manifest.permission.READ_SMS,
+            Manifest.permission.RECEIVE_MMS,
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions += Manifest.permission.POST_NOTIFICATIONS
+        }
+        messagePermissionLauncher.launch(permissions.toTypedArray())
     }
 }
 
 @Composable
-private fun ClaroApp(viewModel: MainViewModel = hiltViewModel()) {
+private fun ClaroApp(
+    communicationViewModel: CommunicationViewModel,
+    messagingViewModel: MessagingViewModel,
+    onRepairPhone: () -> Unit,
+    onRepairMessages: () -> Unit,
+    viewModel: MainViewModel = hiltViewModel(),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val communication by communicationViewModel.state.collectAsStateWithLifecycle()
+    val messaging by messagingViewModel.state.collectAsStateWithLifecycle()
+    val openPhoneRequest by communicationViewModel.openPhoneRequests.collectAsStateWithLifecycle()
+    val sosState by viewModel.sosState.collectAsStateWithLifecycle()
     val navController = rememberNavController()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -136,6 +259,14 @@ private fun ClaroApp(viewModel: MainViewModel = hiltViewModel()) {
             }
         }
     }
+    val projectedHome = state.home?.withCommunicationProjections(communication, messaging)
+    val runtimeBlockers = integrationBlockers(
+        hasActiveCall = communication.hasActiveCall,
+        sosCritical = sosState is SosState.CountingDown || sosState is SosState.Calling,
+        purchaseCritical =
+            state.billingObservability.purchaseResult == PurchaseResult.Purchasing ||
+                state.billingObservability.purchaseResult == PurchaseResult.Pending,
+    )
 
     DisposableEffect(lifecycleOwner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
@@ -157,6 +288,67 @@ private fun ClaroApp(viewModel: MainViewModel = hiltViewModel()) {
                 launchSingleTop = true
             }
         }
+    }
+
+    LaunchedEffect(communication.route, openPhoneRequest) {
+        if (
+            communication.route == CommunicationRoute.INCOMING_CALL ||
+            openPhoneRequest > 0
+        ) {
+            navController.navigate(PhoneRoute) { launchSingleTop = true }
+        }
+    }
+
+    LaunchedEffect(
+        projectedHome?.homeRole,
+        communication.qualification,
+        messaging.qualification,
+    ) {
+        viewModel.setReadiness(
+            ReadinessCapability.HOME,
+            when (projectedHome?.homeRole) {
+                HomeRoleState.GRANTED -> CapabilityStatus.READY
+                HomeRoleState.UNAVAILABLE -> CapabilityStatus.UNAVAILABLE
+                else -> CapabilityStatus.NEEDS_ATTENTION
+            },
+        )
+        viewModel.setReadiness(
+            ReadinessCapability.PHONE,
+            if (communication.qualification.canOwnCalls) {
+                CapabilityStatus.READY
+            } else if (!communication.qualification.telephonySupported) {
+                CapabilityStatus.UNAVAILABLE
+            } else {
+                CapabilityStatus.NEEDS_ATTENTION
+            },
+        )
+        viewModel.setReadiness(
+            ReadinessCapability.MESSAGES,
+            if (messaging.qualification.canSend) {
+                CapabilityStatus.READY
+            } else if (!messaging.qualification.telephonySupported) {
+                CapabilityStatus.UNAVAILABLE
+            } else {
+                CapabilityStatus.NEEDS_ATTENTION
+            },
+        )
+        viewModel.setReadiness(
+            ReadinessCapability.CONTACTS,
+            if (communication.qualification.roleHeld) {
+                CapabilityStatus.READY
+            } else {
+                CapabilityStatus.NEEDS_ATTENTION
+            },
+        )
+        viewModel.setReadiness(
+            ReadinessCapability.NOTIFICATIONS,
+            if (messaging.qualification.notificationPermissionGranted) {
+                CapabilityStatus.READY
+            } else {
+                CapabilityStatus.NEEDS_ATTENTION
+            },
+        )
+        viewModel.setReadiness(ReadinessCapability.MEDIA, CapabilityStatus.READY)
     }
 
     CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
@@ -196,51 +388,87 @@ private fun ClaroApp(viewModel: MainViewModel = hiltViewModel()) {
                         )
                     }
                     composable<TouchHomeRoute> {
-                        state.home?.let { home ->
+                        projectedHome?.let { home ->
                             TouchHomeScreen(
                                 home = home,
                                 onUseClassicMode = { navController.openSettings(viewModel) },
                                 onTileSelected = { tile ->
                                     handleTile(
                                         tile,
-                                        openApps = { navController.navigate(AppsRoute) },
+                                        openPhone = {
+                                            communicationViewModel.openDialer()
+                                            navController.navigate(PhoneRoute)
+                                        },
+                                        openMessages = {
+                                            messagingViewModel.openInbox()
+                                            navController.navigate(MessagesRoute)
+                                        },
+                                        openSafetyFeature = { destination ->
+                                            navController.navigate(SafetyRoute(destination))
+                                        },
                                         openSettings = { navController.openSettings(viewModel) },
                                         launchApp = launchPackage,
                                     )
                                 },
-                                onFavoriteSelected = {
-                                    platformNotice = if (it.phoneNumber == null) {
+                                onFavoriteSelected = { favorite ->
+                                    platformNotice = if (favorite.phoneNumber == null) {
                                         "Ask your caregiver to add a person."
                                     } else {
-                                        "Phone confirmation is not available yet."
+                                        communicationViewModel.requestCall(
+                                            CallerIdentity(
+                                                displayName = favorite.displayName,
+                                                number = favorite.phoneNumber,
+                                            ),
+                                        )
+                                        navController.navigate(PhoneRoute)
+                                        null
                                     }
                                 },
                                 onRepairHomeRole = launchHomeRole,
                                 onReturnToCall = {
-                                    platformNotice = "No active-call provider is connected yet."
+                                    communicationViewModel.returnToActiveCall()
+                                    navController.navigate(PhoneRoute)
                                 },
                             )
                         }
                     }
                     composable<ClassicHomeRoute> {
-                        state.home?.let { home ->
+                        projectedHome?.let { home ->
                             ClassicPhoneScreen(
                                 home = home,
                                 onOpenMenu = { navController.navigate(LauncherMenuRoute) },
                                 onTileSelected = { tile ->
                                     handleTile(
                                         tile,
-                                        openApps = { navController.navigate(AppsRoute) },
+                                        openPhone = {
+                                            communicationViewModel.openDialer()
+                                            navController.navigate(PhoneRoute)
+                                        },
+                                        openMessages = {
+                                            messagingViewModel.openInbox()
+                                            navController.navigate(MessagesRoute)
+                                        },
+                                        openSafetyFeature = { destination ->
+                                            navController.navigate(SafetyRoute(destination))
+                                        },
                                         openSettings = { navController.openSettings(viewModel) },
                                         launchApp = launchPackage,
                                     )
                                 },
-                                onFavoriteSelected = {
-                                    platformNotice = "Phone confirmation is not available yet."
+                                onFavoriteSelected = { favorite ->
+                                    favorite.phoneNumber?.let { number ->
+                                        communicationViewModel.requestCall(
+                                            CallerIdentity(favorite.displayName, number),
+                                        )
+                                        navController.navigate(PhoneRoute)
+                                    } ?: run {
+                                        platformNotice = "Ask your caregiver to add a person."
+                                    }
                                 },
                                 onRepairHomeRole = launchHomeRole,
                                 onReturnToCall = {
-                                    platformNotice = "No active-call provider is connected yet."
+                                    communicationViewModel.returnToActiveCall()
+                                    navController.navigate(PhoneRoute)
                                 },
                             )
                         }
@@ -268,7 +496,17 @@ private fun ClaroApp(viewModel: MainViewModel = hiltViewModel()) {
                                 onTileSelected = { tile ->
                                     handleTile(
                                         tile,
-                                        openApps = { navController.navigate(AppsRoute) },
+                                        openPhone = {
+                                            communicationViewModel.openDialer()
+                                            navController.navigate(PhoneRoute)
+                                        },
+                                        openMessages = {
+                                            messagingViewModel.openInbox()
+                                            navController.navigate(MessagesRoute)
+                                        },
+                                        openSafetyFeature = { destination ->
+                                            navController.navigate(SafetyRoute(destination))
+                                        },
                                         openSettings = { navController.openSettings(viewModel) },
                                         launchApp = launchPackage,
                                     )
@@ -276,6 +514,46 @@ private fun ClaroApp(viewModel: MainViewModel = hiltViewModel()) {
                                 onUseTouchStyle = { navController.openSettings(viewModel) },
                             )
                         }
+                    }
+                    composable<PhoneRoute> {
+                        IntegratedCommunicationScreen(
+                            state = communication,
+                            visualMode = state.preferences.visualMode,
+                            viewModel = communicationViewModel,
+                            onRepairPhone = onRepairPhone,
+                            onHome = { navController.goHome(state.preferences.visualMode) },
+                        )
+                    }
+                    composable<MessagesRoute> {
+                        IntegratedMessagingScreen(
+                            state = messaging,
+                            visualMode = state.preferences.visualMode,
+                            viewModel = messagingViewModel,
+                            onRepairMessages = onRepairMessages,
+                            onHome = { navController.goHome(state.preferences.visualMode) },
+                        )
+                    }
+                    composable<SafetyRoute> { entry ->
+                        SafetyMediaAppsScreen(
+                            initialDestination = entry.toRoute<SafetyRoute>().destination,
+                            visualMode = state.preferences.visualMode,
+                            viewModel = viewModel,
+                            onBack = navController::popBackStack,
+                        )
+                    }
+                    composable<MembershipRoute> {
+                        LaunchedEffect(Unit) { viewModel.membershipOpened() }
+                        BillingObservabilityScreen(
+                            state = state.billingObservability,
+                            classicShell = state.preferences.visualMode == VisualMode.CLASSIC,
+                            onBack = navController::popBackStack,
+                            onRefresh = viewModel::refreshPlans,
+                            onPurchase = viewModel::purchase,
+                            onRestore = viewModel::restorePurchases,
+                            onConsentChange = viewModel::updateConsent,
+                            onWithdrawConsent = viewModel::withdrawConsent,
+                            onResetDiagnostics = viewModel::resetDiagnostics,
+                        )
                     }
                     composable<AccessGateRoute> {
                         AccessGateScreen(
@@ -331,6 +609,20 @@ private fun ClaroApp(viewModel: MainViewModel = hiltViewModel()) {
                                 viewModel.recordSettingsActivity()
                                 navController.navigate(ReadinessRoute)
                             },
+                            onHomeAndApps = {
+                                viewModel.recordSettingsActivity()
+                                navController.navigate(AppsRoute)
+                            },
+                            onPeopleAndSafety = {
+                                viewModel.recordSettingsActivity()
+                                navController.navigate(
+                                    SafetyRoute(SafetyMediaAppsDestination.SOS),
+                                )
+                            },
+                            onMembershipPrivacy = {
+                                viewModel.recordSettingsActivity()
+                                navController.navigate(MembershipRoute)
+                            },
                             onLockAndExit = {
                                 viewModel.lockSettings()
                                 navController.goHome(state.preferences.visualMode)
@@ -345,7 +637,9 @@ private fun ClaroApp(viewModel: MainViewModel = hiltViewModel()) {
                             message = state.message,
                             onApply = { mode ->
                                 viewModel.recordSettingsActivity()
-                                viewModel.applyVisualMode(mode) { navController.goHome(mode) }
+                                viewModel.applyVisualMode(mode, runtimeBlockers) {
+                                    navController.goHome(mode)
+                                }
                             },
                             onCancel = {
                                 viewModel.cancelDeferredModeSwitch()
@@ -450,14 +744,158 @@ private fun ProtectedSessionMonitor(
 
 private fun handleTile(
     tile: HomeTile,
-    openApps: () -> Unit,
+    openPhone: () -> Unit,
+    openMessages: () -> Unit,
+    openSafetyFeature: (SafetyMediaAppsDestination) -> Unit,
     openSettings: () -> Unit,
     launchApp: (String) -> Unit,
 ) {
     when (tile.kind) {
-        HomeTileKind.APPS -> openApps()
+        HomeTileKind.PHONE -> openPhone()
+        HomeTileKind.MESSAGES -> openMessages()
+        HomeTileKind.CAMERA -> openSafetyFeature(SafetyMediaAppsDestination.CAMERA)
+        HomeTileKind.GALLERY -> openSafetyFeature(SafetyMediaAppsDestination.GALLERY)
+        HomeTileKind.SOS -> openSafetyFeature(SafetyMediaAppsDestination.SOS)
+        HomeTileKind.APPS -> openSafetyFeature(SafetyMediaAppsDestination.APPS)
         HomeTileKind.INSTALLED_APP -> tile.packageName?.let(launchApp)
-        else -> if (tile.label == "Settings") openSettings()
+    }
+    if (tile.label == "Settings") openSettings()
+}
+
+@Composable
+private fun IntegratedCommunicationScreen(
+    state: CommunicationUiState,
+    visualMode: VisualMode,
+    viewModel: CommunicationViewModel,
+    onRepairPhone: () -> Unit,
+    onHome: () -> Unit,
+) {
+    val callbacks = CommunicationCallbacks(viewModel, onRepairPhone, onHome)
+    if (visualMode == VisualMode.TOUCH) {
+        TouchCommunicationScreen(
+            state = state,
+            onDigit = callbacks.onDigit,
+            onBackspace = callbacks.onBackspace,
+            onCallEnteredNumber = callbacks.onCallEnteredNumber,
+            onDirectCall = callbacks.onDirectCall,
+            onOpenContacts = callbacks.onOpenContacts,
+            onSearchContacts = callbacks.onSearchContacts,
+            onLoadMoreContacts = callbacks.onLoadMoreContacts,
+            onOpenContact = callbacks.onOpenContact,
+            onChooseNumber = callbacks.onChooseNumber,
+            onConfirmCall = callbacks.onConfirmCall,
+            onCancelCall = callbacks.onCancelCall,
+            onAnswer = callbacks.onAnswer,
+            onDecline = callbacks.onDecline,
+            onEnd = callbacks.onEnd,
+            onToggleMute = callbacks.onToggleMute,
+            onAudioRoute = callbacks.onAudioRoute,
+            onToggleHold = callbacks.onToggleHold,
+            onSwap = callbacks.onSwap,
+            onRepairPhone = callbacks.onRepair,
+            onHome = callbacks.onHome,
+        )
+    } else {
+        ClassicCommunicationScreen(
+            state = state,
+            onDigit = callbacks.onDigit,
+            onBackspace = callbacks.onBackspace,
+            onCallEnteredNumber = callbacks.onCallEnteredNumber,
+            onDirectCall = callbacks.onDirectCall,
+            onOpenContacts = callbacks.onOpenContacts,
+            onSearchContacts = callbacks.onSearchContacts,
+            onLoadMoreContacts = callbacks.onLoadMoreContacts,
+            onOpenContact = callbacks.onOpenContact,
+            onChooseNumber = callbacks.onChooseNumber,
+            onConfirmCall = callbacks.onConfirmCall,
+            onCancelCall = callbacks.onCancelCall,
+            onAnswer = callbacks.onAnswer,
+            onDecline = callbacks.onDecline,
+            onEnd = callbacks.onEnd,
+            onToggleMute = callbacks.onToggleMute,
+            onAudioRoute = callbacks.onAudioRoute,
+            onToggleHold = callbacks.onToggleHold,
+            onSwap = callbacks.onSwap,
+            onRepairPhone = callbacks.onRepair,
+            onHome = callbacks.onHome,
+        )
+    }
+}
+
+private class CommunicationCallbacks(
+    viewModel: CommunicationViewModel,
+    onRepairPhone: () -> Unit,
+    onHome: () -> Unit,
+) {
+    val onDigit = viewModel::inputDigit
+    val onBackspace = viewModel::backspace
+    val onCallEnteredNumber = viewModel::requestEnteredNumberCall
+    val onDirectCall = viewModel::directCallAssignment
+    val onOpenContacts = viewModel::openContacts
+    val onSearchContacts = viewModel::searchContacts
+    val onLoadMoreContacts = viewModel::loadMoreContacts
+    val onOpenContact = viewModel::openContact
+    val onChooseNumber = viewModel::chooseContactNumber
+    val onConfirmCall = viewModel::confirmOutgoingCall
+    val onCancelCall = viewModel::cancelConfirmation
+    val onAnswer = viewModel::answer
+    val onDecline = viewModel::decline
+    val onEnd = viewModel::end
+    val onToggleMute = viewModel::toggleMute
+    val onAudioRoute = viewModel::selectAudioRoute
+    val onToggleHold = viewModel::toggleHold
+    val onSwap = viewModel::swapCall
+    val onRepair = onRepairPhone
+    val onHome = onHome
+}
+
+@Composable
+private fun IntegratedMessagingScreen(
+    state: MessagingUiState,
+    visualMode: VisualMode,
+    viewModel: MessagingViewModel,
+    onRepairMessages: () -> Unit,
+    onHome: () -> Unit,
+) {
+    if (visualMode == VisualMode.TOUCH) {
+        TouchMessagingScreen(
+            state = state,
+            onSearchInbox = viewModel::searchInbox,
+            onOpenConversation = viewModel::openConversation,
+            onNewMessage = viewModel::startNewMessage,
+            onSearchRecipients = viewModel::searchRecipients,
+            onLoadMoreRecipients = viewModel::loadMoreRecipients,
+            onChooseContactNumber = viewModel::chooseContactNumber,
+            onManualRecipient = viewModel::enterManualRecipient,
+            onBodyChange = viewModel::updateBody,
+            onReview = viewModel::review,
+            onEdit = viewModel::editAfterReview,
+            onSend = viewModel::send,
+            onRetry = viewModel::retry,
+            onConfirmDuplicateRisk = viewModel::confirmDuplicateRiskAndSendAgain,
+            onCancelFailure = viewModel::cancelFailure,
+            onRepair = onRepairMessages,
+            onHome = onHome,
+        )
+    } else {
+        ClassicMessagingScreen(
+            state = state,
+            onSearchInbox = viewModel::searchInbox,
+            onOpenConversation = viewModel::openConversation,
+            onNewMessage = viewModel::startNewMessage,
+            onSearchRecipients = viewModel::searchRecipients,
+            onChooseContactNumber = viewModel::chooseContactNumber,
+            onManualRecipient = viewModel::enterManualRecipient,
+            onBodyChange = viewModel::updateBody,
+            onReview = viewModel::review,
+            onEdit = viewModel::editAfterReview,
+            onSend = viewModel::send,
+            onRetry = viewModel::retry,
+            onConfirmDuplicateRisk = viewModel::confirmDuplicateRiskAndSendAgain,
+            onCancelFailure = viewModel::cancelFailure,
+            onRepair = onRepairMessages,
+            onHome = onHome,
+        )
     }
 }
 
