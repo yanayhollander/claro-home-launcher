@@ -5,7 +5,11 @@ import com.clarohome.core.domain.ProtectedRoute
 
 object PhoneContactsContract : FeatureContract {
     override val id = "phone-contacts"
-    override val protectedRoutes = setOf(ProtectedRoute.SETTINGS)
+    override val protectedRoutes = setOf(
+        ProtectedRoute.CONTACT_MANAGEMENT,
+        ProtectedRoute.SPEED_DIAL,
+        ProtectedRoute.SETTINGS,
+    )
 }
 
 object MessagingContract : FeatureContract {

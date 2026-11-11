@@ -1,13 +1,29 @@
-plugins { alias(libs.plugins.android.library) }
+plugins {
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt)
+}
 
 android {
     namespace = "com.clarohome.feature.communication"
     compileSdk = 37
-    defaultConfig { minSdk = 29 }
+    defaultConfig {
+        minSdk = 29
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
-dependencies { api(project(":core:domain")) }
+dependencies {
+    api(project(":core:domain"))
+    implementation(project(":core:model"))
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.hilt.android)
+    implementation(libs.kotlinx.coroutines.android)
+    ksp(libs.hilt.compiler)
+
+    testImplementation(project(":core:testing"))
+}

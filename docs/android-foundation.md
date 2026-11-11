@@ -40,10 +40,37 @@ app
   feature work.
 
 The app now declares HOME intent handling and can request or repair the HOME role.
-It still deliberately does not request dialer, SMS, contacts, or notification
-roles; place calls; send messages; purchase products; or upload telemetry.
 Unavailable phone/message authority is represented as unknown rather than a
 fabricated zero, and launch failures remain visible.
+
+The phone/contacts layer now qualifies and requests the dialer role, handles
+`ACTION_DIAL`, declares the default-phone `InCallService`, and requests phone,
+call-log, contacts, and incoming-call notification permissions in role-first
+order. It does not claim the SMS role or send messages; messaging remains a
+separate stacked feature.
+
+## Phone and contacts implementation
+
+- `feature:communication` owns the shared call/contact state machine, capability
+  contracts, persisted speed-dial references and call outcomes.
+- Telecom callbacks are authoritative for dialing, ringing, connection, hold,
+  audio routes, duration and disconnect outcomes. Submitting a call to Telecom
+  never fabricates a connected state.
+- Emergency numbers hand off through the system dialer. Claro never silently
+  selects a SIM/account or claims emergency completion.
+- Android Contacts Provider remains the source of truth. Lists are paged,
+  multiple numbers require explicit selection, and saved assignment snapshots
+  become unresolved when a contact or selected number changes.
+- Touch and Classic presentations consume the same immutable communication
+  state. Classic keeps its integrated control deck and permanent keypad.
+- Incoming calls use a high-priority full-screen notification request with
+  visible Answer and Decline actions. Actual lock-screen presentation remains
+  subject to Android/OEM full-screen-intent policy.
+
+Physical-device validation is still required for carrier connection/disconnect
+causes, no-service and dual-SIM account selection, Bluetooth and proximity
+behavior, call waiting/conference capability reporting, ringtone/DND behavior,
+locked-screen incoming calls, emergency handoff, and OEM dialer-role repair.
 
 ## Toolchain and dependency policy
 

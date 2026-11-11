@@ -64,6 +64,8 @@ enum class ProtectedRoute {
     LANGUAGE,
     READINESS,
     PEOPLE_AND_SAFETY,
+    CONTACT_MANAGEMENT,
+    SPEED_DIAL,
     MEMBERSHIP,
     PRIVACY,
     RESET,
