@@ -154,7 +154,6 @@ class StoryboardRegressionTest {
                     mode = SettingsAccessMode.DATE_QUESTION,
                     message = null,
                     onUnlock = {},
-                    onCancel = {},
                     onRecoverPin = {},
                 )
             }
@@ -163,7 +162,7 @@ class StoryboardRegressionTest {
         compose.onNodeWithText("Today's date?").assertIsDisplayed()
         compose.onNodeWithText("Forgot PIN?").assertDoesNotExist()
         compose.onNodeWithText("Unlock").assertHeightIsAtLeast(64.dp)
-        compose.onNodeWithText("Cancel").assertHeightIsAtLeast(64.dp)
+        compose.onNodeWithText("Cancel").assertDoesNotExist()
         capture("protected-settings", "onboarding-screen")
     }
 

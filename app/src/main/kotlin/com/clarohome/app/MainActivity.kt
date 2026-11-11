@@ -915,6 +915,9 @@ private fun ClaroApp(
                     }
                     composable<AccessGateRoute> { entry ->
                         val target = entry.toRoute<AccessGateRoute>().target
+                        DisposableEffect(Unit) {
+                            onDispose { viewModel.clearMessage() }
+                        }
                         AccessGateScreen(
                             mode = state.preferences.accessProtection.mode,
                             message = state.message,
@@ -925,12 +928,6 @@ private fun ClaroApp(
                                         communicationViewModel = communicationViewModel,
                                         popGate = true,
                                     )
-                                }
-                            },
-                            onCancel = {
-                                viewModel.clearMessage()
-                                if (!navController.popBackStack()) {
-                                    navController.goHome(state.preferences.visualMode)
                                 }
                             },
                             onRecoverPin = { navController.navigate(PinRecoveryRoute(target)) },

@@ -183,7 +183,6 @@ fun AccessGateScreen(
     mode: SettingsAccessMode,
     message: String?,
     onUnlock: (String) -> Unit,
-    onCancel: () -> Unit,
     onRecoverPin: () -> Unit,
 ) {
     var input by rememberSaveable(mode) { mutableStateOf("") }
@@ -207,10 +206,6 @@ fun AccessGateScreen(
                     onClick = onRecoverPin,
                 )
             }
-            ClaroSecondaryButton(
-                label = stringResource(R.string.onb_cancel),
-                onClick = onCancel,
-            )
         },
     ) {
         Column(
