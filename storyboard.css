@@ -33,6 +33,12 @@ textarea:focus-visible, summary:focus-visible { outline: 3px solid #0879ff; outl
 .brand-mark { width: 44px; height: 46px; display: grid; place-items: center; border-radius: 12px; background: #175cd3; color: white; font-size: 44px; line-height: 1; padding-bottom: 7px; position: relative; }
 .brand-mark span { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #8ed3ff; right: 7px; top: 8px; }
 .brand-sub { display: block; font-size: 8px; font-weight: 600; letter-spacing: 2px; margin-top: 3px; }
+.version-switcher { display: flex; gap: 4px; margin-top: 18px; }
+.version-switcher a { flex: 1; padding: 10px 6px; border: 1px solid #cbd6e9; border-radius: 4px; font-size: 12px; text-align: center; text-decoration: none; }
+.version-switcher a[aria-current] { color: white; background: #175cd3; border-color: #175cd3; font-weight: 700; }
+.classic-layout-controls { display: grid; gap: 7px; margin-top: 12px; font-size: 11px; }
+.classic-layout-controls select { width: 100%; padding: 8px; border: 1px solid #cbd6e9; border-radius: 4px; background: white; color: var(--ink); }
+.classic-layout-controls a { color: #075bd8; line-height: 1.4; }
 .edition { margin: 30px 0 14px; display: flex; justify-content: space-between; font-size: 9px; color: var(--muted); letter-spacing: 1.5px; }
 .edition span { padding: 3px 6px; background: #edf2ff; border-radius: 3px; }
 .sidebar-intro { font-size: 16px; line-height: 1.55; margin: 0 0 18px; }
@@ -111,6 +117,65 @@ body:has(#clean-preview:checked) .capture-toggle { top: 10px; bottom: auto; righ
 .phone-action-dock[data-screen="call-confirm"] .primary { background: #078534; border-color: #078534; }
 .phone-action-dock .call-end { min-height: 76px; }
 .phone.large-text .phone-action-dock button { min-height: 80px; font-size: 28px; }
+.classic-preview .phone { border-width: 9px; border-radius: 30px; background: #202734; }
+.classic-preview .phone-system-nav { display: none; }
+.classic-preview .device-status { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 9px; background: #eef2f7; color: #172033; font-size: 16px; flex: 0 0 30px; }
+.classic-preview .phone-content { background: white; border-radius: 10px 10px 0 0; overflow-y: scroll; overscroll-behavior-y: contain; touch-action: pan-y; }
+.classic-preview .phone-content .dialpad { display: none; }
+.classic-preview .phone-content .screen { flex: 1 0 auto; }
+.classic-preview .screen input:focus, .classic-preview .screen textarea:focus { outline: 3px solid #0879ff; outline-offset: -3px; }
+.classic-preview .home-screen { background: white; }
+.classic-deck { flex: 0 0 auto; padding: 5px; background: #202734; color: white; }
+.classic-context-keys { display: grid; grid-template-columns: minmax(0, 1fr) 146px minmax(0, 1fr); grid-template-rows: repeat(2, 73px); gap: 6px; direction: ltr; }
+.classic-context-keys button { min-width: 0; min-height: 0; margin: 0; border: 1px solid #728096; border-radius: 8px; background: linear-gradient(#465164, #303949); color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 3px; font-size: 17px; line-height: 1.15; font-weight: 700; overflow-wrap: anywhere; }
+.classic-context-keys .primary { background: #087c3b; border-color: #29a564; }
+.classic-context-keys .danger, .classic-context-keys .classic-end { background: #b51e35; border-color: #e76674; }
+.classic-context-keys .icon { width: 26px; height: 24px; flex-shrink: 0; }
+.classic-context-keys .classic-long-key { font-size: 14px; }
+#classic-confirm { grid-area: 1 / 3; }
+#classic-back { grid-area: 1 / 1; }
+#classic-call { grid-area: 2 / 1; }
+#classic-end { grid-area: 2 / 3; }
+.classic-dpad { grid-area: 1 / 2 / 3 / 3; align-self: center; display: grid; grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(3, 48px); border: 1px solid #8997aa; border-radius: 22px; background: linear-gradient(#48566a, #303b4d); overflow: hidden; }
+.classic-context-keys .classic-dpad button { border: 0; border-radius: 0; background: transparent; padding: 0; }
+#classic-nav-up { grid-area: 1 / 2; }
+#classic-nav-left { grid-area: 2 / 1; }
+.classic-context-keys #classic-ok { grid-area: 2 / 2; border: 1px solid #b6c4d6; border-radius: 13px; background: #61738b; font-size: 21px; }
+#classic-nav-right { grid-area: 2 / 3; }
+#classic-nav-down { grid-area: 3 / 2; }
+.classic-preview[data-classic-layout="wide"] .classic-context-keys { grid-template-rows: 64px 146px; }
+.classic-preview[data-classic-layout="wide"] #classic-back { grid-area: 1 / 1 / 2 / 4; justify-self: start; width: calc(50% - 3px); }
+.classic-preview[data-classic-layout="wide"] #classic-confirm { grid-area: 1 / 1 / 2 / 4; justify-self: end; width: calc(50% - 3px); }
+.classic-preview[data-classic-layout="wide"] .classic-dpad { grid-area: 2 / 2; }
+.classic-preview[data-classic-layout="lower"] .classic-context-keys { grid-template-rows: 146px 64px; }
+.classic-preview[data-classic-layout="lower"] .classic-dpad { grid-area: 1 / 2; }
+.classic-preview[data-classic-layout="lower"] #classic-call { grid-area: 1 / 1; }
+.classic-preview[data-classic-layout="lower"] #classic-end { grid-area: 1 / 3; }
+.classic-preview[data-classic-layout="lower"] #classic-back { grid-area: 2 / 1 / 3 / 4; justify-self: start; width: calc(50% - 3px); }
+.classic-preview[data-classic-layout="lower"] #classic-confirm { grid-area: 2 / 1 / 3 / 4; justify-self: end; width: calc(50% - 3px); }
+.classic-preview[data-classic-layout="stacked"] .classic-context-keys { grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1fr); grid-template-rows: 64px 48px 64px; gap: 4px; }
+.classic-preview[data-classic-layout="stacked"] .classic-context-keys > button { z-index: 1; }
+.classic-preview[data-classic-layout="stacked"] #classic-call { grid-area: 3 / 1; }
+.classic-preview[data-classic-layout="stacked"] #classic-end { grid-area: 3 / 3; }
+.classic-preview[data-classic-layout="stacked"] .classic-dpad { grid-area: 1 / 1 / 4 / 4; align-self: stretch; grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1fr); grid-template-rows: 64px 48px 64px; gap: 4px; border: 0; }
+.classic-context-keys .classic-nav-key .icon { width: 30px; height: 30px; stroke-width: 2.5; }
+.classic-preview .screen .classic-selected { outline: 3px solid #0879ff; outline-offset: -3px; }
+.classic-preview .button-row:empty, .classic-preview .call-controls:empty { display: none; }
+.classic-mode-status { display: flex; justify-content: center; align-items: center; gap: 6px; height: 24px; min-width: 0; overflow: hidden; text-align: center; font-size: 15px; }
+.classic-mode-status output { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.classic-mode-status > span { flex-shrink: 0; }
+.classic-number-keys { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.classic-number { width: 100%; min-height: 64px; border: 1px solid #8390a1; border-bottom: 3px solid #111722; border-radius: 9px; padding: 3px; background: linear-gradient(#424d5e, #293342); color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.classic-number strong { font-size: 34px; font-weight: 600; line-height: 1; }
+.classic-number small { color: #e1e7f0; font-size: 13px; line-height: 1.3; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.classic-number.holding { outline: 3px solid #57db8e; outline-offset: -3px; background: #126039; }
+.classic-preview .classic-clock { text-align: center; padding: 6px 0; }
+.classic-clock time { font-size: 58px; line-height: 1; font-weight: 700; color: #172033; }
+.classic-preview .classic-clock p { font-size: 22px; margin-top: 4px; }
+.classic-preview .home-screen .speed-dials { padding: 2px 0; }
+.classic-home-links { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; margin-top: auto; }
+.classic-home-links button { min-height: 64px; font-size: 19px; gap: 5px; }
+.classic-home-links .icon { width: 27px; height: 27px; }
 .phone-system-nav { height: 64px; flex: 0 0 64px; border-top: 3px solid var(--phone-line); background: #fff; display: grid; grid-template-columns: 1fr 1fr; }
 .phone-system-nav button { border: 0; color: #172033; background: white; font-size: 22px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 58px; }
 .phone-system-nav button + button { border-inline-start: 2px solid #d5dae3; }
@@ -240,6 +305,13 @@ body:has(#clean-preview:checked) .capture-toggle { top: 10px; bottom: auto; righ
 .screen[data-screen="calling"] > p, .screen[data-screen="incoming"] > p,
 .screen[data-screen="call-confirm"] > p { padding: 4px; }
 .call-status { color: #55647b; }
+.classic-preview .screen[data-screen="calling"] { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; }
+.classic-preview .screen[data-screen="calling"] > * { grid-column: 1 / -1; }
+.classic-preview .screen[data-screen="calling"] > .call-status { grid-row: 2; }
+.classic-preview .screen[data-screen="calling"] .call-status bdi { font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.classic-preview .screen[data-screen="calling"] > .avatar.large { grid-area: 3 / 1; width: 72px; height: 72px; flex-basis: 72px; margin: 0 auto; }
+.classic-preview .screen[data-screen="calling"] > .call-name { grid-area: 4 / 1; }
+.classic-preview .screen[data-screen="calling"] > p[dir="ltr"] { grid-area: 5 / 1; }
 .screen .call-duration { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 14px 4px; font-size: 38px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .call-duration .icon { width: 32px; height: 32px; color: #55647b; }
 .call-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; width: 100%; }
@@ -371,3 +443,7 @@ body:has(#clean-preview:checked) .phone:not(.large-text) .core-tiles { grid-auto
   .stage { display: flex; margin: 0; }
   .phone { box-shadow: none; }
 }
+body.classic-embed:has(#clean-preview:checked) .workspace { padding: 0; }
+body.classic-embed:has(#clean-preview:checked) .phone { width: 386px; height: 808px; box-shadow: none; }
+body.classic-embed .capture-toggle, body.classic-embed .skip-link { display: none; }
+body.classic-embed { background: transparent; overflow: hidden; }

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Claro Home — Button arrangements</title>
+  <link rel="stylesheet" href="classic-buttons.css">
+  <script src="classic-buttons.js" defer></script>
+</head>
+<body>
+  <header class="comparison-header">
+    <div>
+      <a href="index.html?version=classic#home">← Back to storyboard</a>
+      <h1>Four simpler button arrangements</h1>
+      <p>Back stays left. Confirm stays right. One connected navigation pad and four large outer keys.</p>
+    </div>
+    <label class="scene-picker">Show the same screen in all four
+      <select id="comparison-scene">
+        <option value="home">Home</option>
+        <option value="contacts">Contacts</option>
+        <option value="contact-detail">Contact details</option>
+        <option value="call-confirm">Confirm a call</option>
+        <option value="calling">Active call</option>
+        <option value="incoming">Incoming call</option>
+        <option value="compose">Write a message</option>
+        <option value="message-confirm">Confirm a message</option>
+        <option value="pin">Unlock settings</option>
+        <option value="gallery">Gallery</option>
+        <option value="classic-menu">Menu</option>
+      </select>
+    </label>
+  </header>
+  <p class="comparison-note">Interactive, scaled previews. Open a version full-size to judge touch targets. Each phone has independent demo state; changing this screen selector resets all four previews. Arrangement names and review notes stay outside the phones.</p>
+  <main class="comparison-scroll" aria-label="Side-by-side button arrangements">
+    <div id="comparison-grid" class="comparison-grid"></div>
+  </main>
+  <noscript><p class="comparison-error">Enable JavaScript to load the four interactive previews.</p></noscript>
+</body>
+</html>

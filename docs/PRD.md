@@ -90,6 +90,64 @@ Out of MVP: monitored emergency response, automatic dispatch, medical/fall detec
 
 ## 4. Experience and accessibility contract
 
+**Separate classic 2G concept (alternate version).**
+
+The original touch storyboard remains the default. A separate
+`?version=classic#home` concept uses a fixed 12-key pad across **all Claro-owned
+screens**, not just Phone. Keep large numeric targets (64px in the HTML preview),
+and only four large outer controls around one connected four-way pad with center
+OK. Back stays left, Confirm/Unlock/Save/Send stays right; Call/Answer stays left
+and Home/End/Decline stays right. Positions stay fixed across screens within each
+arrangement. Do not retain separate permanent Delete or Options keys.
+The right softkey opens Menu/Options when there is no primary action, and selects
+items while Options is open. If a primary action and secondary choices coexist,
+provide an Options navigation row in the display. Edit, Delete contact/photo,
+text deletion/clearing, Cancel and shortcuts live in Options. Destructive choices
+still require confirmation; text deletion must never delete a contact/photo.
+Do not repeat action buttons in a separate action dock.
+
+`classic-buttons.html` compares four arrangements: A, a compact classic cluster;
+B, wide softkeys above navigation/call keys; C, wide softkeys below them; and D,
+wide corner keys with navigation fitted between them. D replaces the tall stacked
+arrangement, recovering 102px of display height without shrinking numeric targets;
+its controls are only 32px taller than A. A is the default concept, not a final production decision.
+All four share the storyboard's behavior and 12-key pad. A common scene selector
+resets four independent interactive previews to the same screen. Scaled comparison
+frames are for arrangement review; use full-size previews to judge touch targets.
+
+Four-way navigation visibly highlights contacts, menu items and fields, scrolls
+the selection into view, and opens/selects it with OK. Left/right move the text
+cursor or change a selected dropdown; up/down move between fields. In photo view,
+left/right choose the previous/next photo. Up/down scroll with overlap when no
+selectable item remains in that direction. Lists, photos, selections and fields
+also stay tappable and swiping remains available. Options/Back preserve drafts,
+selection and scroll position. Hide the input-mode indicator during
+browsing and numeric-only entry; text entry shows Letters/Numbers as appropriate.
+Longer content scrolls above the deck instead of hiding keys or shrinking body
+text to fit. Portrait/small-height layouts require device validation;
+do not promise that an arbitrary landscape/window size can retain both a useful
+display and full-size keys.
+
+Classic Home emphasizes clock/date, four photo contacts, Messages and SOS. Menu
+retains all six core features plus Contacts and protected Settings. This is an
+intentional alternate home hierarchy, not a removal of functionality or a change
+to the original six-tile design. Existing assignments, free access, SMS safety,
+settings-access methods and SOS limits still apply. Text fields support basic
+English ABC multi-tap in the prototype (# switches ABC/123, 0 is space); full
+localized input and OS-keyboard integration remain native design work.
+
+Numbers from idle Home open number entry without placing a call. Green retains
+call confirmation, with no duplicate on-screen Call or Cancel buttons: the fixed
+green key confirms, and Back/Home leaves the confirmation.
+Long-press 1/2 retains the explicitly configured direct-call
+behavior, but only on idle Home/Phone, never in an editable field, during a call,
+an external handoff or SOS countdown. Green answers incoming calls; red
+declines/ends or returns Home without deleting the SMS draft. Digits produce
+simulated tones only on active-call screens; editing text elsewhere during a call
+must not send tones or create another call. Block number input during incoming
+calls/countdowns/handoffs while keeping the keys visible. Native system/camera/
+third-party surfaces cannot be promised a persistent Claro keypad.
+
 **REQ-UX-01 — Recognition before reading.**  
 Acceptance: use original Claro artwork: large recognizable icons and portraits, white/charcoal high-contrast neutral surfaces and saturated meaningful accents, not muted beige/sage cards or copied competitor artwork. The six default tiles form a tightly packed **2-column × 3-row** grid of big, edge-to-edge rectangular light tiles with dark separators, **2–4dp gutters** and minimal internal padding. Use a green handset (Phone), blue envelope (Messages), orange camera (Camera), blue photo (Gallery), red SOS symbol and violet apps grid (Apps). Keep short, preferably one-word visible labels wherever recognition needs them; every control has an accessible name. Color supplements shape, text and state cues, never replaces them. Portrait/name fallbacks work without downloaded assets; do not hide labels with invisible text.
 

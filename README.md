@@ -33,6 +33,77 @@ Dialer and the Home Phone tile remain unchanged. Single-number contacts in these
 options open call confirmation directly; multiple-number contacts still require
 an explicit number choice. Keypad long-press shortcuts remain available.
 
+### Separate 2G phone version
+
+The **Original / 2G phone** switch above the storyboard navigation keeps both
+designs available. Open <http://127.0.0.1:4173/?version=classic#home> for the
+classic concept; the original URL and its dialer alternatives are unchanged.
+Switching versions reloads the in-memory prototype rather than sharing drafts.
+
+The 2G concept keeps a 12-key number pad, four large outer keys, and one connected
+four-way pad with center OK. Back always stays on the left and the primary
+Confirm/Unlock/Save/Send softkey on the right. Green Call/Answer stays left and red
+Home/End/Decline stays right. Their positions do not move between screens within
+an arrangement. There are no separate permanent Delete or Options keys.
+
+The right softkey opens Menu/Options when there is no primary action, and selects
+an option while that list is open. When a screen has both a primary action and
+secondary choices, an Options navigation row in the display opens the latter.
+Text deletion and clearing are included in Options alongside secondary actions
+such as Edit, Delete contact, Cancel and navigation shortcuts. Text deletion never
+deletes a contact/photo; destructive choices still require separate confirmation.
+
+Open <http://127.0.0.1:4173/classic-buttons.html> to compare the base arrangement
+and three alternatives side by side:
+
+| Version | Arrangement | Tradeoff |
+|---|---|---|
+| A. Classic | Softkeys and call keys flank the connected pad | Most display space |
+| B. Wide softkeys | Wide Back/Confirm row above the pad and call keys | Larger softkeys |
+| C. Softkeys below | Wide Back/Confirm row below the pad and call keys | Softkeys closest to the numbers |
+| D. Integrated pad | Wide corner keys with navigation fitted between them | Wider outer keys; only 32px taller than A |
+
+Use the common screen selector to reset all four to the same scene. Otherwise,
+each frame is independently interactive and keeps its own in-memory state.
+The comparison scales 386×808 previews to fit four columns; full-size links and
+the storyboard's Button arrangement selector are provided for touch-target review.
+Individual layouts use `?version=classic&layout=classic`, `layout=wide`,
+`layout=lower`, or `layout=stacked`, followed by the desired screen hash.
+The existing `layout=stacked` URL now opens replacement D, the integrated pad.
+
+The classic active-call screen shows status and duration near the top without
+requiring an initial scroll, followed by a centered caller photo, name and number.
+Longer caller details scroll above the fixed phone controls.
+The storyboard uses a fixed sample duration, not a live call timer.
+
+The four arrows highlight contacts, menu items and fields; OK opens/selects the
+highlighted item. Left/right move the text cursor or change a selected dropdown;
+up/down move between fields. Photo-view left/right show the previous/next photo.
+When no selectable item remains above/below, up/down scroll the display with
+overlap. The selected item scrolls into view. Lists, photos, selection controls
+and input fields also remain tappable, and swiping still scrolls the display.
+Home prioritizes the clock, four people, Messages and SOS. Menu contains Phone,
+Contacts, Messages, Camera, Gallery, SOS, Apps and protected Settings instead of
+repeating the original six-tile home. The same contact assignments and access
+rules are used within each preview session.
+
+Typing from Home starts number entry, not a call. Green opens call confirmation,
+then confirms it. Confirmation has no duplicate Call or Cancel buttons in the
+display: use the green Call softkey to proceed, or Back/Home to leave.
+Long-pressing 1/2 for 0.8 seconds calls the assigned person
+directly only from idle Home/Phone. Text/date/PIN entry cannot trigger speed dial.
+Focused fields use the fixed keys: English ABC multi-tap for text, # to switch
+ABC/123, 0 for space, and number entry for phone/PIN/date fields. The mode indicator
+appears only for text entry, labeled Letters or Numbers, never as an idle "123".
+Date separators are inserted automatically. This is a basic English text-entry preview, not T9
+prediction or a completed Spanish/Hebrew keyboard.
+
+Green answers incoming calls; red declines/ends a call or returns Home while
+retaining SMS drafts. On the active-call screen the numbers simulate tones;
+they never silently start a second call. Numbers are disabled during an incoming
+call, SOS countdown or simulated external handoff. Real Android/third-party apps
+cannot retain Claro's keypad; that platform boundary remains unchanged.
+
 ### Settings access
 
 Setup offers **Date question** or **Caregiver PIN**. The initial preview uses the

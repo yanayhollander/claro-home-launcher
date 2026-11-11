@@ -1,0 +1,27 @@
+* { box-sizing: border-box; }
+body { margin: 0; padding: 24px; background: #eef1f5; color: #172033; font: 14px Arial, Helvetica, sans-serif; }
+a { color: #075bd8; text-underline-offset: 3px; }
+.comparison-header { display: flex; justify-content: space-between; align-items: end; gap: 24px; max-width: 1800px; margin: auto; }
+.comparison-header a { font-size: 13px; }
+h1 { margin: 14px 0 8px; font-size: 28px; letter-spacing: -.6px; }
+.comparison-header p { margin: 0; line-height: 1.5; color: #46546b; }
+.scene-picker { display: grid; gap: 8px; min-width: 240px; font-size: 13px; }
+.scene-picker select { padding: 11px; border: 1px solid #aebbd0; border-radius: 6px; background: white; color: #172033; font: inherit; }
+.comparison-note { max-width: 1800px; margin: 16px auto 22px; color: #536077; font-size: 12px; line-height: 1.6; }
+.comparison-scroll { overflow-x: auto; padding-bottom: 12px; }
+.comparison-grid { display: grid; grid-template-columns: repeat(4, minmax(200px, 1fr)); gap: 18px; max-width: 1800px; margin: auto; }
+.comparison-card { min-width: 0; }
+.comparison-card h2 { margin: 0 0 5px; font-size: 20px; }
+.comparison-description { min-height: 60px; margin: 0 0 12px; color: #536077; font-size: 12px; line-height: 1.5; }
+.comparison-viewport { position: relative; width: 100%; aspect-ratio: 386 / 808; overflow: hidden; border-radius: 24px; }
+.comparison-viewport iframe { position: absolute; top: 0; left: 0; width: 386px; height: 808px; border: 0; transform: scale(var(--preview-scale, 1)); transform-origin: top left; }
+.comparison-open { display: inline-block; padding: 12px 0; font-size: 13px; }
+.comparison-error { padding: 14px; background: #fff0f0; border: 1px solid #c73346; color: #9c1728; line-height: 1.5; }
+[hidden] { display: none !important; }
+a:focus-visible, select:focus-visible { outline: 3px solid #0879ff; outline-offset: 3px; }
+@media (max-width: 700px) {
+  body { padding: 16px; }
+  .comparison-header { align-items: stretch; flex-direction: column; gap: 16px; }
+  h1 { font-size: 24px; }
+  .comparison-grid { gap: 14px; }
+}

@@ -4,6 +4,34 @@
   const $ = id => document.getElementById(id);
   const phone = $("phone-content");
   const actionDock = $("phone-actions");
+  const previewParams = new URLSearchParams(location.search);
+  const classicMode = previewParams.get("version") === "classic";
+  const classicLayouts = { classic: "A. Classic", wide: "B. Wide softkeys", lower: "C. Softkeys below", stacked: "D. Integrated pad" };
+  const classicLayout = Object.hasOwn(classicLayouts, previewParams.get("layout")) ? previewParams.get("layout") : "classic";
+  const device = document.querySelector(".phone");
+  const classicDeck = $("classic-deck");
+  let classicActions = [], classicOptionActions = [], classicOptionsOpen = false;
+  let classicOptionsScroll = 0, classicOptionReturnKey = "";
+  let classicOptionInput = null;
+  let classicSelected = null, classicSelectionKey = "", classicSelectionScope = "";
+  let classicScrollObserver;
+  document.body.classList.toggle("classic-preview", classicMode);
+  if (classicMode) {
+    document.body.dataset.classicLayout = classicLayout;
+    $("classic-layout-controls").hidden = false;
+    $("classic-layout").innerHTML = Object.entries(classicLayouts).map(([value, label]) => `<option value="${value}">${label}</option>`).join("");
+    $("classic-layout").value = classicLayout;
+    $("classic-layout").addEventListener("change", event => {
+      const url = new URL(location.href);
+      url.searchParams.set("layout", event.target.value);
+      location.assign(url.href);
+    });
+    if (previewParams.get("embedded") === "1") {
+      document.body.classList.add("classic-embed");
+      $("clean-preview").checked = true;
+    }
+  }
+  $(classicMode ? "classic-version" : "touch-version").setAttribute("aria-current", "true");
   const esc = value => String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const paths = {
     phone: "M8 3H4a1 1 0 0 0-1 1c0 9.4 7.6 17 17 17a1 1 0 0 0 1-1v-4l-5-2-2 2a14 14 0 0 1-6-6l2-2-2-5Z",
@@ -20,6 +48,10 @@
     settings: "m9 3-1 3-3 1-2 5 2 5 3 1 1 3h6l1-3 3-1 2-5-2-5-3-1-1-3H9Zm3 5a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z",
     contact: "M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM4 21v-3a8 8 0 0 1 16 0v3",
     check: "m4 12 5 5L20 6",
+    "arrow-up": "M12 20V4m-7 7 7-7 7 7",
+    "arrow-down": "M12 4v16m-7-7 7 7 7-7",
+    "arrow-left": "M20 12H4m7-7-7 7 7 7",
+    "arrow-right": "M4 12h16m-7-7 7 7-7 7",
     lock: "M6 10h12v11H6V10Zm3 0V6a3 3 0 0 1 6 0v4",
     sun: "M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z"
   };
@@ -75,6 +107,7 @@
   Object.entries(dialerOptions).forEach(([id, option]) => {
     registry[id] = { ...registry.dialer, ...option, id, try: "Compare this alternative without replacing the current dialer. Choose a person or enter a number; all calls remain simulated." };
   });
+  if (classicMode) registry["classic-menu"] = { ...registry.home, id: "classic-menu", title: "A familiar phone menu.", subtitle: "All core features remain available above the fixed keypad.", try: "Choose a feature. Contacts, Back, Menu and the number keys stay in the same place." };
   const protectedRoutes = new Set(["settings", "home-edit", "speed-dial", "display", "language", "sos-settings", "permissions", "privacy", "reset", "plans", "purchase", "membership", "trial-ended"]);
   const initial = () => ({
     contacts: [
@@ -90,13 +123,14 @@
     readiness: { Home: "Not checked", Phone: "Not checked", Messages: "Not checked", Contacts: "Not checked", Notifications: "Not checked", Media: "Not checked" },
     handover: false, digits: "", recipient: "202-555-0101", body: "", selected: "mira", numberIndex: 0,
     target: { name: "Mira", number: "202-555-0101" }, messages: [], unread: true,
-    activeCall: false, callState: "Connected", muted: false, speaker: false, held: false, dialTab: "keypad", phoneTabs: {}, network: "available", sosArmed: false,
+    activeCall: false, callState: "Connected", muted: false, speaker: false, held: false, dialTab: "keypad", phoneTabs: {}, network: "available", sosArmed: false, classicTones: "",
     membership: "Free", plan: "monthly", photos: [{ id: 1, title: "Morning hills", owned: false }, { id: 2, title: "A quiet afternoon", owned: false }, { id: 3, title: "Garden light", owned: true }, { id: 4, title: "Weekend walk", owned: false }],
     photoIndex: 0, search: "", appFilter: "all", error: "", notice: "", attempts: 0, cooldown: 0, recoveryAttempts: 0, recoveryCooldown: 0,
     unlocked: false, intended: "settings", contactMode: "", editId: "", picker: "", external: "", confirm: "", setupVisits: {}, formDrafts: {}, preferenceDrafts: {}
   });
   let state = initial(), route = "", variant = "standard", suppressClick = null;
   let countdownTimer, holdTimer, holdButton, holdStart, inactivityTimer, countdown = 5, draft = null, accessModeDraft = null;
+  let classicInput = null, classicNumeric = false, multiTap = null;
   const variants = {
     home: ["standard", "missed", "no SIM", "no signal", "airplane mode", "signal unknown", "unassigned", "active call", "huge text"],
     dialer: ["standard", "empty recents", "unassigned", "permission denied", "no signal"],
@@ -135,6 +169,7 @@
     "trial-ended": ["standard", "offline"],
     "pin-recovery": ["standard", "incorrect", "cooldown", "forgotten secret"]
   };
+  if (classicMode) variants["classic-menu"] = ["standard"];
   const copy = {
     en: { home: "Home", back: "Back", phone: "Phone", messages: "Messages", camera: "Camera", gallery: "Gallery", sos: "SOS", apps: "Apps", people: "Your people", contacts: "Contacts", call: "Call", recent: "Recent", missed: "Missed", keypad: "Keypad", search: "Search name or number", newMessage: "Write a message", date: "Wednesday, 11 November", more: "More apps below", settings: "Settings", callPerson: "Call", type: "Enter a number", write: "Message", battery: "Battery", signal: "Mobile signal", ready: "Available", add: "Add person" },
     es: { home: "Inicio", back: "Atrás", phone: "Teléfono", messages: "Mensajes", camera: "Cámara", gallery: "Galería", sos: "SOS", apps: "Aplicaciones", people: "Tus personas", contacts: "Contactos", call: "Llamar", recent: "Recientes", missed: "Perdidas", keypad: "Teclado", search: "Buscar nombre o número", newMessage: "Escribir un mensaje", date: "Miércoles, 11 de noviembre", more: "Más aplicaciones abajo", settings: "Ajustes", callPerson: "Llamar", type: "Introduce un número", write: "Mensaje", battery: "Batería", signal: "Señal móvil", ready: "Disponible", add: "Añadir persona" },
@@ -200,10 +235,12 @@
   function activate(id, fromHistory = false) {
     cleanup();
     if (!registry[id]) { id = "home"; history.replaceState(history.state, "", "#home"); }
+    if (classicMode && dialerOptions[id]) { id = "dialer"; history.replaceState(history.state, "", "#dialer"); }
     if (id === "pin-recovery" && state.accessMode === "date") { id = "pin"; history.replaceState(history.state, "", "#pin"); }
     if (protectedRoutes.has(id) && !state.unlocked) { state.intended = id; state.pendingAction = ""; id = "pin"; history.replaceState(history.state, "", "#pin"); }
     if (id === "home") lock();
     if (route !== id) {
+      classicInput = null; multiTap = null;
       if (route === "setup") accessModeDraft = null;
       if (draft && ["home-edit", "display", "language"].includes(route)) state.preferenceDrafts[route] = draft;
       if (route === "contact-detail") state.contactMode = "";
@@ -221,6 +258,7 @@
     if (route === "sos-countdown") startCountdown();
   }
   function back() {
+    if (classicMode && classicOptionsOpen) { closeClassicOptions(); return; }
     if (state.confirm || state.external || state.contactMode) { state.confirm = ""; state.external = ""; state.contactMode = ""; state.error = ""; render(); return; }
     if (dialerOptions[route] && state.phoneTabs[route] && state.phoneTabs[route] !== dialerOptions[route].initialTab) {
       state.phoneTabs[route] = dialerOptions[route].initialTab; state.search = ""; render(); return;
@@ -272,6 +310,7 @@
     "trial-ended": ["go:home", "go:plans"],
     "pin-recovery": ["submit", "forgot-recovery", "go:pin"]
   };
+  if (classicMode) screenActions["classic-menu"] = [];
   function mountScreenActions() {
     const device = phone.parentElement;
     let keys = screenActions[route];
@@ -299,10 +338,14 @@
         key.startsWith(".") ? key :
         key.startsWith("go:") ? `button[data-action="go"][data-route="${key.slice(3)}"]` :
         `button[data-action="${key}"]`;
-      return device.querySelector(selector);
+      return (classicMode ? phone : device).querySelector(selector);
     }).filter(Boolean);
     if (!controls.length && route !== "home") {
       controls = [...phone.querySelectorAll(".screen > button.primary, .screen > button.danger")];
+    }
+    if (classicMode) {
+      mountClassicActions(controls);
+      return;
     }
     for (const control of controls) {
       if (control.type !== "submit" || !control.form) continue;
@@ -316,13 +359,53 @@
     actionDock.dir = phone.dir;
     actionDock.lang = phone.lang;
   }
+  function mountClassicActions(preferred) {
+    phone.querySelectorAll(".dialpad").forEach(pad => pad.remove());
+    const selectable = ".row-button, .speed-dial, .plan, .photo-grid button, .classic-home-links button, .tab-row button";
+    const buttons = [...phone.querySelectorAll("button")].filter(control => !control.matches(selectable));
+    const ordered = [...new Set([...preferred.flatMap(control => control.matches("button") ? [control] : [...control.querySelectorAll("button")]), ...buttons])];
+    const confirming = ["delete-contact", "remove-photo", "sos-test", "reset"].includes(state.confirm) || Boolean(state.contactMode);
+    classicActions = ordered.filter(control => !control.matches(selectable) && (!confirming || preferred.includes(control)));
+    for (const control of ordered) {
+      if (control.matches(selectable)) continue;
+      if (control.type === "submit" && control.form) {
+        control.form.id = `screen-form-${control.form.dataset.form}`;
+        control.setAttribute("form", control.form.id);
+      }
+      const permission = control.closest(".permission-card")?.querySelector("h3")?.textContent;
+      const app = control.closest(".edit-app")?.querySelector("strong")?.textContent;
+      if (permission || app) control.textContent = `${control.textContent} ${permission || app}`;
+      control.classList.add("classic-context-key");
+      if (control.textContent.trim().length > 20) control.classList.add("classic-long-key");
+      control.remove();
+    }
+    classicActions = classicActions.filter(control =>
+      !["end-call", "end-sos", "decline", "call-keypad"].includes(control.dataset.action) &&
+      !(control.dataset.action === "go" && control.dataset.route === "home" && control.textContent.trim() === t("home")));
+    if (state.external) {
+      classicActions = classicActions.filter(control => [
+        "external-back", "capture", "add-picker-photo", "purchase-pending",
+        "purchase-success", "purchase-cancel", "cancel-membership",
+        "restore-none", "restore-demo", "restore-failed"
+      ].includes(control.dataset.action));
+    }
+    if (!state.external && ["dialer", "call-confirm"].includes(route)) {
+      const call = document.createElement("button");
+      call.type = "button"; call.dataset.action = "classic-call"; call.className = "classic-context-key primary";
+      call.innerHTML = `${icon("phone")}<span>Call</span>`;
+      classicActions.unshift(call);
+    }
+    classicOptionsOpen = false;
+    actionDock.replaceChildren();
+    actionDock.hidden = true;
+  }
   function render(preserve = false) {
     const focused = document.activeElement;
     const focusId = preserve && focused && phone.contains(focused) ? focused.id : "";
     const selection = focusId && "selectionStart" in focused ? [focused.selectionStart, focused.selectionEnd] : null;
     const scroll = phone.scrollTop;
     const meta = registry[route];
-    document.title = `Claro Home — ${route === "home" ? "Interactive storyboard" : route}`;
+    document.title = `Claro Home${classicMode ? " 2G" : ""} — ${route === "home" ? "Interactive storyboard" : route}`;
     $("section-name").textContent = meta.group;
     $("screen-title").textContent = meta.title; $("screen-subtitle").textContent = meta.subtitle;
     $("screen-count").textContent = `${String(meta.index + 1).padStart(2, "0")} / ${definitions.length}`;
@@ -333,12 +416,12 @@
     $("prototype-status").textContent = "Local storyboard only · session changes reset on reload · no native implementation, telemetry or real actions.";
     const boundaries = ["camera", "apps", "permissions", "purchase"].includes(route) ? "Android / Play boundary: the external panel is an illustration, not a launched app or real system prompt." : "Every call, message, emergency action and membership result is simulated; no network or device action occurs.";
     const detailNote = route === "pin" || route === "pin-recovery" || route === "setup" ? "Date mode is an accidental-change barrier, not a security or cognitive assessment: anyone who knows today's local date can pass. It needs no PIN or recovery phrase. PIN mode requires credentials created in Setup; the date question cannot recover or bypass that PIN. Changing modes requires the current unlock method. Three failed attempts pause input for 30 seconds; inactivity locks after two minutes." : route === "home" || route === "speed-dial" ? "Original illustrated portraits stand in for contact photos. Four people stay visible. Additional apps scroll; the six core tiles and free features cannot be removed." : route === "plans" || route === "purchase" || route === "membership" ? "No prices are approved. Price to be confirmed. Seven days free only through an eligible explicit store enrollment; lifetime is separate and never renews." : "Large accessible targets and in-page outcomes. Native accessibility, provider behavior and OS lifecycle still require approved device validation.";
-    $("screen-notes").innerHTML = [[meta.refs, "Product requirement references for this screen; review named states below."], ["Honest boundaries", boundaries], ["Review note", detailNote], ["Implementation context", "All data and outcomes are in-memory simulations. Portraits and gallery landscapes are original illustrations, not contact photos. HOME, DIALER and SMS roles must be requested separately; contact/media access must be scoped. Native Telecom, lock-screen, accessibility, lifecycle, permission recovery, carrier delivery and device handover require validation. Optional analytics/crash collection needs separate consent, no sensitive values may be logged, and billing needs its own privacy disclosure. Only core navigation is translated; secondary screens remain English draft. Prices and products are unapproved; a real checkout must disclose currency, full charge, first billing date, trial eligibility, renewal, cancellation deadline and Play management before consent."], ...(reviewFeedback ? [["Latest review action", reviewFeedback]] : [])].map((n, i) => `<div class="note"><span class="note-number">${i + 1}</span><div><h3>${esc(n[0])}</h3><p>${esc(n[1])}</p></div></div>`).join("");
+    $("screen-notes").innerHTML = [[meta.refs, "Product requirement references for this screen; review named states below."], ["Honest boundaries", boundaries], ["Review note", classicMode ? "Separate 2G concept: four outer keys and one connected navigation pad. Back stays left; Confirm stays right. The right softkey opens Options when no primary action exists; otherwise an Options navigation row gives access to secondary actions, including text deletion. Call and Home retain their positions within each layout. Compare four arrangements using the sidebar link. Four arrows highlight items/fields; OK selects. Left/right edit the cursor or dropdown value and browse photos; up/down move between items or scroll. Touch remains available. Hold 1/2 for speed dial only from Home/Phone, never while entering text or during SOS. Text fields support English ABC multi-tap; # switches letters/numbers, 0 inserts a space. Native third-party/system screens cannot retain Claro's keypad. This is not T9 prediction or fully localized text input." : detailNote], ["Implementation context", "All data and outcomes are in-memory simulations. Portraits and gallery landscapes are original illustrations, not contact photos. HOME, DIALER and SMS roles must be requested separately; contact/media access must be scoped. Native Telecom, lock-screen, accessibility, lifecycle, permission recovery, carrier delivery and device handover require validation. Optional analytics/crash collection needs separate consent, no sensitive values may be logged, and billing needs its own privacy disclosure. Only core navigation is translated; secondary screens remain English draft. Prices and products are unapproved; a real checkout must disclose currency, full charge, first billing date, trial eligibility, renewal, cancellation deadline and Play management before consent."], ...(reviewFeedback ? [["Latest review action", reviewFeedback]] : [])].map((n, i) => `<div class="note"><span class="note-number">${i + 1}</span><div><h3>${esc(n[0])}</h3><p>${esc(n[1])}</p></div></div>`).join("");
     $("state-controls").innerHTML = `<p>Preview states only. They do not reflect a real device.</p>${(variants[route] || ["standard"]).map(v => button(esc(v), "variant", "", `data-variant="${esc(v)}" aria-pressed="${v === variant}"`)).join("")}${button("Reset this screen preview", "variant", "", `data-variant="${esc(variants[route][0])}"`)}`;
     $("screen-nav").innerHTML = definitions.map((d, i) => {
       const group = i === 0 || d[1] !== definitions[i - 1][1] ? `<div class="nav-group">${d[1]}</div>` : "";
       const link = `<a class="screen-link ${route === d[0] ? "active" : ""}" href="#${d[0]}" ${route === d[0] ? 'aria-current="page"' : ""}><span class="nav-index">${String(i + 1).padStart(2, "0")}</span>${esc(d[0].split("-").map(s => s[0].toUpperCase() + s.slice(1)).join(" "))}</a>`;
-      const options = d[0] === "dialer" ? `<div class="dialer-options" role="group" aria-label="Dialer design options"><span class="dialer-options-label">Options</span>${Object.entries(dialerOptions).map(([id, option]) => `<a class="screen-link dialer-option ${route === id ? "active" : ""}" href="#${id}" ${route === id ? 'aria-current="page"' : ""}>${esc(option.label)}</a>`).join("")}</div>` : "";
+      const options = d[0] === "dialer" && !classicMode ? `<div class="dialer-options" role="group" aria-label="Dialer design options"><span class="dialer-options-label">Options</span>${Object.entries(dialerOptions).map(([id, option]) => `<a class="screen-link dialer-option ${route === id ? "active" : ""}" href="#${id}" ${route === id ? 'aria-current="page"' : ""}>${esc(option.label)}</a>`).join("")}</div>` : "";
       return group + (options ? `<div class="dialer-nav-item">${link}${options}</div>` : link);
     }).join("");
     const isRTL = state.language === "he";
@@ -357,7 +440,8 @@
     const status = document.querySelector(".device-status-right");
     status.textContent = `${network === "available" ? "▂▄▆█" : network} · 82% ▰`;
     status.setAttribute("aria-label", `${network}, battery 82 percent`);
-    const content = screens[route]();
+    if (classicMode) document.querySelector(".device-status > span:first-child").textContent = route === "home" ? "Claro" : "9:41";
+    const content = classicMode && route === "home" ? classicHome() : classicMode && (route === "dialer" || dialerOptions[route]) ? classicDialer() : screens[route]();
     actionDock.replaceChildren();
     phone.innerHTML = `<section class="screen ${route === "home" ? "home-screen" : ""}" data-screen="${route}" aria-label="${esc(route)}">${state.notice ? info(esc(state.notice), "success") : ""}${state.error ? info(esc(state.error), "error") : ""}${content}${state.external && !content.includes('class="external-panel"') ? noticeExternal() : ""}</section>`;
     phone.querySelectorAll("form[data-form]").forEach(form => {
@@ -370,6 +454,10 @@
       });
     });
     mountScreenActions();
+    if (classicMode) {
+      phone.querySelectorAll('input:not([type="checkbox"]):not([type="radio"]), textarea').forEach(input => input.setAttribute("inputmode", "none"));
+      renderClassicDeck();
+    }
     if (focusId) {
       const restored = $(focusId);
       if (restored) { restored.focus({ preventScroll: true }); if (selection && restored.setSelectionRange) { try { restored.setSelectionRange(...selection); } catch (_) { /* Numeric fields do not support selection. */ } } }
@@ -381,6 +469,315 @@
   const emergency = () => button("Emergency call", "emergency", "secondary emergency-action");
   const permissionWarning = feature => `${info(`${esc(feature)} access needed.`, "warning")}${button(`Open ${esc(feature)}`, "native", "primary")}${goButton("Settings", "permissions")}`;
   const noticeExternal = () => state.external ? `<div class="external-panel" role="region" aria-label="${esc(state.external)}">${heading(state.external)}${button("Back to Claro", "external-back", "primary")}</div>` : "";
+  function classicHome() {
+    return `<div class="classic-clock"><time dir="ltr">9:41</time><p>${esc(new Date().toLocaleDateString(({ en: "en-GB", es: "es", he: "he" })[state.language], { weekday: "short", day: "numeric", month: "short" }))}</p></div>
+      <div class="speed-dials">${state.favorites.map((value, i) => { const contact = variant === "unassigned" && i === 3 ? null : resolve(value); return button(`${avatar(contact)}<span>${esc(contact?.name || "+")}</span>`, contact ? "favorite" : "unassigned", "speed-dial", `data-slot="${i}" aria-label="${esc(contact ? `Call ${contact.name}` : t("add"))}"`); }).join("")}</div>
+      <div class="classic-home-links">${goButton(`${icon("messages")} ${esc(t("messages"))}${state.unread ? '<span aria-label="Unread messages">●</span>' : ""}`, "messages")}${goButton(`${icon("sos")} SOS`, "sos", "danger")}</div>`;
+  }
+  function classicDialer() {
+    if (variant === "permission denied" || state.readiness.Phone.startsWith("Denied")) return heading(t("phone")) + permissionWarning("Phone") + emergency();
+    return heading(t("phone")) + `<div class="dial-display" dir="ltr" aria-live="polite">${esc(state.digits || t("type"))}</div>` +
+      goButton(`${icon("contact")} ${esc(t("contacts"))}`, "contacts") +
+      state.contacts.slice(0, 3).map((contact, i) => row(contact.name, `${i === 0 ? t("missed") : t("recent")} · 9:${20 + i}`, "recent-call", `data-id="${contact.id}"`, avatar(contact))).join("") + emergency();
+  }
+  function classicTarget() {
+    if (classicOptionsOpen) return null;
+    if (classicSelected?.isConnected && classicSelected.matches('select, input[type="checkbox"], input[type="radio"]')) return null;
+    const editable = input => input && phone.contains(input) && !input.disabled && !input.readOnly && (input.matches('textarea, input[type="text"], input[type="tel"], input[type="password"], input[type="search"]'));
+    if (editable(document.activeElement)) return document.activeElement;
+    if (editable(classicSelected)) return classicSelected;
+    if (editable(classicInput)) return classicInput;
+    if (route === "compose") return phone.querySelector('[name="body"]');
+    return [...phone.querySelectorAll("input, textarea")].find(editable) || null;
+  }
+  function classicIsNumeric(input) {
+    return input && (input.type === "tel" || ["date", "pin", "newPin", "confirmPin"].includes(input.name));
+  }
+  function classicFeedback(text) { $("classic-feedback").textContent = text; }
+  function classicCandidates() {
+    return [...phone.querySelectorAll("button, input, select, textarea")].filter(el =>
+      !el.disabled && el.type !== "hidden" && !el.closest("[hidden]") && el.getClientRects().length);
+  }
+  function classicCandidateKey(el) {
+    return el.id || el.name || JSON.stringify([el.tagName, el.dataset, el.getAttribute("aria-label")]);
+  }
+  function selectClassicItem(el, reveal = false) {
+    phone.querySelectorAll(".classic-selected").forEach(item => item.classList.remove("classic-selected"));
+    classicSelected = el;
+    classicSelectionKey = el ? classicCandidateKey(el) : "";
+    if (!el) return;
+    el.classList.add("classic-selected");
+    if (reveal) {
+      el.focus({ preventScroll: true });
+      const bounds = el.getBoundingClientRect(), display = phone.getBoundingClientRect();
+      if (bounds.top < display.top) phone.scrollTop += bounds.top - display.top - 4;
+      else if (bounds.bottom > display.bottom) phone.scrollTop += bounds.bottom - display.bottom + 4;
+    }
+  }
+  function syncClassicSelection() {
+    const scope = `${route}:${classicOptionsOpen ? "options" : "screen"}`;
+    if (classicSelectionScope !== scope) { classicSelectionScope = scope; classicSelectionKey = ""; }
+    const candidates = classicCandidates();
+    selectClassicItem(candidates.find(el => classicCandidateKey(el) === classicSelectionKey) || candidates[0] || null);
+  }
+  function classicNeighbor(direction) {
+    const candidates = classicCandidates();
+    if (!candidates.length) return null;
+    if (!candidates.includes(classicSelected)) return candidates[0];
+    const horizontal = ["left", "right"].includes(direction);
+    const sign = ["up", "left"].includes(direction) ? -1 : 1;
+    const bounds = classicSelected.getBoundingClientRect();
+    const x = bounds.left + bounds.width / 2, y = bounds.top + bounds.height / 2;
+    const neighbors = candidates.filter(el => el !== classicSelected).map(el => {
+      const rect = el.getBoundingClientRect();
+      const dx = rect.left + rect.width / 2 - x, dy = rect.top + rect.height / 2 - y;
+      return { el, major: (horizontal ? dx : dy) * sign, minor: Math.abs(horizontal ? dy : dx), sameRow: Math.min(rect.bottom, bounds.bottom) - Math.max(rect.top, bounds.top) > 8 };
+    }).filter(item => item.major > 8 && (!horizontal || item.sameRow)).sort((a, b) => a.major + a.minor * 3 - b.major - b.minor * 3);
+    if (neighbors.length) return neighbors[0].el;
+    if (horizontal && candidates.some(el => {
+      if (el === classicSelected) return false;
+      const rect = el.getBoundingClientRect();
+      return Math.min(rect.bottom, bounds.bottom) - Math.max(rect.top, bounds.top) > 8;
+    })) return null;
+    return horizontal ? candidates[candidates.indexOf(classicSelected) + sign] || null : null;
+  }
+  function updateClassicNavigation() {
+    const selected = classicSelected?.isConnected ? classicSelected : null;
+    for (const direction of ["up", "down", "left", "right"]) {
+      const horizontal = ["left", "right"].includes(direction);
+      let available;
+      if (horizontal && selected?.matches('input:not([type="checkbox"]):not([type="radio"]), textarea')) {
+        available = direction === "left" ? selected.selectionEnd > 0 : selected.selectionStart < selected.value.length;
+      } else if (horizontal && selected?.matches("select")) {
+        available = direction === "left" ? selected.selectedIndex > 0 : selected.selectedIndex < selected.options.length - 1;
+      } else if (horizontal && route === "photo" && !classicOptionsOpen) {
+        available = state.photos.length > 1;
+      } else {
+        available = Boolean(classicNeighbor(direction)) || (!horizontal && (direction === "up" ? phone.scrollTop > 1 : phone.scrollHeight - phone.clientHeight - phone.scrollTop > 1));
+      }
+      $(`classic-nav-${direction}`).disabled = !available;
+    }
+    $("classic-ok").disabled = !selected;
+  }
+  function classicNavigate(el) {
+    const direction = el.dataset.direction;
+    const horizontal = ["left", "right"].includes(direction);
+    const sign = ["up", "left"].includes(direction) ? -1 : 1;
+    const selected = classicSelected;
+    multiTap = null;
+    if (horizontal && selected?.matches('input:not([type="checkbox"]):not([type="radio"]), textarea')) {
+      const start = selected.selectionStart ?? 0, end = selected.selectionEnd ?? start;
+      const cursor = start !== end ? sign < 0 ? start : end : Math.max(0, Math.min(selected.value.length, start + sign));
+      selected.focus({ preventScroll: true }); selected.setSelectionRange(cursor, cursor);
+    } else if (horizontal && selected?.matches("select")) {
+      const index = selected.selectedIndex + sign;
+      if (index >= 0 && index < selected.options.length && !selected.options[index].disabled) {
+        selected.selectedIndex = index;
+        selected.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    } else if (horizontal && route === "photo" && !classicOptionsOpen) {
+      actions[sign < 0 ? "previous-photo" : "next-photo"]();
+    } else {
+      const neighbor = classicNeighbor(direction);
+      if (neighbor) selectClassicItem(neighbor, true);
+      else if (!horizontal) phone.scrollBy({ top: sign * Math.max(72, Math.floor(phone.clientHeight * 0.7)), behavior: "auto" });
+    }
+    updateClassicNavigation();
+  }
+  function classicOK() {
+    const selected = classicSelected;
+    if (!selected || selected.disabled) return;
+    if (selected.matches("input:not([type=checkbox]):not([type=radio]), textarea, select")) selected.focus({ preventScroll: true });
+    else selected.click();
+  }
+  function classicConfirmAction() {
+    const eligible = classicActions.filter(control => !["classic-call", "contact-call", "place-call", "answer", "retry-call"].includes(control.dataset.action));
+    return eligible.find(control => ["confirm-delete-contact", "confirm-remove-photo", "confirm-reset", "cancel-sos", "start-sos", "reset-review"].includes(control.dataset.action)) ||
+      eligible.find(control => control.type === "submit") ||
+      eligible.find(control => control.classList.contains("primary")) || null;
+  }
+  function invokeClassicAction(control) {
+    if (!control || control.disabled) return;
+    if (control.type === "submit") {
+      const form = $(control.getAttribute("form"));
+      if (form) form.requestSubmit();
+      else { state.error = "Form unavailable. Go back and try again."; render(); }
+    } else {
+      const action = actions[control.dataset.action];
+      if (action) action(control);
+      else { state.error = "Action unavailable. Go back and try again."; render(); }
+    }
+  }
+  function closeClassicOptions() {
+    classicOptionsOpen = false;
+    classicOptionInput = null;
+    $("classic-options")?.remove();
+    phone.querySelector(".screen").hidden = false;
+    classicSelectionScope = `${route}:screen`;
+    classicSelectionKey = classicOptionReturnKey;
+    renderClassicDeck();
+    phone.scrollTop = classicOptionsScroll;
+    updateClassicNavigation();
+  }
+  function openClassicOptions() {
+    if (classicOptionsOpen) { closeClassicOptions(); return; }
+    classicOptionInput = classicTarget();
+    renderClassicSoftkeys();
+    classicOptionsScroll = phone.scrollTop;
+    classicOptionReturnKey = classicSelectionKey;
+    classicOptionsOpen = true;
+    phone.querySelector(".screen").hidden = true;
+    phone.insertAdjacentHTML("beforeend", `<section id="classic-options" class="screen" aria-label="Options">${heading("Options")}${classicOptionActions.map((control, index) =>
+      row(control.dataset.action === "delete-contact" ? "Delete contact" : control.getAttribute("aria-label") || control.textContent.trim(), "", "classic-option", `data-index="${index}" ${control.disabled ? "disabled" : ""}`)).join("")}</section>`);
+    phone.scrollTop = 0;
+    renderClassicDeck();
+  }
+  function renderClassicSoftkeys() {
+    const input = classicOptionsOpen ? classicOptionInput : classicTarget();
+    const confirmAction = classicConfirmAction(), confirm = $("classic-confirm");
+    const call = $("classic-call"), end = $("classic-end");
+    call.innerHTML = `${icon("phone")}<span>${route === "incoming" ? "Answer" : "Call"}</span>`;
+    call.disabled = Boolean(state.external) || classicOptionsOpen || Boolean(state.contactMode) || route === "sos-countdown" ||
+      (state.activeCall && ["calling", "sos-active"].includes(route)) || (Boolean(input) && !["dialer", "contacts"].includes(route));
+    end.innerHTML = `${icon("end")}<span>${esc(route === "incoming" ? "Decline" : state.activeCall ? "End" : t("home"))}</span>`;
+    $("classic-back").textContent = t("back");
+    classicOptionActions = classicActions.filter(control => control !== confirmAction && !["classic-call", "contact-call", "place-call", "answer", "retry-call"].includes(control.dataset.action));
+    if (!state.external && route !== "incoming" && route !== "sos-countdown" && !(state.activeCall && ["calling", "sos-active"].includes(route)) && (input || (route === "dialer" && state.digits))) {
+      const remove = document.createElement("button");
+      remove.type = "button"; remove.dataset.action = "classic-delete"; remove.textContent = "Delete character";
+      remove.disabled = input ? !input.value : !state.digits;
+      classicOptionActions.unshift(remove);
+      const clear = document.createElement("button");
+      clear.type = "button"; clear.dataset.action = "classic-clear"; clear.textContent = "Clear text"; clear.disabled = remove.disabled;
+      classicOptionActions.push(clear);
+    }
+    if (!state.external && !["delete-contact", "remove-photo", "sos-test", "reset"].includes(state.confirm)) {
+      for (const [label, destination] of [[t("contacts"), "contacts"], ["Menu", "classic-menu"]]) {
+        if (route === destination || classicOptionActions.some(control => control.dataset.route === destination || (destination === "contacts" && control.dataset.action === "manage-contacts"))) continue;
+        const control = document.createElement("button");
+        control.type = "button"; control.dataset.action = "go"; control.dataset.route = destination; control.textContent = label;
+        classicOptionActions.push(control);
+      }
+    }
+    confirm.textContent = classicOptionsOpen ? "Select" : confirmAction ? confirmAction.textContent.trim() : route === "home" ? "Menu" : "Options";
+    confirm.disabled = classicOptionsOpen ? !classicSelected : confirmAction ? confirmAction.disabled : classicOptionActions.length === 0;
+    confirm.classList.toggle("primary", !classicOptionsOpen && Boolean(confirmAction) && !confirmAction.classList.contains("danger"));
+    confirm.classList.toggle("danger", !classicOptionsOpen && Boolean(confirmAction?.classList.contains("danger")));
+    confirm.classList.toggle("classic-long-key", confirm.textContent.trim().length > 12);
+    const screen = phone.querySelector(".screen");
+    const shortcut = screen.querySelector(".classic-options-shortcut");
+    if (confirmAction && classicOptionActions.length) {
+      if (!shortcut) {
+        screen.insertAdjacentHTML("beforeend", row("Options", "", "classic-options", 'aria-label="More options"'));
+        screen.lastElementChild.classList.add("classic-options-shortcut");
+      }
+    } else shortcut?.remove();
+  }
+  function renderClassicDeck() {
+    classicDeck.hidden = false;
+    syncClassicSelection();
+    const blocked = Boolean(state.external) || classicOptionsOpen || route === "incoming" || route === "sos-countdown";
+    const selectionOnly = classicSelected?.matches('select, input[type="checkbox"], input[type="radio"]');
+    classicDeck.querySelectorAll('[data-action="classic-digit"]').forEach(key => { key.disabled = blocked || Boolean(selectionOnly); });
+    const input = classicTarget();
+    renderClassicSoftkeys();
+    syncClassicSelection();
+    const mode = $("classic-input-mode");
+    mode.hidden = !input || classicIsNumeric(input);
+    mode.textContent = mode.hidden ? "" : classicNumeric ? "Numbers" : "Letters";
+    classicDeck.querySelectorAll("[data-speed-label]").forEach(label => {
+      const contact = resolve(state.keys[Number(label.dataset.speedLabel)]);
+      label.textContent = ["home", "dialer"].includes(route) && !input ? contact?.name || "" : label.dataset.speedLabel === "0" ? ".,?!" : "ABC";
+    });
+    if (!state.activeCall) state.classicTones = "";
+    $("classic-feedback").textContent = state.classicTones ? state.classicTones.slice(-12) : "";
+    classicScrollObserver.disconnect();
+    classicScrollObserver.observe(phone);
+    if (phone.firstElementChild) classicScrollObserver.observe(phone.firstElementChild);
+    requestAnimationFrame(updateClassicNavigation);
+  }
+  function classicEdit(input, text, replace = false) {
+    const start = replace ? multiTap.start : input.selectionStart ?? input.value.length;
+    const end = replace ? multiTap.end : input.selectionEnd ?? input.value.length;
+    if (input.maxLength >= 0 && input.value.length - (end - start) + text.length > input.maxLength) { classicFeedback("Maximum length reached."); return false; }
+    input.focus({ preventScroll: true });
+    input.setRangeText(text, start, end, "end");
+    if (input.name === "date") {
+      const beforeCursor = input.value.slice(0, input.selectionStart).replace(/\D/g, "").length;
+      const digits = input.value.replace(/\D/g, "").slice(0, 8);
+      input.value = digits.slice(0, 2) + (digits.length >= 2 ? "/" : "") + digits.slice(2, 4) + (digits.length >= 4 ? "/" : "") + digits.slice(4);
+      let cursor = 0, count = 0;
+      while (cursor < input.value.length && count < beforeCursor) {
+        if (/\d/.test(input.value[cursor])) count++;
+        cursor++;
+      }
+      if (input.value[cursor] === "/") cursor++;
+      input.setSelectionRange(cursor, cursor);
+    }
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    classicInput = classicTarget();
+    if (classicInput) {
+      const fieldBounds = classicInput.getBoundingClientRect(), screenBounds = phone.getBoundingClientRect();
+      if (fieldBounds.top < screenBounds.top || fieldBounds.bottom > screenBounds.bottom) phone.scrollTop += fieldBounds.top - screenBounds.top - 4;
+    }
+    updateClassicNavigation();
+    return true;
+  }
+  function classicDigit(el) {
+    if (suppressClick?.element === el) { suppressClick = null; return; }
+    const digit = el.dataset.digit;
+    if (state.activeCall && ["calling", "sos-active"].includes(route)) { state.classicTones = (state.classicTones + digit).slice(-24); renderClassicDeck(); return; }
+    const input = classicTarget();
+    if (input) {
+      if (digit === "#" && !classicIsNumeric(input)) { classicNumeric = !classicNumeric; multiTap = null; renderClassicDeck(); return; }
+      if (["date", "pin", "newPin", "confirmPin"].includes(input.name) && !/^\d$/.test(digit)) { classicFeedback("Use number keys."); return; }
+      const alphabet = { "1": ".,?!1", "2": "abc2", "3": "def3", "4": "ghi4", "5": "jkl5", "6": "mno6", "7": "pqrs7", "8": "tuv8", "9": "wxyz9", "0": " 0", "*": ".,?!*" };
+      const letters = classicIsNumeric(input) || classicNumeric ? digit : alphabet[digit];
+      const replace = letters.length > 1 && multiTap?.route === route && multiTap.id === input.id && multiTap.digit === digit && Date.now() - multiTap.time < 1000 && input.selectionStart === multiTap.end && input.selectionEnd === multiTap.end && input.value.slice(multiTap.start, multiTap.end) === multiTap.text;
+      const index = replace ? (multiTap.index + 1) % letters.length : 0;
+      const start = replace ? multiTap.start : input.selectionStart ?? input.value.length;
+      const text = letters[index];
+      if (classicEdit(input, text, replace)) multiTap = { route, id: input.id, digit, index, start, end: start + text.length, text, time: Date.now() };
+      return;
+    }
+    if (state.activeCall) { classicFeedback("Return to the call for tones."); return; }
+    multiTap = null;
+    if (route !== "dialer") { state.digits = digit; navigate("dialer"); }
+    else { state.digits = (state.digits + digit).slice(0, 24); state.error = ""; render(); }
+  }
+  function classicDelete() {
+    if (state.activeCall && ["calling", "sos-active"].includes(route)) { classicFeedback("Tones cannot be deleted."); return; }
+    multiTap = null;
+    const input = classicTarget();
+    if (!input) { state.digits = state.digits.slice(0, -1); render(); return; }
+    let start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? start;
+    if (start === end && start > 0) { start--; if (input.name === "date" && input.value[start] === "/") start = Math.max(0, start - 1); }
+    input.setSelectionRange(start, end);
+    classicEdit(input, "");
+  }
+  function classicCall() {
+    if (route === "incoming") { actions.answer(); return; }
+    if (state.activeCall) { navigate(route === "sos-active" ? "sos-active" : "calling"); return; }
+    if (route === "call-confirm") { actions["place-call"](); return; }
+    if (route === "contact-detail" && !state.contactMode) { actions["contact-call"](); return; }
+    if (["call-ended", "call-failed"].includes(route)) { actions["retry-call"](); return; }
+    if (route === "dialer" && state.digits) { actions.dial(); return; }
+    if (classicSelected && ["contact", "phone-contact", "recent-call", "favorite"].includes(classicSelected.dataset.action)) {
+      if (classicSelected.dataset.action === "contact") actions["phone-contact"](classicSelected);
+      else actions[classicSelected.dataset.action](classicSelected);
+      return;
+    }
+    navigate("dialer");
+  }
+  function classicEnd() {
+    if (route === "incoming") { actions.decline(); return; }
+    if (state.activeCall) { actions[route === "sos-active" ? "end-sos" : "end-call"](); return; }
+    state.digits = ""; classicInput = null; multiTap = null; navigate("home");
+  }
+  function classicSpeedDialAllowed() {
+    return classicMode && !classicOptionsOpen && !classicTarget() && !state.activeCall && !state.external && ["home", "dialer"].includes(route);
+  }
   function dialerPreview() {
     const option = dialerOptions[route];
     const tab = state.phoneTabs[route] || option.initialTab;
@@ -412,6 +809,10 @@
       }).join("")}</div>` + button(`${icon("phone")} ${esc(t("call"))}`, "dial", "primary", state.digits ? "" : "disabled") + emergency();
   }
   const screens = {
+    "classic-menu": () => heading("Menu") + [
+      [t("contacts"), "contacts", "contact"], [t("phone"), "dialer", "phone"], [t("messages"), "messages", "messages"],
+      [t("camera"), "camera", "camera"], [t("gallery"), "gallery", "gallery"], ["SOS", "sos", "sos"], [t("apps"), "apps", "apps"], [t("settings"), "settings", "settings"]
+    ].map(([label, destination, symbol]) => row(label, "", "go", `data-route="${destination}"`, icon(symbol))).join(""),
     home: () => {
       const noSignal = state.network !== "available";
       const dates = { en: ["WED 11", "NOV 2026"], es: ["MIÉ 11", "NOV 2026"], he: ["יום ד׳ 11", "נוב׳ 2026"] };
@@ -460,7 +861,7 @@
     },
     "call-confirm": () => heading("Call?") + avatar({ name: state.target.name }, true) + `<h3 class="call-name">${esc(state.target.name)}</h3><p dir="ltr">${esc(state.target.number)}</p>` +
       (variant === "no SIM" ? info("No SIM. Calling unavailable.", "warning") : "") +
-      button(`${icon("phone")} Call`, "place-call", "primary") + button("Cancel", "back"),
+      (classicMode ? "" : button(`${icon("phone")} Call`, "place-call", "primary") + button("Cancel", "back")),
     calling: () => heading("Call") + avatar({ name: state.target.name }, true) + `<h3 class="call-name">${esc(state.target.name)}</h3><p dir="ltr">${esc(state.target.number)}</p><p class="call-status">${esc(variant === "connected" ? (state.held ? "On hold" : state.callState) : variant)}${["dialing", "ringing"].includes(variant) ? "" : ` · <bdi>${sampleCallDuration}</bdi>`}</p>` +
       `<div class="call-controls">${button(`${icon("speaker")} Speaker`, "speaker", "secondary", `aria-pressed="${state.speaker}"`)}${button(`${icon("microphone")} Mute`, "mute", "secondary", `aria-pressed="${state.muted}"`)}${button(state.held ? "Resume" : "Hold", "hold-call", "secondary", `aria-pressed="${state.held}"`)}${button(`${icon("apps")} Keypad`, "call-keypad")}</div>` +
       (state.confirm === "call-keypad" ? `<div class="dialpad" dir="ltr">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"].map(n => button(n, "dtmf", "dial-key", `data-digit="${n}"`)).join("")}</div><small dir="ltr">${esc(state.digits)}</small>` : "") +
@@ -684,6 +1085,30 @@
     state.editId = nextId; state.contactMode = "edit"; navigate("contact-detail"); state.contactMode = "edit"; render();
   }
   const actions = {
+    "classic-digit": classicDigit,
+    "classic-delete": classicDelete,
+    "classic-call": classicCall,
+    "classic-end": classicEnd,
+    "classic-back": back,
+    "classic-confirm": () => {
+      if (classicOptionsOpen) classicOK();
+      else if (!classicConfirmAction()) openClassicOptions();
+      else invokeClassicAction(classicConfirmAction());
+    },
+    "classic-clear": () => {
+      const input = classicTarget();
+      multiTap = null;
+      if (input) { input.setSelectionRange(0, input.value.length); classicEdit(input, ""); }
+      else { state.digits = ""; render(); }
+    },
+    "classic-options": openClassicOptions,
+    "classic-option": el => {
+      const control = classicOptionActions[Number(el.dataset.index)];
+      closeClassicOptions();
+      invokeClassicAction(control);
+    },
+    "classic-nav": classicNavigate,
+    "classic-ok": classicOK,
     go: el => {
       if (el.dataset.discard) { delete state.preferenceDrafts[route]; draft = null; const form = phone.querySelector("form[data-form]"); if (form) delete state.formDrafts[form.dataset.form]; }
       navigate(el.dataset.route);
@@ -821,7 +1246,12 @@
       state.photos.splice(state.photoIndex, 1); state.photoIndex = Math.max(0, Math.min(state.photoIndex, state.photos.length - 1));
       navigate("gallery"); state.notice = "Picture removed."; render();
     },
-    "pick-photo": () => { state.external = "Photos"; state.confirm = "picker"; render(); phone.querySelector(".screen").insertAdjacentHTML("beforeend", button("Choose picture", "add-picker-photo", "primary")); mountScreenActions(); },
+    "pick-photo": () => {
+      state.external = "Photos"; state.confirm = "picker"; render();
+      phone.querySelector(".screen").insertAdjacentHTML("beforeend", button("Choose picture", "add-picker-photo", "primary"));
+      if (classicMode) { mountClassicActions(classicActions); renderClassicDeck(); }
+      else mountScreenActions();
+    },
     "add-picker-photo": () => { state.photos.push({ id: Date.now(), title: "Landscape", owned: false }); state.external = ""; variant = "standard"; state.notice = "Picture added."; render(); },
     "finish-loading": () => { variant = "standard"; render(); },
     "start-sos": startSOS,
@@ -875,7 +1305,14 @@
     restore: () => {
       state.external = "Google Play";
       render();
-      if (route !== "membership") phone.querySelector(".screen").insertAdjacentHTML("beforeend", `${button("No purchases found", "restore-none")}${button("Restore lifetime", "restore-demo")}${button("Try later", "restore-failed")}`);
+      if (route !== "membership") {
+        phone.querySelector(".screen").insertAdjacentHTML("beforeend", `${button("No purchases found", "restore-none")}${button("Restore lifetime", "restore-demo")}${button("Try later", "restore-failed")}`);
+        if (classicMode) {
+          const previous = classicActions;
+          mountClassicActions(previous);
+          renderClassicDeck();
+        }
+      }
     },
     "manage-membership": () => { state.external = "Google Play"; render(); },
     "cancel-membership": () => { state.membership = "Canceled — valid demo"; state.external = ""; state.notice = "Renewal canceled. Access lasts through your paid period."; render(); },
@@ -990,6 +1427,13 @@
       case "recipient": state.recipient = el.value; break;
       case "body": state.body = el.value; $("message-length").textContent = messageLength(); break;
     }
+    if (classicMode) updateClassicNavigation();
+  });
+  phone.addEventListener("focusin", event => {
+    if (!classicMode) return;
+    if (classicCandidates().includes(event.target)) selectClassicItem(event.target);
+    if (event.target.matches("input, textarea")) classicInput = event.target;
+    multiTap = null; renderClassicDeck();
   });
   phone.addEventListener("change", event => {
     const el = event.target; touchSession(); rememberForm(el);
@@ -1005,27 +1449,29 @@
       case "handover": state.handover = el.checked; render(); break;
     }
   });
-  phone.addEventListener("pointerdown", event => {
-    const key = event.target.closest('[data-action="digit"]');
-    if ((route !== "dialer" && !dialerOptions[route]) || !key || !["1", "2"].includes(key.dataset.digit) || (event.pointerType === "mouse" && event.button !== 0)) return;
+  device.addEventListener("pointerdown", event => {
+    if (classicMode && event.target.closest(".classic-deck")) event.preventDefault();
+    const key = event.target.closest('[data-action="digit"], [data-action="classic-digit"]');
+    const classicKey = key?.dataset.action === "classic-digit";
+    if (!key || (classicKey ? !classicSpeedDialAllowed() : route !== "dialer" && !dialerOptions[route]) || !["1", "2"].includes(key.dataset.digit) || (event.pointerType === "mouse" && event.button !== 0)) return;
     clearHold(); suppressClick = null; holdButton = key; holdStart = { x: event.clientX, y: event.clientY, id: event.pointerId };
     try { key.setPointerCapture(event.pointerId); } catch (_) { /* Capture may be unavailable for an interrupted pointer. */ }
     key.classList.add("holding"); key.setAttribute("aria-description", "Hold in progress. Release or move to cancel.");
     holdTimer = setTimeout(() => {
-      if (holdButton !== key || (route !== "dialer" && !dialerOptions[route])) return;
+      if (holdButton !== key || (classicKey ? !classicSpeedDialAllowed() : route !== "dialer" && !dialerOptions[route])) return;
       suppressClick = { element: key }; clearHold(); shortcut(Number(key.dataset.digit) - 1, true);
     }, 800);
   });
-  phone.addEventListener("pointermove", event => {
+  device.addEventListener("pointermove", event => {
     if (holdButton && holdStart && Math.hypot(event.clientX - holdStart.x, event.clientY - holdStart.y) > 10) { suppressClick = { element: holdButton }; clearHold(); }
   });
-  phone.addEventListener("pointerup", clearHold);
-  phone.addEventListener("pointercancel", () => { if (holdButton) suppressClick = { element: holdButton }; clearHold(); });
-  phone.addEventListener("lostpointercapture", clearHold);
+  device.addEventListener("pointerup", clearHold);
+  device.addEventListener("pointercancel", () => { if (holdButton) suppressClick = { element: holdButton }; clearHold(); });
+  device.addEventListener("lostpointercapture", clearHold);
   phone.addEventListener("scroll", () => { if (holdButton) suppressClick = { element: holdButton }; clearHold(); }, { passive: true });
   document.addEventListener("keydown", event => {
     touchSession();
-    if (event.key === "Escape") { clearHold(); if ($("clean-preview")) $("clean-preview").checked = false; if (state.external || state.confirm || state.contactMode) back(); }
+    if (event.key === "Escape") { clearHold(); if ($("clean-preview") && !document.body.classList.contains("classic-embed")) $("clean-preview").checked = false; if (state.external || state.confirm || state.contactMode) back(); }
   });
   $("phone-back").addEventListener("click", back);
   $("phone-home").addEventListener("click", () => navigate("home"));
@@ -1038,6 +1484,25 @@
     if (document.hidden && route === "sos-countdown") { clearInterval(countdownTimer); variant = "interrupted"; render(); }
   });
   window.addEventListener("pagehide", cleanup);
+  if (classicMode) {
+    classicDeck.innerHTML = `<div id="classic-controls" class="classic-context-keys" role="group" aria-label="Fixed phone controls">
+        ${button("Confirm", "classic-confirm", "classic-context-key", 'id="classic-confirm"')}
+        ${button(esc(t("back")), "classic-back", "classic-context-key", 'id="classic-back"')}
+        ${button("", "classic-call", "classic-context-key primary", 'id="classic-call"')}
+        ${button("", "classic-end", "classic-context-key classic-end", 'id="classic-end"')}
+        <div class="classic-dpad" role="group" aria-label="Four-way navigation">
+          ${["up", "left", "right", "down"].map(direction => button(icon(`arrow-${direction}`), "classic-nav", "classic-nav-key", `id="classic-nav-${direction}" data-direction="${direction}" aria-label="Navigate ${direction}" aria-controls="phone-content"`)).join("")}
+          ${button("OK", "classic-ok", "classic-nav-key", 'id="classic-ok" aria-label="Open or select highlighted item" aria-controls="phone-content"')}
+        </div>
+      </div>
+      <div class="classic-mode-status"><output id="classic-feedback" role="status" aria-live="polite"></output><span id="classic-input-mode" hidden></span></div>
+      <div class="classic-number-keys" dir="ltr" role="group" aria-label="Number keypad">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"].map((digit, i) => button(`<strong>${digit}</strong><small ${i < 2 ? `data-speed-label="${i}"` : ""}>${[".,?!", "ABC", "DEF", "GHI", "JKL", "MNO", "PQRS", "TUV", "WXYZ", "+", "space", "abc / 123"][i]}</small>`, "classic-digit", "classic-number", `data-digit="${digit}" aria-label="${digit}${digit === "1" || digit === "2" ? ". Hold for speed dial from Home or Phone" : ""}"`)).join("")}</div>`;
+    classicScrollObserver = new ResizeObserver(updateClassicNavigation);
+    phone.addEventListener("scroll", updateClassicNavigation, { passive: true });
+    document.addEventListener("selectionchange", () => {
+      if (phone.contains(document.activeElement)) updateClassicNavigation();
+    });
+  }
   const entry = location.hash.slice(1);
   history.replaceState({ claro: true, parent: null }, "", registry[entry] ? `#${entry}` : "#home");
   activate(registry[entry] ? entry : "home");
