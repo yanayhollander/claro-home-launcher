@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="comm_channel_incoming_calls_name">שיחות נכנסות</string>
+    <string name="comm_channel_incoming_calls_description">התראות על שיחות טלפון נכנסות</string>
+    <string name="comm_notification_incoming_call_text">שיחה נכנסת</string>
+    <string name="comm_notification_action_decline">דחייה</string>
+    <string name="comm_notification_action_answer">מענה</string>
+    <string name="comm_caller_private_number">מספר חסוי</string>
+    <string name="comm_caller_unknown">מתקשר לא מזוהה</string>
+    <string name="comm_contact_name_and_number_required">נדרשים שם ומספר טלפון</string>
+    <string name="comm_contact_not_saved">איש הקשר לא נשמר</string>
+    <string name="comm_contact_saved_not_opened">איש הקשר נשמר אך לא ניתן היה לפתוח אותו</string>
+    <string name="comm_contact_not_found">איש הקשר לא נמצא</string>
+    <string name="comm_contact_change_failed">עדכון איש הקשר נכשל</string>
+    <string name="comm_channel_messages_name">הודעות</string>
+    <string name="comm_channel_messages_description">הודעות טקסט ומולטימדיה נכנסות</string>
+    <string name="comm_notification_new_sms_title">הודעה חדשה</string>
+    <string name="comm_notification_new_sms_text">יש לפתוח את Claro כדי לקרוא</string>
+    <string name="comm_notification_new_mms_title">הודעת מולטימדיה חדשה</string>
+    <string name="comm_notification_new_mms_text">יש לפתוח את Claro כדי להוריד או לבדוק את השגיאה</string>
+    <string name="comm_mms_fallback_subject">הודעת מולטימדיה</string>
+    <string name="comm_mms_group_or_multimedia">הודעה קבוצתית או הודעת מולטימדיה</string>
+    <string name="comm_mms_download_required_subject">הודעת מולטימדיה — נדרשת הורדה</string>
+</resources>

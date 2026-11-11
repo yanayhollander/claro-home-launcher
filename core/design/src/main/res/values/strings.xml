@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="design_unassigned_person">Add person</string>
+    <string name="design_battery_percent" tools:ignore="PluralsCandidate">Battery %1$d percent</string>
+    <string name="design_battery_percent_charging" tools:ignore="PluralsCandidate">Battery %1$d percent, charging</string>
+    <string name="design_signal_available">Mobile signal: %1$d of 4</string>
+    <string name="design_signal_no_sim">Mobile signal: No SIM</string>
+    <string name="design_signal_no_service">Mobile signal: No signal</string>
+    <string name="design_signal_airplane">Mobile signal: Airplane mode</string>
+    <string name="design_signal_unknown">Mobile signal: Unknown</string>
+</resources>

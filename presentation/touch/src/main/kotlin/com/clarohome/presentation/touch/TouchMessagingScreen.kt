@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -46,10 +47,13 @@ import com.clarohome.feature.communication.ClaroMessage
 import com.clarohome.feature.communication.ContactNumber
 import com.clarohome.feature.communication.MessageDeliveryState
 import com.clarohome.feature.communication.MessageDirection
+import com.clarohome.feature.communication.MessageFailure
 import com.clarohome.feature.communication.MessageKind
 import com.clarohome.feature.communication.MessageRecipient
 import com.clarohome.feature.communication.MessagingRoute
 import com.clarohome.feature.communication.MessagingUiState
+import com.clarohome.feature.communication.SmsEncoding
+import com.clarohome.presentation.touch.R
 
 @Composable
 fun TouchMessagingScreen(
@@ -149,18 +153,18 @@ private fun InboxRoute(
     modifier: Modifier = Modifier,
 ) {
     ClaroScreenScaffold(
-        title = "Messages",
+        title = stringResource(R.string.touch_tile_messages),
         modifier = modifier,
         scrollable = false,
         dock = {
             ClaroPrimaryButton(
-                label = "Write a message",
+                label = stringResource(R.string.touch_write_message),
                 onClick = onNewMessage,
                 containerColor = ClaroColors.Blue,
             )
         },
     ) {
-        MessageFieldLabel("Search name or number")
+        MessageFieldLabel(stringResource(R.string.touch_search_name_or_number))
         OutlinedTextField(
             value = state.searchQuery,
             onValueChange = onSearchInbox,
@@ -175,22 +179,22 @@ private fun InboxRoute(
         if (!state.qualification.canRead) {
             ClaroInfoCard(
                 text = if (!state.qualification.telephonySupported) {
-                    "Messages are not available on this device."
+                    stringResource(R.string.touch_messages_unavailable_device)
                 } else {
-                    "Message access needs repair."
+                    stringResource(R.string.touch_message_access_repair)
                 },
                 tone = ClaroBannerTone.WARNING,
             )
             if (state.qualification.telephonySupported) {
                 ClaroPrimaryButton(
-                    label = "Repair message access",
+                    label = stringResource(R.string.touch_repair_message_access),
                     onClick = onRepair,
                     containerColor = ClaroColors.Blue,
                 )
             }
         }
         state.statusMessage?.let { status ->
-            ClaroInfoCard(text = status)
+            ClaroInfoCard(text = localizedMessagingStatus(status, state.sendFailure))
         }
         LazyColumn(
             modifier = Modifier
@@ -202,32 +206,37 @@ private fun InboxRoute(
                 item(key = "inbox-empty") {
                     ClaroInfoCard(
                         text = if (state.searchQuery.isBlank()) {
-                            "No messages yet."
+                            stringResource(R.string.touch_no_messages_yet)
                         } else {
-                            "No matching messages."
+                            stringResource(R.string.touch_no_matching_messages)
                         },
                     )
                 }
             }
             itemsIndexed(state.conversations, key = { _, item -> item.id }) { index, conversation ->
-                val snippetText = buildString {
-                    if (conversation.kind == MessageKind.MMS) {
-                        append("MMS · ")
-                        if (conversation.groupSize > 1) {
-                            append("${conversation.groupSize} people · ")
-                        }
-                    }
-                    append(conversation.snippet)
+                val snippetText = when {
+                    conversation.kind == MessageKind.MMS && conversation.groupSize > 1 ->
+                        stringResource(
+                            R.string.touch_mms_group_snippet,
+                            conversation.groupSize,
+                            conversation.snippet,
+                        )
+                    conversation.kind == MessageKind.MMS ->
+                        stringResource(R.string.touch_mms_snippet, conversation.snippet)
+                    else -> conversation.snippet
                 }
+                val titleText = conversation.recipient.accessibleName
+                    .ifBlank { stringResource(R.string.touch_unknown_number) }
                 ClaroRowButton(
-                    title = conversation.recipient.accessibleName,
+                    title = titleText,
                     subtitle = snippetText,
                     unreadDot = conversation.unreadCount > 0,
                     leading = {
                         ClaroAvatar(
-                            name = conversation.recipient.accessibleName,
+                            name = conversation.recipient.displayName,
                             size = 48.dp,
                             paletteSeed = index,
+                            isUnassigned = conversation.recipient.displayName.isNullOrBlank(),
                         )
                     },
                     onClick = { onOpenConversation(conversation.id) },
@@ -249,28 +258,28 @@ private fun ComposeRoute(
     modifier: Modifier = Modifier,
 ) {
     ClaroScreenScaffold(
-        title = "Write a message",
+        title = stringResource(R.string.touch_write_message),
         modifier = modifier,
         scrollable = true,
         dock = {
             ClaroPrimaryButton(
-                label = "Review",
+                label = stringResource(R.string.touch_action_review),
                 onClick = onReview,
                 containerColor = ClaroColors.Blue,
             )
             ClaroSecondaryButton(
-                label = "Cancel · keep draft",
+                label = stringResource(R.string.touch_cancel_keep_draft),
                 onClick = onCancelKeepDraft,
             )
         },
     ) {
         state.statusMessage?.takeIf { it.isNotBlank() }?.let { status ->
             ClaroInfoCard(
-                text = status,
+                text = localizedMessagingStatus(status, state.sendFailure),
                 tone = if (state.sendFailure != null) ClaroBannerTone.ERROR else ClaroBannerTone.INFO,
             )
         }
-        MessageFieldLabel("To")
+        MessageFieldLabel(stringResource(R.string.touch_field_to))
         state.draft.recipient?.displayName?.takeIf { it.isNotBlank() }?.let { recipientName ->
             Text(
                 text = recipientName,
@@ -295,11 +304,11 @@ private fun ComposeRoute(
             )
         }
         ClaroSecondaryButton(
-            label = "Contacts",
+            label = stringResource(R.string.touch_contacts),
             onClick = onOpenRecipients,
             icon = ClaroIconKind.CONTACT,
         )
-        MessageFieldLabel("Message")
+        MessageFieldLabel(stringResource(R.string.touch_action_message))
         OutlinedTextField(
             value = state.draft.body,
             onValueChange = onBodyChange,
@@ -308,7 +317,7 @@ private fun ComposeRoute(
                 .heightIn(min = 168.dp),
             placeholder = {
                 Text(
-                    text = "Write here...",
+                    text = stringResource(R.string.touch_message_placeholder),
                     color = ClaroColors.Muted,
                     fontSize = 24.sp,
                     lineHeight = 32.sp,
@@ -328,15 +337,15 @@ private fun ComposeRoute(
         if (!state.qualification.canSend) {
             ClaroInfoCard(
                 text = if (!state.qualification.telephonySupported) {
-                    "SMS sending is not available on this device."
+                    stringResource(R.string.touch_sms_sending_unavailable_device)
                 } else {
-                    "Sending messages needs repair."
+                    stringResource(R.string.touch_sending_messages_repair)
                 },
                 tone = ClaroBannerTone.WARNING,
             )
             if (state.qualification.telephonySupported) {
                 ClaroSecondaryButton(
-                    label = "Repair message access",
+                    label = stringResource(R.string.touch_repair_message_access),
                     onClick = onRepair,
                 )
             }
@@ -355,17 +364,17 @@ private fun RecipientsRoute(
     modifier: Modifier = Modifier,
 ) {
     ClaroScreenScaffold(
-        title = "Choose recipient",
+        title = stringResource(R.string.touch_choose_recipient_title),
         modifier = modifier,
         scrollable = false,
         dock = {
             ClaroSecondaryButton(
-                label = "Cancel",
+                label = stringResource(R.string.touch_action_cancel),
                 onClick = onCancelRecipients,
             )
         },
     ) {
-        MessageFieldLabel("Search name or number")
+        MessageFieldLabel(stringResource(R.string.touch_search_name_or_number))
         OutlinedTextField(
             value = state.recipientQuery,
             onValueChange = onSearchRecipients,
@@ -378,13 +387,16 @@ private fun RecipientsRoute(
             colors = messagingFieldColors(),
         )
         ClaroPrimaryButton(
-            label = "Use typed number",
+            label = stringResource(R.string.touch_use_typed_number),
             onClick = { onManualRecipient(state.recipientQuery) },
             enabled = state.recipientQuery.isNotBlank(),
             containerColor = ClaroColors.Blue,
         )
         state.statusMessage?.let { status ->
-            ClaroInfoCard(text = status, tone = ClaroBannerTone.WARNING)
+            ClaroInfoCard(
+                text = localizedMessagingStatus(status, state.sendFailure),
+                tone = ClaroBannerTone.WARNING,
+            )
         }
         LazyColumn(
             modifier = Modifier
@@ -399,7 +411,11 @@ private fun RecipientsRoute(
                 ) { number ->
                     ClaroRowButton(
                         title = contact.displayName,
-                        subtitle = "${number.label} · ${number.value}",
+                        subtitle = stringResource(
+                            R.string.touch_contact_number_subtitle,
+                            number.localizedLabel(),
+                            number.value,
+                        ),
                         leading = {
                             ClaroAvatar(
                                 name = contact.displayName,
@@ -415,22 +431,22 @@ private fun RecipientsRoute(
                 item(key = "recipients-empty") {
                     ClaroInfoCard(
                         text = if (state.recipientQuery.isBlank()) {
-                            "No contacts yet."
+                            stringResource(R.string.touch_no_contacts_yet)
                         } else {
-                            "No matches."
+                            stringResource(R.string.touch_no_matches)
                         },
                     )
                 }
             }
             if (state.contactsLoading) {
                 item(key = "recipients-loading") {
-                    ClaroInfoCard(text = "Loading contacts")
+                    ClaroInfoCard(text = stringResource(R.string.touch_loading_contacts))
                 }
             }
             if (state.contactsNextOffset != null && !state.contactsLoading) {
                 item(key = "recipients-more") {
                     ClaroSecondaryButton(
-                        label = "Load more contacts",
+                        label = stringResource(R.string.touch_load_more_contacts),
                         onClick = onLoadMoreRecipients,
                     )
                 }
@@ -448,13 +464,14 @@ private fun ConversationRoute(
     modifier: Modifier = Modifier,
 ) {
     val recipient = state.selectedConversation?.recipient ?: state.draft.recipient
+    val conversationFallback = stringResource(R.string.touch_conversation_title)
     ClaroScreenScaffold(
-        title = recipient?.accessibleName?.ifBlank { "Conversation" } ?: "Conversation",
+        title = recipient?.accessibleName?.ifBlank { conversationFallback } ?: conversationFallback,
         modifier = modifier,
         scrollable = false,
         dock = {
             ClaroPrimaryButton(
-                label = "Review",
+                label = stringResource(R.string.touch_action_review),
                 onClick = onReview,
                 containerColor = ClaroColors.Blue,
             )
@@ -463,7 +480,7 @@ private fun ConversationRoute(
         RecipientSummaryBar(recipient = recipient)
         state.statusMessage?.let { status ->
             ClaroInfoCard(
-                text = status,
+                text = localizedMessagingStatus(status, state.sendFailure),
                 tone = if (state.sendFailure != null) ClaroBannerTone.ERROR else ClaroBannerTone.INFO,
             )
         }
@@ -475,7 +492,7 @@ private fun ConversationRoute(
         ) {
             if (state.messages.isEmpty()) {
                 item(key = "conversation-empty") {
-                    ClaroInfoCard(text = "No messages in this conversation yet.")
+                    ClaroInfoCard(text = stringResource(R.string.touch_conversation_empty))
                 }
             }
             items(
@@ -487,7 +504,7 @@ private fun ConversationRoute(
                 ConversationBubble(message = message)
             }
         }
-        MessageFieldLabel("Message")
+        MessageFieldLabel(stringResource(R.string.touch_action_message))
         OutlinedTextField(
             value = state.draft.body,
             onValueChange = onBodyChange,
@@ -496,7 +513,7 @@ private fun ConversationRoute(
                 .heightIn(min = 104.dp),
             placeholder = {
                 Text(
-                    text = "Write here...",
+                    text = stringResource(R.string.touch_message_placeholder),
                     color = ClaroColors.Muted,
                     fontSize = 24.sp,
                 )
@@ -513,12 +530,16 @@ private fun ConversationRoute(
         )
         if (!state.qualification.canSend) {
             ClaroInfoCard(
-                text = "Sending messages needs repair.",
+                text = if (!state.qualification.telephonySupported) {
+                    stringResource(R.string.touch_sms_sending_unavailable_device)
+                } else {
+                    stringResource(R.string.touch_sending_messages_repair)
+                },
                 tone = ClaroBannerTone.WARNING,
             )
             if (state.qualification.telephonySupported) {
                 ClaroSecondaryButton(
-                    label = "Repair message access",
+                    label = stringResource(R.string.touch_repair_message_access),
                     onClick = onRepair,
                 )
             }
@@ -535,11 +556,16 @@ private fun ConversationBubble(message: ClaroMessage) {
         RoundedCornerShape(topStart = 3.dp, topEnd = 10.dp, bottomEnd = 10.dp, bottomStart = 3.dp)
     }
     val statusLabel = when (message.deliveryState) {
-        MessageDeliveryState.DELIVERY_CONFIRMED -> "Delivered"
-        MessageDeliveryState.DELIVERY_UNKNOWN -> "Delivery unknown"
-        MessageDeliveryState.KNOWN_FAILURE -> "Failed"
-        MessageDeliveryState.PENDING -> "Sending"
-        MessageDeliveryState.SENT -> "Sent · delivery not confirmed"
+        MessageDeliveryState.DELIVERY_CONFIRMED ->
+            stringResource(R.string.touch_delivery_confirmed)
+        MessageDeliveryState.DELIVERY_UNKNOWN ->
+            stringResource(R.string.touch_delivery_unknown)
+        MessageDeliveryState.KNOWN_FAILURE ->
+            stringResource(R.string.touch_delivery_failed)
+        MessageDeliveryState.PENDING ->
+            stringResource(R.string.touch_delivery_sending)
+        MessageDeliveryState.SENT ->
+            stringResource(R.string.touch_delivery_sent_unconfirmed)
         MessageDeliveryState.RECEIVED,
         MessageDeliveryState.DRAFT,
         -> null
@@ -569,19 +595,21 @@ private fun ConversationBubble(message: ClaroMessage) {
             }
             if (message.kind == MessageKind.MMS && message.groupParticipants.size > 1) {
                 Text(
-                    text = "MMS · ${message.groupParticipants.size} people",
+                    text = stringResource(
+                        R.string.touch_mms_group_label,
+                        message.groupParticipants.size,
+                    ),
                     color = ClaroColors.Muted,
                     fontSize = 17.sp,
                 )
             }
             message.attachments.forEach { attachment ->
                 val attachmentName = attachment.displayName?.takeIf { it.isNotBlank() }
-                val attachmentText = buildString {
-                    if (attachmentName != null) {
-                        append(attachmentName)
-                        append(" · ")
-                    }
-                    append(attachment.state.accessibleAttachmentMessage())
+                val attachmentStatus = attachment.state.accessibleAttachmentMessage()
+                val attachmentText = if (attachmentName != null) {
+                    stringResource(R.string.touch_attachment_named, attachmentName, attachmentStatus)
+                } else {
+                    attachmentStatus
                 }
                 Text(
                     text = attachmentText,
@@ -612,22 +640,22 @@ private fun ConfirmationRoute(
     modifier: Modifier = Modifier,
 ) {
     ClaroScreenScaffold(
-        title = "Send message?",
+        title = stringResource(R.string.touch_send_message_confirm_title),
         modifier = modifier,
         scrollable = true,
         dock = {
             ClaroPrimaryButton(
-                label = "Send",
+                label = stringResource(R.string.touch_action_send),
                 onClick = onSend,
                 enabled = state.canConfirm,
                 containerColor = ClaroColors.Blue,
             )
             ClaroSecondaryButton(
-                label = "Edit",
+                label = stringResource(R.string.touch_action_edit),
                 onClick = onEdit,
             )
             ClaroSecondaryButton(
-                label = "Cancel · keep draft",
+                label = stringResource(R.string.touch_cancel_keep_draft),
                 onClick = onCancelKeepDraft,
             )
         },
@@ -648,7 +676,7 @@ private fun ConfirmationRoute(
                 .padding(12.dp),
         ) {
             Text(
-                text = state.draft.body.ifBlank { "Your draft is empty." },
+                text = state.draft.body.ifBlank { stringResource(R.string.touch_draft_empty) },
                 color = ClaroColors.Ink,
                 fontSize = 24.sp,
                 lineHeight = 33.sp,
@@ -661,7 +689,7 @@ private fun ConfirmationRoute(
             lineHeight = 23.sp,
         )
         state.statusMessage?.let { status ->
-            ClaroInfoCard(text = status)
+            ClaroInfoCard(text = localizedMessagingStatus(status, state.sendFailure))
         }
     }
 }
@@ -672,13 +700,13 @@ private fun SendingRoute(
     modifier: Modifier = Modifier,
 ) {
     ClaroScreenScaffold(
-        title = "Sending",
+        title = stringResource(R.string.touch_delivery_sending),
         modifier = modifier,
         scrollable = true,
     ) {
         RecipientSummaryBar(recipient = state.draft.recipient)
         ClaroInfoCard(
-            text = "Sending… Please wait.",
+            text = stringResource(R.string.touch_sending_please_wait),
             tone = ClaroBannerTone.WARNING,
         )
         if (state.draft.body.isNotBlank()) {
@@ -716,14 +744,19 @@ private fun FailedRoute(
     onRepair: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val headerTitle = if (state.unknownOutcome) "Delivery uncertain" else "Message not sent"
+    val headerTitle = if (state.unknownOutcome) {
+        stringResource(R.string.touch_delivery_uncertain_title)
+    } else {
+        stringResource(R.string.touch_message_not_sent_title)
+    }
     val explanation = when {
         state.unknownOutcome && state.duplicateRiskConfirmationRequired ->
-            "Sending again may deliver this message twice."
+            stringResource(R.string.touch_duplicate_risk_warning)
         state.unknownOutcome ->
-            "This message may already have been sent."
+            stringResource(R.string.touch_message_may_be_sent)
         else ->
-            state.statusMessage ?: "Message could not be sent. Please try again."
+            state.statusMessage?.let { localizedMessagingStatus(it, state.sendFailure) }
+                ?: stringResource(R.string.touch_message_send_failed_default)
     }
 
     ClaroScreenScaffold(
@@ -732,7 +765,11 @@ private fun FailedRoute(
         scrollable = true,
         dock = {
             ClaroPrimaryButton(
-                label = if (state.duplicateRiskConfirmationRequired) "Send again" else "Try again",
+                label = if (state.duplicateRiskConfirmationRequired) {
+                    stringResource(R.string.touch_action_send_again)
+                } else {
+                    stringResource(R.string.touch_action_try_again)
+                },
                 onClick = if (state.duplicateRiskConfirmationRequired) {
                     onConfirmDuplicateRisk
                 } else {
@@ -741,7 +778,7 @@ private fun FailedRoute(
                 containerColor = ClaroColors.Blue,
             )
             ClaroSecondaryButton(
-                label = "Cancel",
+                label = stringResource(R.string.touch_action_cancel),
                 onClick = onCancel,
             )
         },
@@ -776,7 +813,7 @@ private fun FailedRoute(
         }
         if (!state.qualification.canSend && state.qualification.telephonySupported) {
             ClaroSecondaryButton(
-                label = "Repair message access",
+                label = stringResource(R.string.touch_repair_message_access),
                 onClick = onRepair,
             )
         }
@@ -787,21 +824,19 @@ private fun FailedRoute(
 private fun RecipientSummaryBar(recipient: MessageRecipient?) {
     val displayName = recipient?.displayName?.takeIf { it.isNotBlank() }
     val number = recipient?.number?.takeIf { it.isNotBlank() }
-    val name = displayName ?: number ?: "To"
+    val name = displayName ?: number ?: stringResource(R.string.touch_field_to)
+    val recipientDescription = if (number != null && number != name) {
+        stringResource(R.string.touch_recipient_name_and_number_a11y, name, number)
+    } else {
+        stringResource(R.string.touch_recipient_name_only_a11y, name)
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(ClaroColors.Surface, RoundedCornerShape(3.dp))
             .padding(horizontal = 8.dp, vertical = 10.dp)
             .semantics(mergeDescendants = true) {
-                contentDescription = buildString {
-                    append("Recipient ")
-                    append(name)
-                    if (number != null && number != name) {
-                        append(", ")
-                        append(number)
-                    }
-                }
+                contentDescription = recipientDescription
             },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -868,13 +903,63 @@ private fun messagingFieldColors() = OutlinedTextFieldDefaults.colors(
     cursorColor = ClaroColors.Blue,
 )
 
+@Composable
 private fun smsLengthHelper(state: MessagingUiState): String =
-    "${state.draft.body.length} · ~${state.encoding.segments} SMS · carrier charges may apply"
+    if (state.encoding.encoding == SmsEncoding.UNICODE) {
+        stringResource(
+            R.string.touch_sms_length_unicode,
+            state.draft.body.length,
+            state.encoding.segments,
+        )
+    } else {
+        stringResource(
+            R.string.touch_sms_length_standard,
+            state.draft.body.length,
+            state.encoding.segments,
+        )
+    }
 
+@Composable
 private fun AttachmentState.accessibleAttachmentMessage(): String = when (this) {
-    AttachmentState.NONE -> "No attachment"
-    AttachmentState.AVAILABLE -> "Attachment available"
-    AttachmentState.DOWNLOAD_REQUIRED -> "Attachment needs mobile data to download"
-    AttachmentState.DOWNLOAD_FAILED -> "Attachment download failed"
-    AttachmentState.UNSUPPORTED -> "This attachment type is not supported"
+    AttachmentState.NONE -> stringResource(R.string.touch_attachment_none)
+    AttachmentState.AVAILABLE -> stringResource(R.string.touch_attachment_available)
+    AttachmentState.DOWNLOAD_REQUIRED -> stringResource(R.string.touch_attachment_download_required)
+    AttachmentState.DOWNLOAD_FAILED -> stringResource(R.string.touch_attachment_download_failed)
+    AttachmentState.UNSUPPORTED -> stringResource(R.string.touch_attachment_unsupported)
+}
+
+@Composable
+private fun localizedMessagingStatus(message: String, failure: MessageFailure?): String {
+    when (message) {
+        "Messages access needs repair",
+        "Message access needs repair.",
+        -> return stringResource(R.string.touch_message_access_repair)
+        "Enter a valid phone number" ->
+            return stringResource(R.string.touch_phone_err_valid_number)
+        "Sending message" ->
+            return stringResource(R.string.touch_delivery_sending)
+        "Choose a default SMS account in Android. Your draft is saved." ->
+            return stringResource(R.string.touch_msg_err_account_saved_draft)
+        "This message may already have been sent. Send it again?" ->
+            return stringResource(R.string.touch_msg_status_duplicate_prompt)
+        "Sent. Delivery is not confirmed." ->
+            return stringResource(R.string.touch_msg_status_sent_unconfirmed)
+        "Delivery confirmed by the carrier" ->
+            return stringResource(R.string.touch_msg_status_delivery_confirmed)
+        "The carrier did not confirm the result. It may already have been sent." ->
+            return stringResource(R.string.touch_msg_status_carrier_unconfirmed)
+    }
+    return when (failure) {
+        MessageFailure.INVALID_RECIPIENT -> stringResource(R.string.touch_msg_err_invalid_recipient)
+        MessageFailure.EMPTY_CONTENT -> stringResource(R.string.touch_msg_err_empty_content)
+        MessageFailure.ROLE_LOST -> stringResource(R.string.touch_msg_err_role_lost)
+        MessageFailure.PERMISSION_DENIED -> stringResource(R.string.touch_msg_err_permission_denied)
+        MessageFailure.NO_SIM -> stringResource(R.string.touch_msg_err_no_sim)
+        MessageFailure.NO_SERVICE -> stringResource(R.string.touch_msg_err_no_service)
+        MessageFailure.ACCOUNT_UNAVAILABLE ->
+            stringResource(R.string.touch_msg_err_account_unavailable)
+        MessageFailure.CARRIER_REJECTED -> stringResource(R.string.touch_msg_err_carrier_rejected)
+        MessageFailure.UNKNOWN -> stringResource(R.string.touch_msg_err_unknown)
+        null -> message
+    }
 }

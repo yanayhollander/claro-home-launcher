@@ -135,8 +135,14 @@ The onboarding and product surfaces use the storyboard palette and hierarchy:
 white content, charcoal headers/deck, Claro blue `#075BD8`, call green `#078534`,
 danger red `#CC1731`, 3-4dp dense separators and 64dp primary targets. Visual mode
 selection requires an explicit choice and previews the two actual shell
-structures. Native Compose reflows for system insets and font scaling, so exact
-browser pixels are not copied when that would break accessibility.
+structures. All UI and notification copy is stored in module-prefixed Android
+string resources across `values` (English), `values-es` (Spanish), and
+`values-iw` (Hebrew), wrapped at runtime by `ClaroLocaleContainer` for immediate
+locale and RTL switching while keeping phone numbers, dates, durations, and
+physical Classic keypad positions LTR (`bundle.language.enableSplit = false`
+bundles all three languages offline). Native Compose reflows for system insets
+and font scaling, so exact browser pixels are not copied when that would break
+accessibility.
 
 ## Billing and diagnostics configuration
 

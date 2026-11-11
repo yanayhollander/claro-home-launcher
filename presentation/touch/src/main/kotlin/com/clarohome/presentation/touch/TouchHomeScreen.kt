@@ -27,6 +27,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -51,6 +52,7 @@ import com.clarohome.core.design.ClaroPrimaryButton
 import com.clarohome.core.design.LocalClaroHaptics
 import com.clarohome.core.model.BadgeValue
 import com.clarohome.core.model.CellularAvailability
+import com.clarohome.core.model.CellularStatus
 import com.clarohome.core.model.FavoritePerson
 import com.clarohome.core.model.FavoriteState
 import com.clarohome.core.model.HomeRoleState
@@ -58,6 +60,7 @@ import com.clarohome.core.model.HomeSnapshot
 import com.clarohome.core.model.HomeTile
 import com.clarohome.core.model.HomeTileKind
 import com.clarohome.feature.launcher.home.HomeCustomizationPolicy
+import com.clarohome.presentation.touch.R
 
 data class TouchHomeContentModel(
     val visibleTileIds: List<String>,
@@ -109,7 +112,7 @@ fun TouchHomeScreen(
                         .padding(horizontal = ClaroDimensions.TileGap),
                 ) {
                     ClaroPrimaryButton(
-                        label = "Return to call · ${activeCall.displayName}",
+                        label = stringResource(R.string.touch_return_to_call, activeCall.displayName),
                         onClick = onReturnToCall,
                         containerColor = ClaroColors.Green,
                         icon = ClaroIconKind.PHONE,
@@ -125,11 +128,12 @@ fun TouchHomeScreen(
         }
         if (extraTiles.isNotEmpty()) {
             item(key = "scroll-cue") {
+                val moreAppsDescription = stringResource(R.string.touch_more_apps_below)
                 Text(
                     text = "⌄",
                     modifier = Modifier
                         .fillMaxWidth()
-                        .semantics { contentDescription = "More apps below" },
+                        .semantics { contentDescription = moreAppsDescription },
                     color = Color.White,
                     fontSize = 20.sp,
                     lineHeight = 20.sp,
@@ -148,6 +152,8 @@ private fun TouchStatusHeader(
     home: HomeSnapshot,
     onUseClassicMode: () -> Unit,
 ) {
+    val brandName = stringResource(R.string.touch_brand_name)
+    val settingsLabel = stringResource(R.string.touch_settings)
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -188,7 +194,7 @@ private fun TouchStatusHeader(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = home.dayAndDate.ifBlank { "Claro" },
+                    text = home.dayAndDate.ifBlank { brandName },
                     modifier = Modifier.semantics { heading() },
                     color = Color.White,
                     fontSize = 26.sp,
@@ -198,7 +204,7 @@ private fun TouchStatusHeader(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "${home.battery.percentage}%",
+                    text = stringResource(R.string.touch_battery_percentage, home.battery.percentage),
                     color = Color(0xFFE0E6F0),
                     fontSize = 15.sp,
                     lineHeight = 20.sp,
@@ -221,14 +227,14 @@ private fun TouchStatusHeader(
                     .background(Color(0xFF384354))
                     .clickable(
                         role = Role.Button,
-                        onClickLabel = "Settings",
+                        onClickLabel = settingsLabel,
                         onClick = {
                             haptics.softkey()
                             onUseClassicMode()
                         },
                     )
                     .semantics {
-                        contentDescription = "Settings"
+                        contentDescription = settingsLabel
                         role = Role.Button
                     },
                 contentAlignment = Alignment.Center,
@@ -256,18 +262,18 @@ private fun RoleRepairCard(
     ) {
         ClaroInfoCard(
             text = when (roleState) {
-                HomeRoleState.AVAILABLE -> "Claro is not your Home app yet."
-                HomeRoleState.UNAVAILABLE -> "This device cannot make Claro the Home app."
-                HomeRoleState.UNKNOWN -> "Home app status is unavailable."
+                HomeRoleState.AVAILABLE -> stringResource(R.string.touch_home_role_available)
+                HomeRoleState.UNAVAILABLE -> stringResource(R.string.touch_home_role_unavailable)
+                HomeRoleState.UNKNOWN -> stringResource(R.string.touch_home_role_unknown)
                 HomeRoleState.GRANTED -> ""
             },
             tone = ClaroBannerTone.WARNING,
         )
         ClaroPrimaryButton(
             label = if (roleState == HomeRoleState.AVAILABLE) {
-                "Choose Claro as Home"
+                stringResource(R.string.touch_home_role_choose)
             } else {
-                "Open Home settings"
+                stringResource(R.string.touch_home_role_open_settings)
             },
             onClick = onRepairHomeRole,
             containerColor = ClaroColors.Blue,
@@ -281,10 +287,11 @@ private fun FavoriteStrip(
     onFavoriteSelected: (FavoritePerson) -> Unit,
 ) {
     val haptics = LocalClaroHaptics.current
+    val addPersonLabel = stringResource(R.string.touch_add_person)
     val visibleFavorites = List(4) { index ->
         favorites.getOrNull(index) ?: FavoritePerson(
             id = "favorite-$index",
-            displayName = "Add person",
+            displayName = addPersonLabel,
             state = FavoriteState.UNASSIGNED,
         )
     }
@@ -301,6 +308,8 @@ private fun FavoriteStrip(
             } else {
                 person.displayName.trim().split(Regex("\\s+")).firstOrNull()?.ifBlank { "+" } ?: "+"
             }
+            val actionLabel = person.favoriteActionLabel()
+            val favoriteDesc = person.favoriteDescription()
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -309,13 +318,13 @@ private fun FavoriteStrip(
                     .background(Color(0xFFF0F3F8))
                     .clickable(
                         role = Role.Button,
-                        onClickLabel = person.favoriteActionLabel(),
+                        onClickLabel = actionLabel,
                     ) {
                         haptics.softkey()
                         onFavoriteSelected(person)
                     }
                     .semantics {
-                        contentDescription = person.favoriteDescription()
+                        contentDescription = favoriteDesc
                         role = Role.Button
                     }
                     .padding(horizontal = 2.dp, vertical = 3.dp),
@@ -323,7 +332,7 @@ private fun FavoriteStrip(
                 verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),
             ) {
                 ClaroAvatar(
-                    name = person.displayName,
+                    name = if (unassigned) addPersonLabel else person.displayName,
                     size = 51.dp,
                     paletteSeed = index,
                     isUnassigned = unassigned,
@@ -374,7 +383,21 @@ private fun HomeTileCard(
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalClaroHaptics.current
-    val description = HomeCustomizationPolicy.badgeLabel(tile.label, tile.badge)
+    val displayLabel = tile.kind.localizedLabel(tile.label)
+    val accessibleLabel = if (tile.kind == HomeTileKind.SOS) {
+        stringResource(R.string.touch_tile_sos_a11y)
+    } else {
+        displayLabel
+    }
+    val description = when (val badge = tile.badge) {
+        is BadgeValue.Known -> if (badge.count == 0) {
+            stringResource(R.string.touch_tile_badge_none, accessibleLabel)
+        } else {
+            stringResource(R.string.touch_tile_badge_count, accessibleLabel, badge.count)
+        }
+        BadgeValue.Unknown -> stringResource(R.string.touch_tile_badge_unknown, accessibleLabel)
+        null -> accessibleLabel
+    }
     Box(
         modifier = modifier
             .heightIn(min = 160.dp)
@@ -399,7 +422,7 @@ private fun HomeTileCard(
     ) {
         if (tile.kind == HomeTileKind.SOS) {
             Text(
-                text = tile.label.ifBlank { "SOS" },
+                text = displayLabel,
                 color = ClaroColors.Red,
                 fontSize = 54.sp,
                 lineHeight = 58.sp,
@@ -420,7 +443,7 @@ private fun HomeTileCard(
                     size = if (tile.kind == HomeTileKind.INSTALLED_APP) 54.dp else 68.dp,
                 )
                 Text(
-                    text = tile.kind.displayLabel(tile.label),
+                    text = displayLabel,
                     color = ClaroColors.Ink,
                     fontSize = 22.sp,
                     lineHeight = 25.sp,
@@ -466,22 +489,32 @@ private fun BadgeBubble(badge: BadgeValue, modifier: Modifier = Modifier) {
     }
 }
 
-private fun FavoritePerson.favoriteActionLabel(): String =
-    if (state == FavoriteState.READY) "Call $displayName" else "Repair $displayName favorite"
-
-private fun FavoritePerson.favoriteDescription(): String = when (state) {
-    FavoriteState.READY -> "$displayName, favorite person"
-    FavoriteState.UNASSIGNED -> "Unassigned favorite. Ask your caregiver to add a person"
-    FavoriteState.CONTACT_MISSING -> "$displayName, contact needs repair"
-    FavoriteState.PHOTO_UNAVAILABLE -> "$displayName, photo unavailable"
+@Composable
+private fun FavoritePerson.favoriteActionLabel(): String = when (state) {
+    FavoriteState.READY -> stringResource(R.string.touch_favorite_action_call, displayName)
+    FavoriteState.UNASSIGNED -> stringResource(R.string.touch_add_person)
+    FavoriteState.CONTACT_MISSING,
+    FavoriteState.PHOTO_UNAVAILABLE,
+    -> stringResource(R.string.touch_favorite_action_repair, displayName)
 }
 
-private fun com.clarohome.core.model.CellularStatus.unavailableLabel(): String? = when (availability) {
+@Composable
+private fun FavoritePerson.favoriteDescription(): String = when (state) {
+    FavoriteState.READY -> stringResource(R.string.touch_favorite_desc_ready, displayName)
+    FavoriteState.UNASSIGNED -> stringResource(R.string.touch_favorite_desc_unassigned)
+    FavoriteState.CONTACT_MISSING ->
+        stringResource(R.string.touch_favorite_desc_contact_missing, displayName)
+    FavoriteState.PHOTO_UNAVAILABLE ->
+        stringResource(R.string.touch_favorite_desc_photo_unavailable, displayName)
+}
+
+@Composable
+private fun CellularStatus.unavailableLabel(): String? = when (availability) {
     CellularAvailability.AVAILABLE -> null
-    CellularAvailability.NO_SIM -> "No SIM"
-    CellularAvailability.NO_SERVICE -> "No signal"
-    CellularAvailability.AIRPLANE_MODE -> "Airplane mode"
-    CellularAvailability.UNKNOWN -> "Signal unknown"
+    CellularAvailability.NO_SIM -> stringResource(R.string.touch_signal_no_sim)
+    CellularAvailability.NO_SERVICE -> stringResource(R.string.touch_signal_no_signal)
+    CellularAvailability.AIRPLANE_MODE -> stringResource(R.string.touch_signal_airplane_mode)
+    CellularAvailability.UNKNOWN -> stringResource(R.string.touch_signal_unknown)
 }
 
 private fun HomeTileKind.tileBackgroundColor(): Color = when (this) {
@@ -514,12 +547,13 @@ private fun HomeTileKind.iconKind(): ClaroIconKind = when (this) {
     HomeTileKind.INSTALLED_APP -> ClaroIconKind.APPS
 }
 
-private fun HomeTileKind.displayLabel(fallback: String): String = when (this) {
-    HomeTileKind.PHONE -> fallback.ifBlank { "Phone" }
-    HomeTileKind.MESSAGES -> fallback.ifBlank { "Messages" }
-    HomeTileKind.CAMERA -> fallback.ifBlank { "Camera" }
-    HomeTileKind.GALLERY -> fallback.ifBlank { "Gallery" }
-    HomeTileKind.SOS -> fallback.ifBlank { "SOS" }
-    HomeTileKind.APPS -> fallback.ifBlank { "Apps" }
+@Composable
+private fun HomeTileKind.localizedLabel(fallback: String): String = when (this) {
+    HomeTileKind.PHONE -> stringResource(R.string.touch_tile_phone)
+    HomeTileKind.MESSAGES -> stringResource(R.string.touch_tile_messages)
+    HomeTileKind.CAMERA -> stringResource(R.string.touch_tile_camera)
+    HomeTileKind.GALLERY -> stringResource(R.string.touch_tile_gallery)
+    HomeTileKind.SOS -> stringResource(R.string.touch_tile_sos)
+    HomeTileKind.APPS -> stringResource(R.string.touch_tile_apps)
     HomeTileKind.INSTALLED_APP -> fallback
 }

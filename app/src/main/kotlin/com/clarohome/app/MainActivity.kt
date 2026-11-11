@@ -2,6 +2,7 @@ package com.clarohome.app
 
 import android.Manifest
 import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -34,11 +35,11 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -49,6 +50,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -67,8 +69,12 @@ import androidx.navigation.toRoute
 import com.clarohome.core.design.ClaroColors
 import com.clarohome.core.design.ClaroIcon
 import com.clarohome.core.design.ClaroIconKind
+import com.clarohome.core.design.ClaroLocaleContainer
 import com.clarohome.core.design.ClaroTheme
 import com.clarohome.core.design.LocalClaroHaptics
+import com.clarohome.core.design.toLocale
+import com.clarohome.core.design.withClaroLanguage
+import java.util.Locale
 import com.clarohome.core.domain.StartupRecoveryState
 import com.clarohome.core.model.AppLanguage
 import com.clarohome.core.model.BatteryStatus
@@ -317,9 +323,12 @@ class MainActivity : ComponentActivity() {
                 ),
             )
         }.onFailure {
+            val language = runCatching {
+                ViewModelProvider(this)[MainViewModel::class.java].uiState.value.preferences.language
+            }.getOrDefault(AppLanguage.ENGLISH)
             Toast.makeText(
                 this,
-                "Android app settings are unavailable on this device.",
+                withClaroLanguage(language).getString(R.string.app_android_settings_unavailable),
                 Toast.LENGTH_LONG,
             ).show()
         }
@@ -385,10 +394,10 @@ private fun ClaroApp(
     val navController = rememberNavController()
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val context = LocalContext.current
+    val localizedContext = remember(context, state.preferences.language) {
+        context.withClaroLanguage(state.preferences.language)
+    }
     val lifecycleOwner = LocalLifecycleOwner.current
-    val layoutDirection =
-        if (state.preferences.language == AppLanguage.HEBREW) LayoutDirection.Rtl
-        else LayoutDirection.Ltr
     var platformNotice by rememberSaveable { mutableStateOf<String?>(null) }
     val roleLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -399,18 +408,18 @@ private fun ClaroApp(
         try {
             roleLauncher.launch(viewModel.homeRoleActionIntent())
         } catch (_: ActivityNotFoundException) {
-            platformNotice = "Home settings are unavailable on this device."
+            platformNotice = localizedContext.getString(R.string.app_home_settings_unavailable)
         }
     }
     val launchPackage = { packageName: String ->
         val launchIntent = viewModel.appLaunchIntent(packageName)
         if (launchIntent == null) {
-            platformNotice = "This app is missing or disabled."
+            platformNotice = localizedContext.getString(R.string.app_missing_or_disabled_notice)
         } else {
             try {
                 context.startActivity(launchIntent)
             } catch (_: ActivityNotFoundException) {
-                platformNotice = "This app could not be opened."
+                platformNotice = localizedContext.getString(R.string.app_could_not_open_notice)
             }
         }
     }
@@ -449,10 +458,18 @@ private fun ClaroApp(
 
     DisposableEffect(lifecycleOwner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshLauncherState()
+            if (event == Lifecycle.Event.ON_RESUME) {
+                Locale.setDefault(viewModel.uiState.value.preferences.language.toLocale())
+                viewModel.refreshLauncherState()
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(state.preferences.language) {
+        Locale.setDefault(state.preferences.language.toLocale())
+        viewModel.refreshLauncherState()
     }
 
     LaunchedEffect(state.preferences.pendingVisualMode, runtimeBlockers) {
@@ -549,7 +566,16 @@ private fun ClaroApp(
         viewModel.setReadiness(ReadinessCapability.MEDIA, CapabilityStatus.READY)
     }
 
-    CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+    ClaroLocaleContainer(language = state.preferences.language) {
+        val privateNumberLabel = stringResource(R.string.app_private_number)
+        val localizedHome = projectedHome?.let { home ->
+            val call = home.activeCall
+            if (call != null && call.displayName == "Private number") {
+                home.copy(activeCall = call.copy(displayName = privateNumberLabel))
+            } else {
+                home
+            }
+        }
         ClaroTheme(
             textSize = state.preferences.textSize,
             highContrast = state.preferences.highContrast,
@@ -571,7 +597,8 @@ private fun ClaroApp(
                     composable<RecoveryRoute> {
                         when (val startup = state.startup) {
                             StartupRecoveryState.Recovering -> LoadingScreen()
-                            is StartupRecoveryState.Failed -> FailureScreen(startup.reason)
+                            is StartupRecoveryState.Failed ->
+                                FailureScreen(localizeStartupFailure(startup.reason))
                             is StartupRecoveryState.Ready -> LoadingScreen()
                         }
                     }
@@ -624,7 +651,7 @@ private fun ClaroApp(
                         )
                     }
                     composable<TouchHomeRoute> {
-                        projectedHome?.let { home ->
+                        localizedHome?.let { home ->
                             TouchHomeScreen(
                                 home = home,
                                 onUseClassicMode = { navController.openSettings(viewModel) },
@@ -646,7 +673,7 @@ private fun ClaroApp(
                                 },
                                 onFavoriteSelected = { favorite ->
                                     platformNotice = if (favorite.phoneNumber == null) {
-                                        "Ask your caregiver to add a person."
+                                        localizedContext.getString(R.string.app_ask_caregiver_add_person)
                                     } else {
                                         communicationViewModel.requestCall(
                                             CallerIdentity(
@@ -667,7 +694,7 @@ private fun ClaroApp(
                         }
                     }
                     composable<ClassicHomeRoute> {
-                        projectedHome?.let { home ->
+                        localizedHome?.let { home ->
                             ClassicPhoneScreen(
                                 home = home,
                                 onOpenMenu = { navController.navigate(LauncherMenuRoute) },
@@ -694,7 +721,9 @@ private fun ClaroApp(
                                         )
                                         navController.navigate(PhoneRoute)
                                     } ?: run {
-                                        platformNotice = "Ask your caregiver to add a person."
+                                        platformNotice = localizedContext.getString(
+                                            R.string.app_ask_caregiver_add_person,
+                                        )
                                     }
                                 },
                                 onRepairHomeRole = launchHomeRole,
@@ -772,8 +801,8 @@ private fun ClaroApp(
                             state = communication,
                             visualMode = state.preferences.visualMode,
                             viewModel = communicationViewModel,
-                            battery = projectedHome?.battery,
-                            cellular = projectedHome?.cellular,
+                            battery = localizedHome?.battery,
+                            cellular = localizedHome?.cellular,
                             canManageContacts = viewModel.isSettingsUnlocked(),
                             onRepairPhone = onRepairPhone,
                             onEmergencyDialer = { viewModel.openEmergencyDialer() },
@@ -788,10 +817,11 @@ private fun ClaroApp(
                                     platformNotice = when (result) {
                                         is ContactWriteResult.Saved -> null
                                         ContactWriteResult.PermissionDenied ->
-                                            "Contacts permission is needed to save."
+                                            localizedContext.getString(R.string.app_contacts_permission_save)
                                         ContactWriteResult.AccountReadOnly ->
-                                            "This contact account is read-only."
-                                        is ContactWriteResult.Failed -> result.reason
+                                            localizedContext.getString(R.string.app_contact_account_read_only)
+                                        is ContactWriteResult.Failed ->
+                                            localizeContactFailureReason(result.reason, localizedContext)
                                     }
                                 }
                             },
@@ -801,10 +831,11 @@ private fun ClaroApp(
                                     platformNotice = when (result) {
                                         is ContactWriteResult.Saved -> null
                                         ContactWriteResult.PermissionDenied ->
-                                            "Contacts permission is needed to delete."
+                                            localizedContext.getString(R.string.app_contacts_permission_delete)
                                         ContactWriteResult.AccountReadOnly ->
-                                            "This contact account is read-only."
-                                        is ContactWriteResult.Failed -> result.reason
+                                            localizedContext.getString(R.string.app_contact_account_read_only)
+                                        is ContactWriteResult.Failed ->
+                                            localizeContactFailureReason(result.reason, localizedContext)
                                     }
                                 }
                             },
@@ -819,8 +850,8 @@ private fun ClaroApp(
                             state = messaging,
                             visualMode = state.preferences.visualMode,
                             viewModel = messagingViewModel,
-                            battery = projectedHome?.battery,
-                            cellular = projectedHome?.cellular,
+                            battery = localizedHome?.battery,
+                            cellular = localizedHome?.cellular,
                             onRepairMessages = onRepairMessages,
                             onHome = { navController.goHome(state.preferences.visualMode) },
                         )
@@ -1097,7 +1128,7 @@ private fun ClaroApp(
                             onClick = { platformNotice = null },
                             modifier = Modifier.heightIn(min = 48.dp),
                         ) {
-                            Text("Dismiss")
+                            Text(stringResource(R.string.app_dismiss))
                         }
                     }
                     }
@@ -1134,6 +1165,11 @@ private fun ProductNavigationBar(
     onHome: () -> Unit,
 ) {
     val haptics = LocalClaroHaptics.current
+    val backIcon = if (LocalLayoutDirection.current == LayoutDirection.Rtl) {
+        ClaroIconKind.ARROW_RIGHT
+    } else {
+        ClaroIconKind.ARROW_LEFT
+    }
     Column {
         HorizontalDivider(thickness = 3.dp, color = ClaroColors.Charcoal)
         Row(
@@ -1157,12 +1193,15 @@ private fun ProductNavigationBar(
                 shape = RectangleShape,
             ) {
                 ClaroIcon(
-                    kind = ClaroIconKind.ARROW_LEFT,
+                    kind = backIcon,
                     tint = ClaroColors.Charcoal,
                     size = 24.dp,
                     modifier = Modifier.padding(end = 10.dp),
                 )
-                Text("Back", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                Text(
+                    stringResource(R.string.app_back),
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                )
             }
             Box(
                 modifier = Modifier
@@ -1191,7 +1230,10 @@ private fun ProductNavigationBar(
                     size = 24.dp,
                     modifier = Modifier.padding(end = 10.dp),
                 )
-                Text("Home", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                Text(
+                    stringResource(R.string.app_home),
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                )
             }
         }
     }
@@ -1217,9 +1259,9 @@ private fun ClassicGlobalDeck(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         ClassicIntegratedPad(
-            menuLabel = "Menu",
-            greenLabel = "☎ Call",
-            redLabel = "⌂ Home",
+            menuLabel = stringResource(R.string.app_menu),
+            greenLabel = "☎ ${stringResource(R.string.app_call)}",
+            redLabel = "⌂ ${stringResource(R.string.app_home)}",
             onBack = onBack,
             onMenu = onMenu,
             onGreen = onCall,
@@ -1512,4 +1554,26 @@ private fun FailureScreen(reason: String) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(reason)
     }
+}
+
+@Composable
+private fun localizeStartupFailure(reason: String): String = when (reason) {
+    "Unable to restore local state" -> stringResource(R.string.app_unable_to_restore_local_state)
+    else -> reason
+}
+
+private fun localizeContactFailureReason(reason: String, context: Context): String = when (reason) {
+    "Name and number are required" ->
+        context.getString(R.string.app_contact_name_and_number_required)
+    "Contact was not saved" ->
+        context.getString(R.string.app_contact_not_saved)
+    "Contact was saved but could not be opened" ->
+        context.getString(R.string.app_contact_saved_could_not_open)
+    "Contact not found" ->
+        context.getString(R.string.app_contact_not_found)
+    "Contact change failed" ->
+        context.getString(R.string.app_contact_change_failed)
+    "Replace the SOS person before deleting this contact" ->
+        context.getString(R.string.app_contact_replace_sos_before_delete)
+    else -> reason
 }

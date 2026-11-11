@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.clarohome.core.design.ClaroColors
 import com.clarohome.core.design.ClaroIcon
@@ -31,7 +32,7 @@ fun LauncherMenuScreen(
     BackHandler(onBack = onBack)
 
     ClaroScreenScaffold(
-        title = "Menu",
+        title = stringResource(R.string.app_menu),
         scrollable = false,
     ) {
         LazyColumn(
@@ -41,7 +42,7 @@ fun LauncherMenuScreen(
         ) {
             item(key = "menu-contacts") {
                 ClaroRowButton(
-                    title = "Contacts",
+                    title = stringResource(R.string.app_contacts),
                     leading = {
                         ClaroIcon(
                             kind = ClaroIconKind.CONTACT,
@@ -55,7 +56,7 @@ fun LauncherMenuScreen(
             items(orderedTiles, key = { it.id }) { tile ->
                 val (subtitle, unread) = tile.menuBadgePresentation()
                 ClaroRowButton(
-                    title = tile.label,
+                    title = tile.localizedLabel(),
                     subtitle = subtitle,
                     unreadDot = unread,
                     leading = {
@@ -76,7 +77,7 @@ fun LauncherMenuScreen(
             }
             item(key = "menu-settings") {
                 ClaroRowButton(
-                    title = "Settings",
+                    title = stringResource(R.string.app_settings),
                     leading = {
                         ClaroIcon(
                             kind = ClaroIconKind.SETTINGS,
@@ -88,6 +89,21 @@ fun LauncherMenuScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun HomeTile.localizedLabel(): String = when (kind) {
+    HomeTileKind.PHONE -> stringResource(R.string.app_phone)
+    HomeTileKind.MESSAGES -> stringResource(R.string.app_messages)
+    HomeTileKind.CAMERA -> stringResource(R.string.app_camera)
+    HomeTileKind.GALLERY -> stringResource(R.string.app_gallery)
+    HomeTileKind.SOS -> stringResource(R.string.app_sos)
+    HomeTileKind.APPS -> stringResource(R.string.app_apps)
+    HomeTileKind.INSTALLED_APP -> if (label == "Settings") {
+        stringResource(R.string.app_settings)
+    } else {
+        label
     }
 }
 
@@ -111,12 +127,13 @@ private fun HomeTileKind.toClaroIconTint(): Color = when (this) {
     HomeTileKind.INSTALLED_APP -> ClaroColors.Blue
 }
 
+@Composable
 private fun HomeTile.menuBadgePresentation(): Pair<String?, Boolean> = when (val current = badge) {
     is BadgeValue.Known -> if (current.count > 0) {
-        "${current.count} new" to true
+        stringResource(R.string.app_badge_new_count, current.count) to true
     } else {
         null to false
     }
-    BadgeValue.Unknown -> "Access needed · count unknown" to false
+    BadgeValue.Unknown -> stringResource(R.string.app_badge_unknown) to false
     null -> null to false
 }

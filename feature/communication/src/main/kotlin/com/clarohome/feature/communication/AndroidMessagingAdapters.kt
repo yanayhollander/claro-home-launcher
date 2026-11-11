@@ -263,13 +263,13 @@ class AndroidMessageRepository @Inject constructor(
             val readIndex = cursor.getColumnIndexOrThrow(Telephony.Mms.READ)
             while (cursor.moveToNext()) {
                 val subject = cursor.getString(subjectIndex).orEmpty()
-                    .ifBlank { "Multimedia message" }
+                    .ifBlank { context.getString(R.string.comm_mms_fallback_subject) }
                 if (query.isNotBlank() && !subject.contains(query, ignoreCase = true)) continue
                 val threadId = cursor.getLong(threadIndex)
                 val row = rows.getOrPut(threadId) {
                     MutableConversation(
                         id = threadId,
-                        address = "Group or multimedia message",
+                        address = context.getString(R.string.comm_mms_group_or_multimedia),
                         snippet = subject,
                         timestampMillis = cursor.getLong(dateIndex) * 1_000,
                         kind = MessageKind.MMS,
@@ -309,9 +309,9 @@ class AndroidMessageRepository @Inject constructor(
                     } else {
                         MessageDirection.OUTGOING
                     },
-                    senderOrRecipient = "Group or multimedia message",
+                    senderOrRecipient = context.getString(R.string.comm_mms_group_or_multimedia),
                     body = cursor.getString(subjectIndex).orEmpty().ifBlank {
-                        "Multimedia message"
+                        context.getString(R.string.comm_mms_fallback_subject)
                     },
                     timestampMillis = cursor.getLong(dateIndex) * 1_000,
                     isRead = cursor.getInt(readIndex) != 0,
@@ -573,7 +573,11 @@ class SmsDeliverReceiver : BroadcastReceiver() {
         Thread {
             try {
                 kotlinx.coroutines.runBlocking { repository.reconcileIncoming(listOf(message)) }
-                showIncomingNotification(context, "New message", "Open Claro to read it")
+                showIncomingNotification(
+                    context,
+                    context.getString(R.string.comm_notification_new_sms_title),
+                    context.getString(R.string.comm_notification_new_sms_text),
+                )
             } finally {
                 pendingResult.finish()
             }
@@ -593,13 +597,16 @@ class MmsWapPushReceiver : BroadcastReceiver() {
                 put(Telephony.Mms.DATE, System.currentTimeMillis() / 1_000)
                 put(Telephony.Mms.READ, 0)
                 put(Telephony.Mms.MESSAGE_BOX, Telephony.Mms.MESSAGE_BOX_INBOX)
-                put(Telephony.Mms.SUBJECT, "Multimedia message — download required")
+                put(
+                    Telephony.Mms.SUBJECT,
+                    context.getString(R.string.comm_mms_download_required_subject),
+                )
             },
         )
         showIncomingNotification(
             context,
-            "New multimedia message",
-            "Open Claro to download or review the failure",
+            context.getString(R.string.comm_notification_new_mms_title),
+            context.getString(R.string.comm_notification_new_mms_text),
         )
     }
 }
@@ -746,9 +753,11 @@ private fun showIncomingNotification(context: Context, title: String, text: Stri
     manager.createNotificationChannel(
         NotificationChannel(
             MESSAGE_CHANNEL,
-            "Messages",
+            context.getString(R.string.comm_channel_messages_name),
             NotificationManager.IMPORTANCE_HIGH,
-        ),
+        ).apply {
+            description = context.getString(R.string.comm_channel_messages_description)
+        },
     )
     val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
     val pendingIntent = PendingIntent.getActivity(

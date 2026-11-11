@@ -1,16 +1,18 @@
 package com.clarohome.app
 
-import android.content.Intent
 import android.app.Activity
+import android.content.Context
+import android.content.Intent
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.clarohome.core.design.withClaroLanguage
+import com.clarohome.core.domain.ClaroPreferencesRepository
+import com.clarohome.core.domain.CriticalActivityRepository
 import com.clarohome.core.domain.EmergencyNumberDetector
 import com.clarohome.core.domain.ExternalAppLaunchResult
 import com.clarohome.core.domain.ExternalAppLauncher
 import com.clarohome.core.domain.HomeRepository
-import com.clarohome.core.domain.ClaroPreferencesRepository
-import com.clarohome.core.domain.CriticalActivityRepository
 import com.clarohome.core.domain.NativeEmergencyDialerGateway
 import com.clarohome.core.domain.PhoneCallGateway
 import com.clarohome.core.domain.StartupRecoveryCoordinator
@@ -19,32 +21,33 @@ import com.clarohome.core.model.AppLanguage
 import com.clarohome.core.model.CapabilityStatus
 import com.clarohome.core.model.ClaroPreferences
 import com.clarohome.core.model.CriticalActivity
-import com.clarohome.core.model.HandoverCheck
 import com.clarohome.core.model.FavoritePerson
 import com.clarohome.core.model.FavoriteState
+import com.clarohome.core.model.HandoverCheck
 import com.clarohome.core.model.HomeSnapshot
 import com.clarohome.core.model.OnboardingStep
 import com.clarohome.core.model.ReadinessCapability
 import com.clarohome.core.model.TextSize
 import com.clarohome.core.model.VisualMode
-import com.clarohome.feature.onboarding.settings.AccessResult
-import com.clarohome.feature.onboarding.settings.ModeSwitchResult
-import com.clarohome.feature.onboarding.settings.OnboardingSettingsManager
-import com.clarohome.feature.launcher.home.HomeRoleController
-import com.clarohome.feature.launcher.home.InstalledAppCatalog
-import com.clarohome.feature.launcher.home.LauncherStatusReader
 import com.clarohome.feature.billing.observability.BillingObservabilityUiState
 import com.clarohome.feature.billing.observability.BillingRepository
 import com.clarohome.feature.billing.observability.ClaroEvent
 import com.clarohome.feature.billing.observability.ConsentAwareObservability
 import com.clarohome.feature.billing.observability.ConsentController
 import com.clarohome.feature.billing.observability.DiagnosticsConsent
+import com.clarohome.feature.launcher.home.HomeRoleController
+import com.clarohome.feature.launcher.home.InstalledAppCatalog
+import com.clarohome.feature.launcher.home.LauncherStatusReader
+import com.clarohome.feature.onboarding.settings.AccessResult
+import com.clarohome.feature.onboarding.settings.ModeSwitchResult
+import com.clarohome.feature.onboarding.settings.OnboardingSettingsManager
 import com.clarohome.feature.safety.media.apps.PersistedSosState
 import com.clarohome.feature.safety.media.apps.SosCallOutcome
 import com.clarohome.feature.safety.media.apps.SosCoordinator
 import com.clarohome.feature.safety.media.apps.SosState
 import com.clarohome.feature.safety.media.apps.TrustedContact
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -64,6 +67,7 @@ data class MainUiState(
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
+    @param:ApplicationContext private val appContext: Context,
     private val savedStateHandle: SavedStateHandle,
     private val preferencesRepository: ClaroPreferencesRepository,
     private val criticalActivityRepository: CriticalActivityRepository,
@@ -162,7 +166,7 @@ class MainViewModel @Inject constructor(
                     message.value = null
                     settingsManager.advanceOnboarding(OnboardingStep.PEOPLE_AND_SPEED_DIAL)
                 }
-                is AccessResult.Invalid -> message.value = result.reason
+                is AccessResult.Invalid -> message.value = localizeAccessInvalidReason(result.reason)
                 else -> Unit
             }
         }
@@ -180,7 +184,7 @@ class MainViewModel @Inject constructor(
                     message.value = null
                     onSuccess()
                 }
-                is AccessResult.Invalid -> message.value = result.reason
+                is AccessResult.Invalid -> message.value = localizeAccessInvalidReason(result.reason)
                 else -> Unit
             }
         }
@@ -201,30 +205,40 @@ class MainViewModel @Inject constructor(
 
     fun unlock(input: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
+            val context = localizedContext()
             when (val result = settingsManager.unlock(input)) {
                 AccessResult.Unlocked -> {
                     message.value = null
                     onSuccess()
                 }
-                AccessResult.Incorrect -> message.value = "That answer was not correct."
+                AccessResult.Incorrect ->
+                    message.value = context.getString(R.string.app_unlock_incorrect)
                 is AccessResult.Cooldown ->
-                    message.value = "Too many attempts. Try again in ${result.remainingSeconds} seconds."
-                is AccessResult.Invalid -> message.value = result.reason
+                    message.value = context.getString(
+                        R.string.app_unlock_cooldown,
+                        result.remainingSeconds.toInt(),
+                    )
+                is AccessResult.Invalid -> message.value = localizeAccessInvalidReason(result.reason)
             }
         }
     }
 
     fun recoverPin(secret: String, pin: String, confirmation: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
+            val context = localizedContext()
             when (val result = settingsManager.recoverPin(secret, pin, confirmation)) {
                 AccessResult.Unlocked -> {
-                    message.value = "PIN changed."
+                    message.value = context.getString(R.string.app_pin_changed)
                     onSuccess()
                 }
-                AccessResult.Incorrect -> message.value = "Recovery secret was not correct."
+                AccessResult.Incorrect ->
+                    message.value = context.getString(R.string.app_recovery_secret_incorrect)
                 is AccessResult.Cooldown ->
-                    message.value = "Recovery is paused for ${result.remainingSeconds} seconds."
-                is AccessResult.Invalid -> message.value = result.reason
+                    message.value = context.getString(
+                        R.string.app_recovery_cooldown,
+                        result.remainingSeconds.toInt(),
+                    )
+                is AccessResult.Invalid -> message.value = localizeAccessInvalidReason(result.reason)
             }
         }
     }
@@ -250,8 +264,9 @@ class MainViewModel @Inject constructor(
                     onApplied()
                 }
                 is ModeSwitchResult.Deferred -> {
-                    message.value = "Phone style will change after: " +
-                        result.blockers.joinToString { it.readableName() }
+                    val context = localizedContext()
+                    val blockers = result.blockers.joinToString { it.readableName(context) }
+                    message.value = context.getString(R.string.app_phone_style_deferred, blockers)
                 }
             }
         }
@@ -506,6 +521,27 @@ class MainViewModel @Inject constructor(
         mutableSosState.value = sosCoordinator.state
     }
 
+    private fun localizedContext(): Context =
+        appContext.withClaroLanguage(uiState.value.preferences.language)
+
+    private fun localizeAccessInvalidReason(reason: String): String {
+        val context = localizedContext()
+        val minRecoveryMatch = MIN_RECOVERY_SECRET_REGEX.matchEntire(reason)
+        if (minRecoveryMatch != null) {
+            val minLength = minRecoveryMatch.groupValues[1].toIntOrNull() ?: 6
+            return context.getString(R.string.app_pin_recovery_secret_min_length, minLength)
+        }
+        return when (reason) {
+            "Use exactly 6 digits." -> context.getString(R.string.app_pin_use_six_digits)
+            "PINs do not match." -> context.getString(R.string.app_pins_do_not_match)
+            "PIN recovery is available only in caregiver PIN mode." ->
+                context.getString(R.string.app_pin_recovery_only_pin_mode)
+            "Enter the same 6-digit PIN twice." ->
+                context.getString(R.string.app_pin_enter_same_twice)
+            else -> reason
+        }
+    }
+
     private suspend fun updatePeopleSetupProgress(favorites: List<FavoritePerson>) {
         val current = uiState.value
         val assigned = favorites.count { it.phoneNumber != null }
@@ -516,7 +552,19 @@ class MainViewModel @Inject constructor(
             sosRecipientAgreed = current.preferences.onboarding.sosRecipientAgreed,
         )
     }
+
+    private companion object {
+        val MIN_RECOVERY_SECRET_REGEX =
+            Regex("^Recovery secret must be at least (\\d+) characters\\.$")
+    }
 }
 
-private fun CriticalActivity.readableName(): String =
-    name.lowercase().replace('_', ' ')
+private fun CriticalActivity.readableName(context: Context): String = when (this) {
+    CriticalActivity.ACTIVE_CALL -> context.getString(R.string.app_blocker_active_call)
+    CriticalActivity.SOS -> context.getString(R.string.app_blocker_sos)
+    CriticalActivity.PURCHASE -> context.getString(R.string.app_blocker_purchase)
+    CriticalActivity.DESTRUCTIVE_CONFIRMATION ->
+        context.getString(R.string.app_blocker_destructive_confirmation)
+    CriticalActivity.EXTERNAL_SYSTEM_UI ->
+        context.getString(R.string.app_blocker_external_system_ui)
+}

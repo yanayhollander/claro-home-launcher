@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -60,7 +61,7 @@ fun AppsMenuScreen(
     var query by rememberSaveable { mutableStateOf("") }
     var customize by rememberSaveable(allowCustomization) { mutableStateOf(allowCustomization) }
     var onHomeOnly by rememberSaveable { mutableStateOf(false) }
-    var unavailableNotice by remember { mutableStateOf<String?>(null) }
+    var unavailableAppLabel by remember { mutableStateOf<String?>(null) }
 
     val editing = allowCustomization && customize
     val allowedApps = HomeCustomizationPolicy.allowedApps(apps)
@@ -75,12 +76,12 @@ fun AppsMenuScreen(
     BackHandler(onBack = onBack)
 
     ClaroScreenScaffold(
-        title = if (editing) "Home & apps" else "Apps",
+        title = if (editing) stringResource(R.string.app_home_and_apps) else stringResource(R.string.app_apps),
         scrollable = false,
         dock = {
             if (editing) {
                 ClaroPrimaryButton(
-                    label = "Done",
+                    label = stringResource(R.string.app_done),
                     onClick = {
                         customize = false
                         onBack()
@@ -89,7 +90,7 @@ fun AppsMenuScreen(
                 )
             } else {
                 ClaroSecondaryButton(
-                    label = "Edit apps",
+                    label = stringResource(R.string.app_edit_apps),
                     onClick = {
                         if (allowCustomization) {
                             customize = true
@@ -103,22 +104,22 @@ fun AppsMenuScreen(
     ) {
         if (editing) {
             ClaroInfoCard(
-                text = "Hiding apps here is a menu convenience only. It does not lock the device or block Android settings.",
+                text = stringResource(R.string.app_apps_hiding_convenience_notice),
                 tone = ClaroBannerTone.INFO,
             )
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Search") },
+                label = { Text(stringResource(R.string.app_search)) },
                 singleLine = true,
             )
             if (visible.isEmpty()) {
                 ClaroInfoCard(
                     text = if (query.isBlank()) {
-                        "No eligible apps found on this device."
+                        stringResource(R.string.app_no_eligible_apps)
                     } else {
-                        "No apps match your search."
+                        stringResource(R.string.app_no_apps_match_search)
                     },
                     tone = ClaroBannerTone.INFO,
                 )
@@ -148,7 +149,7 @@ fun AppsMenuScreen(
                 value = query,
                 onValueChange = { query = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Search") },
+                label = { Text(stringResource(R.string.app_search)) },
                 singleLine = true,
             )
             AppsTabStrip(
@@ -156,23 +157,23 @@ fun AppsMenuScreen(
                 onSelectAllAllowed = { onHomeOnly = false },
                 onSelectOnHome = { onHomeOnly = true },
             )
-            unavailableNotice?.let { notice ->
+            unavailableAppLabel?.let { label ->
                 ClaroInfoCard(
-                    text = notice,
+                    text = stringResource(R.string.app_unavailable_review_edit_apps, label),
                     tone = ClaroBannerTone.ERROR,
                 )
             }
             if (allowedApps.isEmpty()) {
                 ClaroInfoCard(
-                    text = "No allowed apps yet.",
+                    text = stringResource(R.string.app_no_allowed_apps_yet),
                     tone = ClaroBannerTone.INFO,
                 )
             } else if (visible.isEmpty()) {
                 ClaroInfoCard(
                     text = if (query.isNotBlank()) {
-                        "No apps match your search."
+                        stringResource(R.string.app_no_apps_match_search)
                     } else {
-                        "No allowed apps on Home yet."
+                        stringResource(R.string.app_no_allowed_apps_on_home)
                     },
                     tone = ClaroBannerTone.INFO,
                 )
@@ -187,11 +188,10 @@ fun AppsMenuScreen(
                             app = app,
                             onLaunch = {
                                 if (app.isAvailable) {
-                                    unavailableNotice = null
+                                    unavailableAppLabel = null
                                     onLaunch(app)
                                 } else {
-                                    unavailableNotice =
-                                        "${app.label} is missing or disabled. Ask a caregiver to review Edit apps."
+                                    unavailableAppLabel = app.label
                                 }
                             },
                         )
@@ -215,13 +215,13 @@ private fun AppsTabStrip(
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         AppsTabButton(
-            label = "All allowed",
+            label = stringResource(R.string.app_tab_all_allowed),
             selected = !onHomeOnly,
             onClick = onSelectAllAllowed,
             modifier = Modifier.weight(1f),
         )
         AppsTabButton(
-            label = "On home",
+            label = stringResource(R.string.app_tab_on_home),
             selected = onHomeOnly,
             onClick = onSelectOnHome,
             modifier = Modifier.weight(1f),
@@ -263,7 +263,11 @@ private fun SeniorAppRow(
     if (app.isAvailable) {
         ClaroRowButton(
             title = app.label,
-            subtitle = if (app.isOnHome) "On Home · opens outside Claro" else "Opens outside Claro",
+            subtitle = if (app.isOnHome) {
+                stringResource(R.string.app_subtitle_on_home_external)
+            } else {
+                stringResource(R.string.app_subtitle_opens_external)
+            },
             leading = {
                 ClaroIcon(
                     kind = ClaroIconKind.APPS,
@@ -302,7 +306,7 @@ private fun SeniorAppRow(
                         fontWeight = FontWeight.Medium,
                     )
                     Text(
-                        text = "App is missing or disabled",
+                        text = stringResource(R.string.app_is_missing_or_disabled),
                         color = ClaroColors.ErrorInk,
                         fontSize = 17.sp,
                         lineHeight = 21.sp,
@@ -359,7 +363,7 @@ private fun CaregiverAppRow(
                 )
                 if (!app.isAvailable) {
                     Text(
-                        text = "App is missing or disabled",
+                        text = stringResource(R.string.app_is_missing_or_disabled),
                         color = ClaroColors.Red,
                         fontSize = 16.sp,
                         lineHeight = 20.sp,
@@ -376,7 +380,7 @@ private fun CaregiverAppRow(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
-                text = "Show on Home",
+                text = stringResource(R.string.app_show_on_home),
                 color = if (canAddToHome) ClaroColors.Ink else ClaroColors.Muted,
                 fontSize = 19.sp,
                 lineHeight = 24.sp,

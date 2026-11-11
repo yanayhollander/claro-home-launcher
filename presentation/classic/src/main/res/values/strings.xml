@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="classic_brand_claro" translatable="false">Claro</string>
+    <string name="classic_battery_dot_percent" translatable="false">· %1$d%%</string>
+    <string name="classic_battery_percent_short" translatable="false">%1$d%%</string>
+    <string name="classic_keypad_legend_1" translatable="false">.,?!</string>
+    <string name="classic_keypad_legend_2" translatable="false">ABC</string>
+    <string name="classic_keypad_legend_3" translatable="false">DEF</string>
+    <string name="classic_keypad_legend_4" translatable="false">GHI</string>
+    <string name="classic_keypad_legend_5" translatable="false">JKL</string>
+    <string name="classic_keypad_legend_6" translatable="false">MNO</string>
+    <string name="classic_keypad_legend_7" translatable="false">PQRS</string>
+    <string name="classic_keypad_legend_8" translatable="false">TUV</string>
+    <string name="classic_keypad_legend_9" translatable="false">WXYZ</string>
+    <string name="classic_keypad_legend_star" translatable="false">+</string>
+    <string name="classic_keypad_legend_pound" translatable="false">abc / 123</string>
+
+    <string name="classic_ok">OK</string>
+    <string name="classic_call">Call</string>
+    <string name="classic_home">Home</string>
+    <string name="classic_back">Back</string>
+    <string name="classic_menu">Menu</string>
+    <string name="classic_options">Options</string>
+    <string name="classic_navigate_up">Navigate up</string>
+    <string name="classic_navigate_down">Navigate down</string>
+    <string name="classic_navigate_left">Navigate left</string>
+    <string name="classic_navigate_right">Navigate right</string>
+    <string name="classic_keypad_space">space</string>
+    <string name="classic_keypad_key_description">%1$s, %2$s</string>
+    <string name="classic_keypad_key_speed_dial">%1$s, %2$s. Hold for speed dial</string>
+
+    <string name="classic_messages">Messages</string>
+    <string name="classic_sos">SOS</string>
+    <string name="classic_phone_title">Phone</string>
+    <string name="classic_choose_claro_as_home">Choose Claro as Home</string>
+    <string name="classic_open_home_settings">Open Home settings</string>
+    <string name="classic_repair_home_access">Repair Home access</string>
+    <string name="classic_return_to_call">Return to call · %1$s</string>
+    <string name="classic_battery_percent" tools:ignore="PluralsCandidate">Battery %1$d percent</string>
+    <string name="classic_battery_percent_charging" tools:ignore="PluralsCandidate">Battery %1$d percent, charging</string>
+    <string name="classic_badge_no_new">%1$s, no new items</string>
+    <string name="classic_badge_new_count" tools:ignore="PluralsCandidate">%1$s, %2$d new</string>
+    <string name="classic_badge_unknown">%1$s, count unavailable, repair required</string>
+    <string name="classic_favorite_slot_unassigned">Add person, favorite slot %1$d</string>
+    <string name="classic_favorite_person">%1$s, favorite person</string>
+
+    <string name="classic_mode_letters">Letters</string>
+    <string name="classic_mode_numbers">Numbers</string>
+    <string name="classic_delete_character">Delete character</string>
+    <string name="classic_clear_text">Clear text</string>
+    <string name="classic_contacts">Contacts</string>
+    <string name="classic_search_name_or_number">Search name or number</string>
+    <string name="classic_loading_contacts">Loading contacts…</string>
+
+    <string name="classic_contact">Contact</string>
+    <string name="classic_confirm_call">Confirm call</string>
+    <string name="classic_incoming_call">Incoming call</string>
+    <string name="classic_active_call_title">Call</string>
+    <string name="classic_call_ended">Call ended</string>
+    <string name="classic_missed_call">Missed call</string>
+    <string name="classic_no_answer">No answer</string>
+    <string name="classic_call_failed">Call failed</string>
+    <string name="classic_system_dialer">System dialer</string>
+    <string name="classic_answer">Answer</string>
+    <string name="classic_decline">Decline</string>
+    <string name="classic_end">End</string>
+    <string name="classic_repair_phone_access">Repair phone access</string>
+    <string name="classic_emergency_call">Emergency call</string>
+    <string name="classic_earpiece">Earpiece</string>
+    <string name="classic_speaker">Speaker</string>
+    <string name="classic_mute">Mute</string>
+    <string name="classic_unmute">Unmute</string>
+    <string name="classic_hold_call">Hold</string>
+    <string name="classic_resume_call">Resume</string>
+    <string name="classic_swap_call">Swap</string>
+    <string name="classic_call_back">Call back</string>
+    <string name="classic_enter_number">Enter a number</string>
+    <string name="classic_phone_number_empty">Phone number empty</string>
+    <string name="classic_phone_number_value">Phone number %1$s</string>
+    <string name="classic_calling_unavailable">Calling is not available on this device.</string>
+    <string name="classic_phone_access_attention">Phone access needs attention.</string>
+    <string name="classic_history_missed">Missed · %1$s</string>
+    <string name="classic_history_recent">Recent · %1$s</string>
+    <string name="classic_no_contacts_yet">No contacts yet.</string>
+    <string name="classic_no_matches">No matches.</string>
+    <string name="classic_more_contacts">More contacts</string>
+    <string name="classic_contact_unavailable">Contact is no longer available</string>
+    <string name="classic_unknown_caller">Unknown caller</string>
+    <string name="classic_private_number">Private number</string>
+    <string name="classic_number_withheld">Number withheld</string>
+    <string name="classic_number_unavailable">Number unavailable</string>
+    <string name="classic_press_call_to_confirm">Press Call to confirm</string>
+    <string name="classic_answer_with_green_key">Answer with the green key</string>
+    <string name="classic_call_on_hold">On hold</string>
+    <string name="classic_call_connected">Connected</string>
+    <string name="classic_call_status_duration">%1$s · %2$s</string>
+    <string name="classic_call_dialing">Dialing…</string>
+    <string name="classic_call_ringing">Ringing…</string>
+    <string name="classic_waiting_phone_service">Waiting for phone service</string>
+    <string name="classic_call_duration">Duration · %1$s</string>
+    <string name="classic_call_did_not_connect">The call did not connect</string>
+    <string name="classic_call_failure_invalid_number">Enter a valid phone number</string>
+    <string name="classic_call_failure_no_sim">No SIM is ready for calls</string>
+    <string name="classic_call_failure_no_service">No mobile service</string>
+    <string name="classic_call_failure_role_lost">Claro is not the default phone app</string>
+    <string name="classic_call_failure_permission_denied">Phone permission is needed</string>
+    <string name="classic_call_failure_account_unavailable">Choose a calling account in system settings</string>
+    <string name="classic_call_failure_network">The call could not connect</string>
+    <string name="classic_continue_system_emergency_dialer">Continue in the system emergency dialer</string>
+    <string name="classic_msg_call_canceled">Call canceled</string>
+    <string name="classic_hold_slot_not_set">Hold %1$s is not set</string>
+    <string name="classic_hold_slot_needs_repair">Ask your caregiver to repair Hold %1$s</string>
+    <string name="classic_timestamp_recent">Recent</string>
+    <string name="classic_timestamp_today">Today · %1$s</string>
+    <string name="classic_timestamp_date_time">%1$s · %2$s</string>
+
+    <string name="classic_conversation">Conversation</string>
+    <string name="classic_choose_recipient">Choose recipient</string>
+    <string name="classic_write_message">Write a message</string>
+    <string name="classic_send_message_title">Send message?</string>
+    <string name="classic_sending_title">Sending</string>
+    <string name="classic_delivery_uncertain">Delivery uncertain</string>
+    <string name="classic_message_not_sent">Message not sent</string>
+    <string name="classic_deck_new">New</string>
+    <string name="classic_deck_choose">Choose</string>
+    <string name="classic_review">Review</string>
+    <string name="classic_send">Send</string>
+    <string name="classic_deck_retry">Retry</string>
+    <string name="classic_sending_ellipsis">Sending…</string>
+    <string name="classic_new_message">New message</string>
+    <string name="classic_repair_messages_access">Repair Messages access</string>
+    <string name="classic_cancel">Cancel</string>
+    <string name="classic_edit">Edit</string>
+    <string name="classic_messages_unavailable">Messages are not available on this device.</string>
+    <string name="classic_messages_access_repair">Messages access needs repair.</string>
+    <string name="classic_no_messages_yet">No messages yet.</string>
+    <string name="classic_no_matching_messages">No matching messages.</string>
+    <string name="classic_conversation_unread_title">%1$s (%2$d)</string>
+    <string name="classic_mms_snippet">MMS · %1$s</string>
+    <string name="classic_delivery_confirmed">Delivered</string>
+    <string name="classic_delivery_unknown">Delivery unknown</string>
+    <string name="classic_delivery_not_sent">Not sent</string>
+    <string name="classic_delivery_sent_unconfirmed">Sent · delivery not confirmed</string>
+    <string name="classic_attachment_available">Attachment available</string>
+    <string name="classic_attachment_download_required">Attachment needs mobile data</string>
+    <string name="classic_attachment_download_failed">Attachment download failed</string>
+    <string name="classic_attachment_unsupported">Unsupported attachment</string>
+    <string name="classic_reply">Reply</string>
+    <string name="classic_write_reply_placeholder">Write a reply…</string>
+    <string name="classic_to_label">To</string>
+    <string name="classic_name_or_number_placeholder">Name or number</string>
+    <string name="classic_use_typed_number">Use typed number</string>
+    <string name="classic_no_contacts_found">No contacts found.</string>
+    <string name="classic_number_with_label">%1$s · %2$s</string>
+    <string name="classic_phone_number_placeholder">Phone number</string>
+    <string name="classic_message_label">Message</string>
+    <string name="classic_write_here_placeholder">Write here…</string>
+    <string name="classic_cancel_keep_draft">Cancel · keep draft</string>
+    <string name="classic_press_send_to_confirm">Press Send to confirm</string>
+    <string name="classic_wait_carrier_result">Wait for the carrier result.</string>
+    <string name="classic_msg_duplicate_risk">Sending again may deliver this message twice. Confirm only if you want to resend.</string>
+    <string name="classic_msg_unknown_outcome">The carrier did not confirm the result. This message may already have been sent.</string>
+    <string name="classic_msg_not_sent_draft_saved">The message could not be sent. Your draft is saved.</string>
+    <string name="classic_send_again">Send again</string>
+    <string name="classic_do_not_resend">Do not resend</string>
+    <string name="classic_try_again">Try again</string>
+    <string name="classic_sms_counter_gsm">%1$d · ~%2$d SMS · carrier charges may apply</string>
+    <string name="classic_sms_counter_unicode">%1$d · ~%2$d SMS · Unicode · carrier charges may apply</string>
+    <string name="classic_recipient">Recipient</string>
+    <string name="classic_msg_failure_invalid_recipient">Enter a valid recipient</string>
+    <string name="classic_msg_failure_empty_content">Write a message before sending</string>
+    <string name="classic_msg_failure_role_lost">Claro must be the default SMS app</string>
+    <string name="classic_msg_failure_permission_denied">Messages permission needs repair</string>
+    <string name="classic_msg_failure_no_sim">No SIM is available for messages</string>
+    <string name="classic_msg_failure_no_service">No cellular service is available</string>
+    <string name="classic_msg_failure_account_unavailable">Choose a default SMS account in Android</string>
+    <string name="classic_msg_failure_carrier_rejected">The carrier could not send this message</string>
+    <string name="classic_msg_failure_unknown">The message result is unknown</string>
+    <string name="classic_msg_choose_default_sms_account">Choose a default SMS account in Android. Your draft is saved.</string>
+    <string name="classic_msg_sent_delivery_unconfirmed">Sent. Delivery is not confirmed.</string>
+    <string name="classic_msg_delivery_confirmed_carrier">Delivery confirmed by the carrier</string>
+    <string name="classic_msg_sending_status">Sending message</string>
+</resources>

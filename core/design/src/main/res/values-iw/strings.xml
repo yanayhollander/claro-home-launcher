@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="design_unassigned_person">הוספת איש קשר</string>
+    <string name="design_battery_percent">סוללה %1$d אחוז</string>
+    <string name="design_battery_percent_charging">סוללה %1$d אחוז, בטעינה</string>
+    <string name="design_signal_available">קליטה סלולרית: %1$d מתוך 4</string>
+    <string name="design_signal_no_sim">קליטה סלולרית: אין SIM</string>
+    <string name="design_signal_no_service">קליטה סלולרית: אין קליטה</string>
+    <string name="design_signal_airplane">קליטה סלולרית: מצב טיסה</string>
+    <string name="design_signal_unknown">קליטה סלולרית: לא ידוע</string>
+</resources>

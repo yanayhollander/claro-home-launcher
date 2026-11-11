@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -188,7 +189,12 @@ fun ClaroAvatar(
     paletteSeed: Int? = null,
     isUnassigned: Boolean = false,
 ) {
-    val hasPerson = !isUnassigned && !name.isNullOrBlank() && name != "?" && name != "Add person"
+    val unassignedLabel = stringResource(R.string.design_unassigned_person)
+    val hasPerson = !isUnassigned &&
+        !name.isNullOrBlank() &&
+        name != "?" &&
+        name != "Add person" &&
+        name != unassignedLabel
     if (!hasPerson) {
         Box(
             modifier = modifier
@@ -277,9 +283,10 @@ fun ClaroBatteryMeter(
     borderColor: Color = Color.White,
     backgroundColor: Color = ClaroColors.Charcoal,
 ) {
-    val label = buildString {
-        append("Battery ${battery.percentage} percent")
-        if (battery.isCharging) append(", charging")
+    val label = if (battery.isCharging) {
+        stringResource(R.string.design_battery_percent_charging, battery.percentage)
+    } else {
+        stringResource(R.string.design_battery_percent, battery.percentage)
     }
     Row(
         modifier = modifier.semantics { contentDescription = label },
@@ -320,11 +327,12 @@ fun ClaroCellularBars(
     val available = cellular.availability == CellularAvailability.AVAILABLE
     val activeBars = if (available) (cellular.signalLevel ?: 0).coerceIn(0, 4) else 0
     val description = when (cellular.availability) {
-        CellularAvailability.AVAILABLE -> "Mobile signal: ${cellular.signalLevel ?: 0} of 4"
-        CellularAvailability.NO_SIM -> "Mobile signal: No SIM"
-        CellularAvailability.NO_SERVICE -> "Mobile signal: No signal"
-        CellularAvailability.AIRPLANE_MODE -> "Mobile signal: Airplane mode"
-        CellularAvailability.UNKNOWN -> "Mobile signal: Unknown"
+        CellularAvailability.AVAILABLE ->
+            stringResource(R.string.design_signal_available, cellular.signalLevel ?: 0)
+        CellularAvailability.NO_SIM -> stringResource(R.string.design_signal_no_sim)
+        CellularAvailability.NO_SERVICE -> stringResource(R.string.design_signal_no_service)
+        CellularAvailability.AIRPLANE_MODE -> stringResource(R.string.design_signal_airplane)
+        CellularAvailability.UNKNOWN -> stringResource(R.string.design_signal_unknown)
     }
     Row(
         modifier = modifier.semantics { contentDescription = description },

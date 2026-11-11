@@ -28,6 +28,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -46,11 +49,13 @@ import com.clarohome.feature.communication.ClaroContact
 import com.clarohome.feature.communication.ContactNumber
 import com.clarohome.feature.communication.MessageDeliveryState
 import com.clarohome.feature.communication.MessageDirection
+import com.clarohome.feature.communication.MessageFailure
 import com.clarohome.feature.communication.MessageKind
 import com.clarohome.feature.communication.MessageRecipient
 import com.clarohome.feature.communication.MessagingRoute
 import com.clarohome.feature.communication.MessagingUiState
 import com.clarohome.feature.communication.SmsEncoding
+import com.clarohome.presentation.classic.R
 
 private enum class ClassicComposeTarget {
     RECIPIENT,
@@ -106,9 +111,10 @@ fun ClassicMessagingScreen(
     val activeModeLabel: String? = when {
         !isEditingRoute -> null
         state.route == MessagingRoute.COMPOSE &&
-            composeTarget == ClassicComposeTarget.RECIPIENT -> "Numbers"
-        numericMode -> "Numbers"
-        else -> "Letters"
+            composeTarget == ClassicComposeTarget.RECIPIENT ->
+            stringResource(R.string.classic_mode_numbers)
+        numericMode -> stringResource(R.string.classic_mode_numbers)
+        else -> stringResource(R.string.classic_mode_letters)
     }
 
     val options = buildClassicMessagingOptions(
@@ -269,7 +275,7 @@ fun ClassicMessagingScreen(
             ClassicSystemStatusBar(battery = battery, cellular = cellular)
             ClassicHeader(
                 title = if (optionsOpen) {
-                    "Options"
+                    stringResource(R.string.classic_options)
                 } else {
                     classicMessagingTitle(state)
                 },
@@ -333,22 +339,22 @@ fun ClassicMessagingScreen(
             }
         }
         ClassicIntegratedPad(
-            menuLabel = "Options",
+            menuLabel = stringResource(R.string.classic_options),
             greenLabel = when (state.route) {
-                MessagingRoute.INBOX -> "＋ New"
-                MessagingRoute.RECIPIENTS -> "✓ Choose"
+                MessagingRoute.INBOX -> "＋ ${stringResource(R.string.classic_deck_new)}"
+                MessagingRoute.RECIPIENTS -> "✓ ${stringResource(R.string.classic_deck_choose)}"
                 MessagingRoute.COMPOSE,
                 MessagingRoute.CONVERSATION,
-                -> "✓ Review"
-                MessagingRoute.CONFIRMATION -> "✉ Send"
+                -> "✓ ${stringResource(R.string.classic_review)}"
+                MessagingRoute.CONFIRMATION -> "✉ ${stringResource(R.string.classic_send)}"
                 MessagingRoute.FAILED -> if (state.duplicateRiskConfirmationRequired) {
-                    "✉ Send"
+                    "✉ ${stringResource(R.string.classic_send)}"
                 } else {
-                    "↻ Retry"
+                    "↻ ${stringResource(R.string.classic_deck_retry)}"
                 }
-                MessagingRoute.SENDING -> "Sending…"
+                MessagingRoute.SENDING -> stringResource(R.string.classic_sending_ellipsis)
             },
-            redLabel = "⌂ Home",
+            redLabel = "⌂ ${stringResource(R.string.classic_home)}",
             onBack = backAction,
             onMenu = if (options.isNotEmpty() || optionsOpen) {
                 { optionsOpen = !optionsOpen }
@@ -367,6 +373,7 @@ fun ClassicMessagingScreen(
     }
 }
 
+@Composable
 private fun buildClassicMessagingOptions(
     state: MessagingUiState,
     composeTarget: ClassicComposeTarget,
@@ -382,120 +389,130 @@ private fun buildClassicMessagingOptions(
     onCancelKeepDraft: () -> Unit,
     onRepair: () -> Unit,
     onHome: () -> Unit,
-): List<ClassicOptionAction> = buildList {
-    when (state.route) {
-        MessagingRoute.INBOX -> {
-            add(ClassicOptionAction(label = "New message", onSelect = onNewMessage))
-            add(ClassicOptionAction(label = "Contacts", onSelect = onOpenRecipients))
-            add(
-                ClassicOptionAction(
-                    label = "Delete character",
-                    enabled = state.searchQuery.isNotEmpty(),
-                    onSelect = { onSearchInbox(state.searchQuery.dropLast(1)) },
-                ),
-            )
-            add(
-                ClassicOptionAction(
-                    label = "Clear text",
-                    enabled = state.searchQuery.isNotEmpty(),
-                    onSelect = { onSearchInbox("") },
-                ),
-            )
-            if (!state.qualification.canRead && state.qualification.telephonySupported) {
-                add(ClassicOptionAction(label = "Repair Messages access", onSelect = onRepair))
+): List<ClassicOptionAction> {
+    val newMessageLabel = stringResource(R.string.classic_new_message)
+    val contactsLabel = stringResource(R.string.classic_contacts)
+    val deleteCharacterLabel = stringResource(R.string.classic_delete_character)
+    val clearTextLabel = stringResource(R.string.classic_clear_text)
+    val repairMessagesLabel = stringResource(R.string.classic_repair_messages_access)
+    val cancelLabel = stringResource(R.string.classic_cancel)
+    val editLabel = stringResource(R.string.classic_edit)
+
+    return buildList {
+        when (state.route) {
+            MessagingRoute.INBOX -> {
+                add(ClassicOptionAction(label = newMessageLabel, onSelect = onNewMessage))
+                add(ClassicOptionAction(label = contactsLabel, onSelect = onOpenRecipients))
+                add(
+                    ClassicOptionAction(
+                        label = deleteCharacterLabel,
+                        enabled = state.searchQuery.isNotEmpty(),
+                        onSelect = { onSearchInbox(state.searchQuery.dropLast(1)) },
+                    ),
+                )
+                add(
+                    ClassicOptionAction(
+                        label = clearTextLabel,
+                        enabled = state.searchQuery.isNotEmpty(),
+                        onSelect = { onSearchInbox("") },
+                    ),
+                )
+                if (!state.qualification.canRead && state.qualification.telephonySupported) {
+                    add(ClassicOptionAction(label = repairMessagesLabel, onSelect = onRepair))
+                }
+                add(ClassicOptionAction(label = cancelLabel, onSelect = onHome))
             }
-            add(ClassicOptionAction(label = "Cancel", onSelect = onHome))
-        }
 
-        MessagingRoute.CONVERSATION -> {
-            add(
-                ClassicOptionAction(
-                    label = "Delete character",
-                    enabled = state.draft.body.isNotEmpty(),
-                    onSelect = { onBodyChange(state.draft.body.dropLast(1)) },
-                ),
-            )
-            add(
-                ClassicOptionAction(
-                    label = "Clear text",
-                    enabled = state.draft.body.isNotEmpty(),
-                    onSelect = { onBodyChange("") },
-                ),
-            )
-            add(ClassicOptionAction(label = "New message", onSelect = onNewMessage))
-            add(ClassicOptionAction(label = "Contacts", onSelect = onOpenRecipients))
-            add(ClassicOptionAction(label = "Cancel", onSelect = onHome))
-        }
+            MessagingRoute.CONVERSATION -> {
+                add(
+                    ClassicOptionAction(
+                        label = deleteCharacterLabel,
+                        enabled = state.draft.body.isNotEmpty(),
+                        onSelect = { onBodyChange(state.draft.body.dropLast(1)) },
+                    ),
+                )
+                add(
+                    ClassicOptionAction(
+                        label = clearTextLabel,
+                        enabled = state.draft.body.isNotEmpty(),
+                        onSelect = { onBodyChange("") },
+                    ),
+                )
+                add(ClassicOptionAction(label = newMessageLabel, onSelect = onNewMessage))
+                add(ClassicOptionAction(label = contactsLabel, onSelect = onOpenRecipients))
+                add(ClassicOptionAction(label = cancelLabel, onSelect = onHome))
+            }
 
-        MessagingRoute.RECIPIENTS -> {
-            add(
-                ClassicOptionAction(
-                    label = "Delete character",
-                    enabled = state.recipientQuery.isNotEmpty(),
-                    onSelect = { onSearchRecipients(state.recipientQuery.dropLast(1)) },
-                ),
-            )
-            add(
-                ClassicOptionAction(
-                    label = "Clear text",
-                    enabled = state.recipientQuery.isNotEmpty(),
-                    onSelect = { onSearchRecipients("") },
-                ),
-            )
-            add(ClassicOptionAction(label = "New message", onSelect = onNewMessage))
-            add(ClassicOptionAction(label = "Cancel", onSelect = onCancelRecipients))
-        }
+            MessagingRoute.RECIPIENTS -> {
+                add(
+                    ClassicOptionAction(
+                        label = deleteCharacterLabel,
+                        enabled = state.recipientQuery.isNotEmpty(),
+                        onSelect = { onSearchRecipients(state.recipientQuery.dropLast(1)) },
+                    ),
+                )
+                add(
+                    ClassicOptionAction(
+                        label = clearTextLabel,
+                        enabled = state.recipientQuery.isNotEmpty(),
+                        onSelect = { onSearchRecipients("") },
+                    ),
+                )
+                add(ClassicOptionAction(label = newMessageLabel, onSelect = onNewMessage))
+                add(ClassicOptionAction(label = cancelLabel, onSelect = onCancelRecipients))
+            }
 
-        MessagingRoute.COMPOSE -> {
-            val editingRecipient = composeTarget == ClassicComposeTarget.RECIPIENT
-            val activeText = if (editingRecipient) recipientFieldValue else state.draft.body
-            add(ClassicOptionAction(label = "Contacts", onSelect = onOpenRecipients))
-            add(
-                ClassicOptionAction(
-                    label = "Delete character",
-                    enabled = activeText.isNotEmpty(),
-                    onSelect = {
-                        if (editingRecipient) {
-                            onRecipientInputChange(recipientFieldValue.dropLast(1))
-                        } else {
-                            onBodyChange(state.draft.body.dropLast(1))
-                        }
-                    },
-                ),
-            )
-            add(
-                ClassicOptionAction(
-                    label = "Clear text",
-                    enabled = activeText.isNotEmpty(),
-                    onSelect = {
-                        if (editingRecipient) {
-                            onRecipientInputChange("")
-                        } else {
-                            onBodyChange("")
-                        }
-                    },
-                ),
-            )
-            add(ClassicOptionAction(label = "New message", onSelect = onNewMessage))
-            add(ClassicOptionAction(label = "Cancel", onSelect = onCancelKeepDraft))
-        }
+            MessagingRoute.COMPOSE -> {
+                val editingRecipient = composeTarget == ClassicComposeTarget.RECIPIENT
+                val activeText = if (editingRecipient) recipientFieldValue else state.draft.body
+                add(ClassicOptionAction(label = contactsLabel, onSelect = onOpenRecipients))
+                add(
+                    ClassicOptionAction(
+                        label = deleteCharacterLabel,
+                        enabled = activeText.isNotEmpty(),
+                        onSelect = {
+                            if (editingRecipient) {
+                                onRecipientInputChange(recipientFieldValue.dropLast(1))
+                            } else {
+                                onBodyChange(state.draft.body.dropLast(1))
+                            }
+                        },
+                    ),
+                )
+                add(
+                    ClassicOptionAction(
+                        label = clearTextLabel,
+                        enabled = activeText.isNotEmpty(),
+                        onSelect = {
+                            if (editingRecipient) {
+                                onRecipientInputChange("")
+                            } else {
+                                onBodyChange("")
+                            }
+                        },
+                    ),
+                )
+                add(ClassicOptionAction(label = newMessageLabel, onSelect = onNewMessage))
+                add(ClassicOptionAction(label = cancelLabel, onSelect = onCancelKeepDraft))
+            }
 
-        MessagingRoute.CONFIRMATION -> {
-            add(ClassicOptionAction(label = "Edit", onSelect = onEdit))
-            add(ClassicOptionAction(label = "Contacts", onSelect = onOpenRecipients))
-            add(ClassicOptionAction(label = "New message", onSelect = onNewMessage))
-            add(ClassicOptionAction(label = "Cancel", onSelect = onCancelKeepDraft))
-        }
+            MessagingRoute.CONFIRMATION -> {
+                add(ClassicOptionAction(label = editLabel, onSelect = onEdit))
+                add(ClassicOptionAction(label = contactsLabel, onSelect = onOpenRecipients))
+                add(ClassicOptionAction(label = newMessageLabel, onSelect = onNewMessage))
+                add(ClassicOptionAction(label = cancelLabel, onSelect = onCancelKeepDraft))
+            }
 
-        MessagingRoute.FAILED -> {
-            add(ClassicOptionAction(label = "Edit", onSelect = onEdit))
-            add(ClassicOptionAction(label = "New message", onSelect = onNewMessage))
-            add(ClassicOptionAction(label = "Contacts", onSelect = onOpenRecipients))
-            add(ClassicOptionAction(label = "Cancel", onSelect = onCancelKeepDraft))
-        }
+            MessagingRoute.FAILED -> {
+                add(ClassicOptionAction(label = editLabel, onSelect = onEdit))
+                add(ClassicOptionAction(label = newMessageLabel, onSelect = onNewMessage))
+                add(ClassicOptionAction(label = contactsLabel, onSelect = onOpenRecipients))
+                add(ClassicOptionAction(label = cancelLabel, onSelect = onCancelKeepDraft))
+            }
 
-        MessagingRoute.SENDING -> {
-            add(ClassicOptionAction(label = "Cancel", onSelect = onCancelKeepDraft))
+            MessagingRoute.SENDING -> {
+                add(ClassicOptionAction(label = cancelLabel, onSelect = onCancelKeepDraft))
+            }
         }
     }
 }
@@ -530,8 +547,9 @@ private fun ClassicMessageDisplay(
     ) {
         when (state.route) {
             MessagingRoute.INBOX -> {
+                val searchLabel = stringResource(R.string.classic_search_name_or_number)
                 Text(
-                    text = "Search name or number",
+                    text = searchLabel,
                     color = ClassicInk,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
@@ -540,7 +558,9 @@ private fun ClassicMessageDisplay(
                 OutlinedTextField(
                     value = state.searchQuery,
                     onValueChange = onSearchInbox,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { contentDescription = searchLabel },
                     singleLine = true,
                     textStyle = TextStyle(fontSize = 23.sp),
                     shape = RectangleShape,
@@ -548,15 +568,15 @@ private fun ClassicMessageDisplay(
                 if (!state.qualification.canRead) {
                     ClaroInfoCard(
                         text = if (!state.qualification.telephonySupported) {
-                            "Messages are not available on this device."
+                            stringResource(R.string.classic_messages_unavailable)
                         } else {
-                            "Messages access needs repair."
+                            stringResource(R.string.classic_messages_access_repair)
                         },
                         tone = ClaroBannerTone.WARNING,
                     )
                     if (state.qualification.telephonySupported) {
                         ClassicLightButton(
-                            label = "Repair Messages access",
+                            label = stringResource(R.string.classic_repair_messages_access),
                             onClick = onRepair,
                             color = ClaroColors.Blue,
                             textColor = Color.White,
@@ -567,9 +587,9 @@ private fun ClassicMessageDisplay(
                 if (state.conversations.isEmpty()) {
                     ClaroInfoCard(
                         text = if (state.searchQuery.isBlank()) {
-                            "No messages yet."
+                            stringResource(R.string.classic_no_messages_yet)
                         } else {
-                            "No matching messages."
+                            stringResource(R.string.classic_no_matching_messages)
                         },
                         tone = ClaroBannerTone.INFO,
                     )
@@ -577,12 +597,16 @@ private fun ClassicMessageDisplay(
                 state.conversations.forEachIndexed { index, conversation ->
                     val hasUnread = conversation.unreadCount > 0
                     val title = if (conversation.unreadCount > 1) {
-                        "${conversation.recipient.accessibleName} (${conversation.unreadCount})"
+                        stringResource(
+                            R.string.classic_conversation_unread_title,
+                            conversation.recipient.accessibleName,
+                            conversation.unreadCount,
+                        )
                     } else {
                         conversation.recipient.accessibleName
                     }
                     val subtitle = if (conversation.kind == MessageKind.MMS) {
-                        "MMS · ${conversation.snippet}"
+                        stringResource(R.string.classic_mms_snippet, conversation.snippet)
                     } else {
                         conversation.snippet
                     }
@@ -602,7 +626,7 @@ private fun ClassicMessageDisplay(
                     )
                 }
                 ClassicLightButton(
-                    label = "Write a message",
+                    label = stringResource(R.string.classic_write_message),
                     onClick = onNewMessage,
                     color = ClaroColors.Blue,
                     textColor = Color.White,
@@ -616,11 +640,16 @@ private fun ClassicMessageDisplay(
                 state.messages.forEach { message ->
                     val incoming = message.direction == MessageDirection.INCOMING
                     val deliveryNote = when (message.deliveryState) {
-                        MessageDeliveryState.DELIVERY_CONFIRMED -> "Delivered"
-                        MessageDeliveryState.DELIVERY_UNKNOWN -> "Delivery unknown"
-                        MessageDeliveryState.KNOWN_FAILURE -> "Not sent"
-                        MessageDeliveryState.PENDING -> "Sending…"
-                        MessageDeliveryState.SENT -> "Sent · delivery not confirmed"
+                        MessageDeliveryState.DELIVERY_CONFIRMED ->
+                            stringResource(R.string.classic_delivery_confirmed)
+                        MessageDeliveryState.DELIVERY_UNKNOWN ->
+                            stringResource(R.string.classic_delivery_unknown)
+                        MessageDeliveryState.KNOWN_FAILURE ->
+                            stringResource(R.string.classic_delivery_not_sent)
+                        MessageDeliveryState.PENDING ->
+                            stringResource(R.string.classic_sending_ellipsis)
+                        MessageDeliveryState.SENT ->
+                            stringResource(R.string.classic_delivery_sent_unconfirmed)
                         MessageDeliveryState.RECEIVED,
                         MessageDeliveryState.DRAFT,
                         -> null
@@ -665,17 +694,21 @@ private fun ClassicMessageDisplay(
                             )
                         }
                         message.attachments.forEach { attachment ->
-                            Text(
-                                text = attachment.state.classicAttachmentLabel(),
-                                color = Color(0xFF4B5565),
-                                fontSize = 16.sp,
-                                lineHeight = 20.sp,
-                            )
+                            val attachmentText = attachment.state.classicAttachmentLabel()
+                            if (attachmentText.isNotBlank()) {
+                                Text(
+                                    text = attachmentText,
+                                    color = Color(0xFF4B5565),
+                                    fontSize = 16.sp,
+                                    lineHeight = 20.sp,
+                                )
+                            }
                         }
                     }
                 }
+                val replyLabel = stringResource(R.string.classic_reply)
                 Text(
-                    text = "Reply",
+                    text = replyLabel,
                     color = ClassicInk,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
@@ -686,15 +719,21 @@ private fun ClassicMessageDisplay(
                     onValueChange = onBodyChange,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 84.dp),
-                    placeholder = { Text("Write a reply…", fontSize = 21.sp) },
+                        .heightIn(min = 84.dp)
+                        .semantics { contentDescription = replyLabel },
+                    placeholder = {
+                        Text(
+                            stringResource(R.string.classic_write_reply_placeholder),
+                            fontSize = 21.sp,
+                        )
+                    },
                     textStyle = TextStyle(fontSize = 22.sp, lineHeight = 28.sp),
                     shape = RectangleShape,
                 )
                 SmsCounterLine(state)
                 if (!state.qualification.canSend && state.qualification.telephonySupported) {
                     ClassicLightButton(
-                        label = "Repair Messages access",
+                        label = stringResource(R.string.classic_repair_messages_access),
                         onClick = onRepair,
                         color = ClaroColors.WarningBg,
                         textColor = ClaroColors.WarningInk,
@@ -704,8 +743,9 @@ private fun ClassicMessageDisplay(
             }
 
             MessagingRoute.RECIPIENTS -> {
+                val toLabel = stringResource(R.string.classic_to_label)
                 Text(
-                    text = "To",
+                    text = toLabel,
                     color = ClassicInk,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
@@ -714,15 +754,22 @@ private fun ClassicMessageDisplay(
                 OutlinedTextField(
                     value = state.recipientQuery,
                     onValueChange = onSearchRecipients,
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Name or number", fontSize = 21.sp) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { contentDescription = toLabel },
+                    placeholder = {
+                        Text(
+                            stringResource(R.string.classic_name_or_number_placeholder),
+                            fontSize = 21.sp,
+                        )
+                    },
                     singleLine = true,
                     textStyle = TextStyle(fontSize = 23.sp),
                     shape = RectangleShape,
                 )
                 if (state.recipientQuery.isNotBlank()) {
                     ClassicLightButton(
-                        label = "Use typed number",
+                        label = stringResource(R.string.classic_use_typed_number),
                         onClick = { onManualRecipient(state.recipientQuery) },
                         color = ClaroColors.Blue,
                         textColor = Color.White,
@@ -730,15 +777,29 @@ private fun ClassicMessageDisplay(
                     )
                 }
                 if (state.contactsLoading) {
-                    ClaroInfoCard(text = "Loading contacts…", tone = ClaroBannerTone.INFO)
+                    ClaroInfoCard(
+                        text = stringResource(R.string.classic_loading_contacts),
+                        tone = ClaroBannerTone.INFO,
+                    )
                 } else if (state.contacts.isEmpty()) {
-                    ClaroInfoCard(text = "No contacts found.", tone = ClaroBannerTone.INFO)
+                    ClaroInfoCard(
+                        text = stringResource(R.string.classic_no_contacts_found),
+                        tone = ClaroBannerTone.INFO,
+                    )
                 }
                 state.contacts.forEachIndexed { index, contact ->
                     contact.numbers.forEach { number ->
                         ClassicRowItem(
                             title = contact.displayName,
-                            subtitle = "${number.value} · ${number.label}",
+                            subtitle = if (number.label.isBlank()) {
+                                number.value
+                            } else {
+                                stringResource(
+                                    R.string.classic_number_with_label,
+                                    number.value,
+                                    number.label,
+                                )
+                            },
                             onClick = { onChooseContactNumber(contact, number) },
                             leading = {
                                 ClaroAvatar(
@@ -756,8 +817,10 @@ private fun ClassicMessageDisplay(
                 if (state.draft.recipient?.displayName != null) {
                     MessageRecipientHeader(recipient = state.draft.recipient)
                 }
+                val toLabel = stringResource(R.string.classic_to_label)
+                val phonePlaceholder = stringResource(R.string.classic_phone_number_placeholder)
                 Text(
-                    text = "To",
+                    text = toLabel,
                     color = ClassicInk,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
@@ -769,24 +832,26 @@ private fun ClassicMessageDisplay(
                         onValueChange = onRecipientInputChange,
                         modifier = Modifier
                             .fillMaxWidth()
+                            .semantics { contentDescription = toLabel }
                             .onFocusChanged { focusState ->
                                 if (focusState.isFocused) {
                                     onComposeTargetChange(ClassicComposeTarget.RECIPIENT)
                                 }
                             },
-                        placeholder = { Text("Phone number", fontSize = 21.sp) },
+                        placeholder = { Text(phonePlaceholder, fontSize = 21.sp) },
                         singleLine = true,
                         textStyle = TextStyle(fontSize = 23.sp),
                         shape = RectangleShape,
                     )
                 }
                 ClassicLightButton(
-                    label = "Contacts",
+                    label = stringResource(R.string.classic_contacts),
                     onClick = onOpenRecipients,
                     leadingIcon = ClaroIconKind.CONTACT,
                 )
+                val messageLabel = stringResource(R.string.classic_message_label)
                 Text(
-                    text = "Message",
+                    text = messageLabel,
                     color = ClassicInk,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
@@ -798,19 +863,25 @@ private fun ClassicMessageDisplay(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 112.dp)
+                        .semantics { contentDescription = messageLabel }
                         .onFocusChanged { focusState ->
                             if (focusState.isFocused) {
                                 onComposeTargetChange(ClassicComposeTarget.BODY)
                             }
                         },
-                    placeholder = { Text("Write here…", fontSize = 21.sp) },
+                    placeholder = {
+                        Text(
+                            stringResource(R.string.classic_write_here_placeholder),
+                            fontSize = 21.sp,
+                        )
+                    },
                     textStyle = TextStyle(fontSize = 22.sp, lineHeight = 28.sp),
                     shape = RectangleShape,
                 )
                 SmsCounterLine(state)
                 if (!state.qualification.canSend && state.qualification.telephonySupported) {
                     ClassicLightButton(
-                        label = "Repair Messages access",
+                        label = stringResource(R.string.classic_repair_messages_access),
                         onClick = onRepair,
                         color = ClaroColors.WarningBg,
                         textColor = ClaroColors.WarningInk,
@@ -818,14 +889,14 @@ private fun ClassicMessageDisplay(
                     )
                 }
                 ClassicLightButton(
-                    label = "Review",
+                    label = stringResource(R.string.classic_review),
                     onClick = onReview,
                     color = ClaroColors.Blue,
                     textColor = Color.White,
                     borderColor = ClaroColors.Blue,
                 )
                 ClassicLightButton(
-                    label = "Cancel · keep draft",
+                    label = stringResource(R.string.classic_cancel_keep_draft),
                     onClick = onCancelFailure,
                 )
             }
@@ -842,34 +913,54 @@ private fun ClassicMessageDisplay(
                     fontSize = 22.sp,
                     lineHeight = 29.sp,
                 )
-                MessageHint("Press Send to confirm")
+                MessageHint(stringResource(R.string.classic_press_send_to_confirm))
                 ClassicLightButton(
-                    label = "Send",
+                    label = stringResource(R.string.classic_send),
                     onClick = onSend,
                     color = ClaroColors.Green,
                     textColor = Color.White,
                     borderColor = ClaroColors.Green,
                 )
-                ClassicLightButton(label = "Edit", onClick = onEdit)
-                ClassicLightButton(label = "Cancel · keep draft", onClick = onCancelFailure)
+                ClassicLightButton(
+                    label = stringResource(R.string.classic_edit),
+                    onClick = onEdit,
+                )
+                ClassicLightButton(
+                    label = stringResource(R.string.classic_cancel_keep_draft),
+                    onClick = onCancelFailure,
+                )
             }
 
             MessagingRoute.SENDING -> {
                 MessageRecipientHeader(recipient = state.draft.recipient)
-                MessageTitle("Sending…")
-                MessageHint("Wait for the carrier result.")
+                MessageTitle(stringResource(R.string.classic_sending_ellipsis))
+                MessageHint(stringResource(R.string.classic_wait_carrier_result))
             }
 
             MessagingRoute.FAILED -> {
                 MessageRecipientHeader(recipient = state.draft.recipient)
+                val currentStatus = state.statusMessage
                 val explanation = when {
                     state.duplicateRiskConfirmationRequired ->
-                        "Sending again may deliver this message twice. Confirm only if you want to resend."
+                        stringResource(R.string.classic_msg_duplicate_risk)
                     state.unknownOutcome ->
-                        state.statusMessage
-                            ?: "The carrier did not confirm the result. This message may already have been sent."
+                        if (
+                            currentStatus == null ||
+                            currentStatus ==
+                            "The carrier did not confirm the result. It may already have been sent." ||
+                            currentStatus ==
+                            "This message may already have been sent. Send it again?"
+                        ) {
+                            stringResource(R.string.classic_msg_unknown_outcome)
+                        } else {
+                            currentStatus
+                        }
+                    state.sendFailure != null ->
+                        state.sendFailure.classicUserMessage()
+                    currentStatus != null ->
+                        localizeMessagingStatus(currentStatus, null)
                     else ->
-                        state.statusMessage ?: "The message could not be sent. Your draft is saved."
+                        stringResource(R.string.classic_msg_not_sent_draft_saved)
                 }
                 ClaroInfoCard(
                     text = explanation,
@@ -893,30 +984,42 @@ private fun ClassicMessageDisplay(
                 }
                 if (state.duplicateRiskConfirmationRequired) {
                     ClassicLightButton(
-                        label = "Send again",
+                        label = stringResource(R.string.classic_send_again),
                         onClick = onConfirmDuplicateRisk,
                         color = ClaroColors.Green,
                         textColor = Color.White,
                         borderColor = ClaroColors.Green,
                     )
-                    ClassicLightButton(label = "Do not resend", onClick = onCancelFailure)
+                    ClassicLightButton(
+                        label = stringResource(R.string.classic_do_not_resend),
+                        onClick = onCancelFailure,
+                    )
                 } else {
                     ClassicLightButton(
-                        label = "Try again",
+                        label = stringResource(R.string.classic_try_again),
                         onClick = onRetry,
                         color = ClaroColors.Green,
                         textColor = Color.White,
                         borderColor = ClaroColors.Green,
                     )
-                    ClassicLightButton(label = "Edit", onClick = onEdit)
-                    ClassicLightButton(label = "Cancel · keep draft", onClick = onCancelFailure)
+                    ClassicLightButton(
+                        label = stringResource(R.string.classic_edit),
+                        onClick = onEdit,
+                    )
+                    ClassicLightButton(
+                        label = stringResource(R.string.classic_cancel_keep_draft),
+                        onClick = onCancelFailure,
+                    )
                 }
             }
         }
         state.statusMessage
             ?.takeIf { state.route != MessagingRoute.FAILED && it.isNotBlank() }
             ?.let { status ->
-                ClaroInfoCard(text = status, tone = ClaroBannerTone.INFO)
+                ClaroInfoCard(
+                    text = localizeMessagingStatus(status, state.sendFailure),
+                    tone = ClaroBannerTone.INFO,
+                )
             }
     }
 }
@@ -924,17 +1027,21 @@ private fun ClassicMessageDisplay(
 @Composable
 private fun SmsCounterLine(state: MessagingUiState) {
     val encoding = state.encoding
+    val text = if (encoding.encoding == SmsEncoding.UNICODE) {
+        stringResource(
+            R.string.classic_sms_counter_unicode,
+            state.draft.body.length,
+            encoding.segments,
+        )
+    } else {
+        stringResource(
+            R.string.classic_sms_counter_gsm,
+            state.draft.body.length,
+            encoding.segments,
+        )
+    }
     Text(
-        text = buildString {
-            append(state.draft.body.length)
-            append(" · ~")
-            append(encoding.segments)
-            append(" SMS")
-            if (encoding.encoding == SmsEncoding.UNICODE) {
-                append(" · Unicode")
-            }
-            append(" · carrier charges may apply")
-        },
+        text = text,
         color = Color(0xFF4B5565),
         fontSize = 16.sp,
         lineHeight = 21.sp,
@@ -944,8 +1051,10 @@ private fun SmsCounterLine(state: MessagingUiState) {
 
 @Composable
 private fun MessageRecipientHeader(recipient: MessageRecipient?) {
-    val name = recipient?.accessibleName.orEmpty().ifBlank { "Recipient" }
+    val name = recipient?.accessibleName.orEmpty()
+        .ifBlank { stringResource(R.string.classic_recipient) }
     val number = recipient?.number.orEmpty()
+    val nameIsRawNumber = recipient?.displayName.isNullOrBlank() && number.isNotBlank()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -960,13 +1069,24 @@ private fun MessageRecipientHeader(recipient: MessageRecipient?) {
             isUnassigned = recipient?.displayName.isNullOrBlank(),
         )
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = name,
-                color = ClassicInk,
-                fontSize = 24.sp,
-                lineHeight = 28.sp,
-                fontWeight = FontWeight.Bold,
-            )
+            if (nameIsRawNumber) {
+                ClassicLtrText(
+                    text = name,
+                    color = ClassicInk,
+                    fontSize = 24.sp,
+                    lineHeight = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Start,
+                )
+            } else {
+                Text(
+                    text = name,
+                    color = ClassicInk,
+                    fontSize = 24.sp,
+                    lineHeight = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
             if (number.isNotBlank() && number != name) {
                 ClassicLtrText(
                     text = number,
@@ -1006,28 +1126,64 @@ private fun MessageHint(value: String) {
     )
 }
 
+@Composable
 private fun AttachmentState.classicAttachmentLabel(): String = when (this) {
     AttachmentState.NONE -> ""
-    AttachmentState.AVAILABLE -> "Attachment available"
-    AttachmentState.DOWNLOAD_REQUIRED -> "Attachment needs mobile data"
-    AttachmentState.DOWNLOAD_FAILED -> "Attachment download failed"
-    AttachmentState.UNSUPPORTED -> "Unsupported attachment"
+    AttachmentState.AVAILABLE -> stringResource(R.string.classic_attachment_available)
+    AttachmentState.DOWNLOAD_REQUIRED ->
+        stringResource(R.string.classic_attachment_download_required)
+    AttachmentState.DOWNLOAD_FAILED -> stringResource(R.string.classic_attachment_download_failed)
+    AttachmentState.UNSUPPORTED -> stringResource(R.string.classic_attachment_unsupported)
 }
 
+@Composable
+private fun MessageFailure?.classicUserMessage(): String = when (this) {
+    MessageFailure.INVALID_RECIPIENT ->
+        stringResource(R.string.classic_msg_failure_invalid_recipient)
+    MessageFailure.EMPTY_CONTENT -> stringResource(R.string.classic_msg_failure_empty_content)
+    MessageFailure.ROLE_LOST -> stringResource(R.string.classic_msg_failure_role_lost)
+    MessageFailure.PERMISSION_DENIED ->
+        stringResource(R.string.classic_msg_failure_permission_denied)
+    MessageFailure.NO_SIM -> stringResource(R.string.classic_msg_failure_no_sim)
+    MessageFailure.NO_SERVICE -> stringResource(R.string.classic_msg_failure_no_service)
+    MessageFailure.ACCOUNT_UNAVAILABLE ->
+        stringResource(R.string.classic_msg_failure_account_unavailable)
+    MessageFailure.CARRIER_REJECTED ->
+        stringResource(R.string.classic_msg_failure_carrier_rejected)
+    MessageFailure.UNKNOWN, null -> stringResource(R.string.classic_msg_failure_unknown)
+}
+
+@Composable
+private fun localizeMessagingStatus(
+    rawStatus: String,
+    failure: MessageFailure?,
+): String = when (rawStatus) {
+    "Enter a valid phone number" -> stringResource(R.string.classic_call_failure_invalid_number)
+    "Choose a default SMS account in Android. Your draft is saved." ->
+        stringResource(R.string.classic_msg_choose_default_sms_account)
+    "Sent. Delivery is not confirmed." ->
+        stringResource(R.string.classic_msg_sent_delivery_unconfirmed)
+    "Delivery confirmed by the carrier" ->
+        stringResource(R.string.classic_msg_delivery_confirmed_carrier)
+    "Sending message" -> stringResource(R.string.classic_msg_sending_status)
+    else -> failure?.classicUserMessage() ?: rawStatus
+}
+
+@Composable
 private fun classicMessagingTitle(state: MessagingUiState): String = when (state.route) {
-    MessagingRoute.INBOX -> "Messages"
+    MessagingRoute.INBOX -> stringResource(R.string.classic_messages)
     MessagingRoute.CONVERSATION -> state.selectedConversation?.recipient?.accessibleName
-        ?.ifBlank { "Conversation" }
-        ?: "Conversation"
-    MessagingRoute.RECIPIENTS -> "Choose recipient"
-    MessagingRoute.COMPOSE -> "Write a message"
-    MessagingRoute.CONFIRMATION -> "Send message?"
-    MessagingRoute.SENDING -> "Sending"
+        ?.ifBlank { null }
+        ?: stringResource(R.string.classic_conversation)
+    MessagingRoute.RECIPIENTS -> stringResource(R.string.classic_choose_recipient)
+    MessagingRoute.COMPOSE -> stringResource(R.string.classic_write_message)
+    MessagingRoute.CONFIRMATION -> stringResource(R.string.classic_send_message_title)
+    MessagingRoute.SENDING -> stringResource(R.string.classic_sending_title)
     MessagingRoute.FAILED -> if (
         state.unknownOutcome || state.duplicateRiskConfirmationRequired
     ) {
-        "Delivery uncertain"
+        stringResource(R.string.classic_delivery_uncertain)
     } else {
-        "Message not sent"
+        stringResource(R.string.classic_message_not_sent)
     }
 }

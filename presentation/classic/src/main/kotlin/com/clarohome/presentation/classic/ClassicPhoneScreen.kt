@@ -47,10 +47,12 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -79,9 +81,10 @@ import com.clarohome.core.model.HomeRoleState
 import com.clarohome.core.model.HomeSnapshot
 import com.clarohome.core.model.HomeTile
 import com.clarohome.core.model.HomeTileKind
-import com.clarohome.feature.launcher.home.HomeCustomizationPolicy
+import com.clarohome.presentation.classic.R
 import java.text.DateFormat
 import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -180,7 +183,9 @@ fun ClassicPhoneScreen(
                                     LocalLayoutDirection provides LayoutDirection.Ltr,
                                 ) {
                                     Text(
-                                        text = home.time.ifBlank { "Claro" },
+                                        text = home.time.ifBlank {
+                                            stringResource(R.string.classic_brand_claro)
+                                        },
                                         modifier = Modifier.semantics { heading() },
                                         color = ClassicInk,
                                         fontSize = 52.sp,
@@ -222,9 +227,12 @@ fun ClassicPhoneScreen(
                         if (home.homeRole != HomeRoleState.GRANTED) {
                             ClassicLightButton(
                                 label = when (home.homeRole) {
-                                    HomeRoleState.AVAILABLE -> "Choose Claro as Home"
-                                    HomeRoleState.UNAVAILABLE -> "Open Home settings"
-                                    HomeRoleState.UNKNOWN -> "Repair Home access"
+                                    HomeRoleState.AVAILABLE ->
+                                        stringResource(R.string.classic_choose_claro_as_home)
+                                    HomeRoleState.UNAVAILABLE ->
+                                        stringResource(R.string.classic_open_home_settings)
+                                    HomeRoleState.UNKNOWN ->
+                                        stringResource(R.string.classic_repair_home_access)
                                     HomeRoleState.GRANTED -> ""
                                 },
                                 onClick = onRepairHomeRole,
@@ -235,8 +243,16 @@ fun ClassicPhoneScreen(
                             )
                         }
                         home.activeCall?.let { activeCall ->
+                            val callerDisplayName = when (activeCall.displayName) {
+                                "Private number" -> stringResource(R.string.classic_private_number)
+                                "Unknown caller" -> stringResource(R.string.classic_unknown_caller)
+                                else -> activeCall.displayName
+                            }
                             ClassicLightButton(
-                                label = "Return to call · ${activeCall.displayName}",
+                                label = stringResource(
+                                    R.string.classic_return_to_call,
+                                    callerDisplayName,
+                                ),
                                 onClick = onReturnToCall,
                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
                                 color = ClaroColors.Green,
@@ -254,7 +270,7 @@ fun ClassicPhoneScreen(
                     ) {
                         messagesTile?.let { tile ->
                             ClassicLightButton(
-                                label = "Messages",
+                                label = stringResource(R.string.classic_messages),
                                 onClick = { onTileSelected(tile) },
                                 modifier = Modifier.weight(1f),
                                 color = ClassicDisplayMuted,
@@ -264,7 +280,7 @@ fun ClassicPhoneScreen(
                         }
                         sosTile?.let { tile ->
                             ClassicLightButton(
-                                label = "SOS",
+                                label = stringResource(R.string.classic_sos),
                                 onClick = { onTileSelected(tile) },
                                 modifier = Modifier.weight(1f),
                                 color = ClaroColors.Red,
@@ -278,9 +294,9 @@ fun ClassicPhoneScreen(
             }
         }
         ClassicIntegratedPad(
-            menuLabel = "Menu",
-            greenLabel = "☎ Call",
-            redLabel = "⌂ Home",
+            menuLabel = stringResource(R.string.classic_menu),
+            greenLabel = "☎ ${stringResource(R.string.classic_call)}",
+            redLabel = "⌂ ${stringResource(R.string.classic_home)}",
             onBack = onBack,
             onMenu = onOpenMenu,
             onGreen = phoneTile?.let { tile -> { onTileSelected(tile) } },
@@ -308,7 +324,7 @@ private fun ClassicHomeStatusBar(home: HomeSnapshot) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "Claro",
+                text = stringResource(R.string.classic_brand_claro),
                 color = ClassicInk,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
@@ -321,7 +337,10 @@ private fun ClassicHomeStatusBar(home: HomeSnapshot) {
                 inactiveColor = ClassicSignalInactive,
             )
             Text(
-                text = "· ${home.battery.percentage}%",
+                text = stringResource(
+                    R.string.classic_battery_dot_percent,
+                    home.battery.percentage,
+                ),
                 color = ClassicInk,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
@@ -334,9 +353,10 @@ private fun ClassicHomeStatusBar(home: HomeSnapshot) {
 
 @Composable
 private fun ClassicCompactBatteryBar(battery: BatteryStatus) {
-    val label = buildString {
-        append("Battery ${battery.percentage} percent")
-        if (battery.isCharging) append(", charging")
+    val label = if (battery.isCharging) {
+        stringResource(R.string.classic_battery_percent_charging, battery.percentage)
+    } else {
+        stringResource(R.string.classic_battery_percent, battery.percentage)
     }
     val fillFraction = battery.percentage.coerceIn(0, 100) / 100f
     val fillColor = if (battery.percentage <= 15 && !battery.isCharging) {
@@ -384,6 +404,20 @@ private fun ClassicShortcut(
         BadgeValue.Unknown -> true
         null -> false
     }
+    val tileLabel = when (tile.kind) {
+        HomeTileKind.PHONE -> stringResource(R.string.classic_phone_title)
+        HomeTileKind.MESSAGES -> stringResource(R.string.classic_messages)
+        else -> tile.label
+    }
+    val badgeDescription = when (val badge = tile.badge) {
+        is BadgeValue.Known -> if (badge.count == 0) {
+            stringResource(R.string.classic_badge_no_new, tileLabel)
+        } else {
+            stringResource(R.string.classic_badge_new_count, tileLabel, badge.count)
+        }
+        BadgeValue.Unknown -> stringResource(R.string.classic_badge_unknown, tileLabel)
+        null -> tileLabel
+    }
     Box(
         modifier = modifier
             .height(64.dp)
@@ -403,7 +437,7 @@ private fun ClassicShortcut(
                 },
             )
             .semantics {
-                contentDescription = HomeCustomizationPolicy.badgeLabel(tile.label, tile.badge)
+                contentDescription = badgeDescription
                 role = Role.Button
             }
             .padding(horizontal = 8.dp, vertical = 6.dp),
@@ -481,6 +515,11 @@ private fun FavoriteRow(
             } else {
                 person.displayName.trim().substringBefore(' ')
             }
+            val slotDescription = if (isUnassigned) {
+                stringResource(R.string.classic_favorite_slot_unassigned, index + 1)
+            } else {
+                stringResource(R.string.classic_favorite_person, person.displayName)
+            }
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -499,11 +538,7 @@ private fun FavoriteRow(
                         onFavoriteSelected(person)
                     }
                     .semantics {
-                        contentDescription = if (isUnassigned) {
-                            "Add person, favorite slot ${index + 1}"
-                        } else {
-                            "${person.displayName}, favorite person"
-                        }
+                        contentDescription = slotDescription
                         role = Role.Button
                     }
                     .padding(horizontal = 2.dp, vertical = 4.dp),
@@ -563,12 +598,13 @@ fun ClassicSystemStatusBar(
     battery: BatteryStatus? = null,
     cellular: CellularStatus? = null,
 ) {
-    var time by remember {
-        mutableStateOf(DateFormat.getTimeInstance(DateFormat.SHORT).format(Date()))
+    val locale = LocalConfiguration.current.locales[0] ?: Locale.ENGLISH
+    var time by remember(locale) {
+        mutableStateOf(DateFormat.getTimeInstance(DateFormat.SHORT, locale).format(Date()))
     }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(locale) {
         while (true) {
-            time = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date())
+            time = DateFormat.getTimeInstance(DateFormat.SHORT, locale).format(Date())
             delay(15_000L)
         }
     }
@@ -599,7 +635,10 @@ fun ClassicSystemStatusBar(
             }
             if (battery != null) {
                 Text(
-                    text = "${battery.percentage}%",
+                    text = stringResource(
+                        R.string.classic_battery_percent_short,
+                        battery.percentage,
+                    ),
                     color = ClassicInk,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
@@ -741,8 +780,9 @@ internal fun ClassicRowItem(
                         )
                     }
                 }
+                val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
                 Text(
-                    text = "→",
+                    text = if (isRtl) "←" else "→",
                     color = Color(0xFF5A687C),
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
@@ -854,9 +894,9 @@ internal fun ClassicLtrText(
 
 @Composable
 fun ClassicIntegratedPad(
-    menuLabel: String = "Menu",
-    greenLabel: String = "☎ Call",
-    redLabel: String = "⌂ Home",
+    menuLabel: String = "",
+    greenLabel: String = "",
+    redLabel: String = "",
     onBack: (() -> Unit)? = null,
     onMenu: (() -> Unit)? = null,
     onGreen: (() -> Unit)? = null,
@@ -867,6 +907,21 @@ fun ClassicIntegratedPad(
     val focusManager = LocalFocusManager.current
     val view = LocalView.current
     val scope = rememberCoroutineScope()
+    val resolvedMenuLabel = if (menuLabel.isBlank() || menuLabel == "Menu") {
+        stringResource(R.string.classic_menu)
+    } else {
+        menuLabel
+    }
+    val resolvedGreenLabel = if (greenLabel.isBlank() || greenLabel == "☎ Call") {
+        "☎ ${stringResource(R.string.classic_call)}"
+    } else {
+        greenLabel
+    }
+    val resolvedRedLabel = if (redLabel.isBlank() || redLabel == "⌂ Home") {
+        "⌂ ${stringResource(R.string.classic_home)}"
+    } else {
+        redLabel
+    }
 
     val sendKey: (Int) -> Unit = { keyCode ->
         view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
@@ -898,14 +953,14 @@ fun ClassicIntegratedPad(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 ClassicDeckButton(
-                    label = "Back",
+                    label = stringResource(R.string.classic_back),
                     color = ClassicDeck,
                     borderColor = ClassicDeckBorder,
                     modifier = Modifier.weight(1f),
                     onClick = onBack,
                 )
                 ClassicDeckButton(
-                    label = greenLabel,
+                    label = resolvedGreenLabel,
                     color = ClaroColors.Green,
                     borderColor = Color(0xFF29A564),
                     modifier = Modifier.weight(1f),
@@ -926,7 +981,7 @@ fun ClassicIntegratedPad(
                 ClassicDirectionButton(
                     label = "↑",
                     modifier = Modifier.fillMaxWidth(),
-                    accessibilityLabel = "Navigate up",
+                    accessibilityLabel = stringResource(R.string.classic_navigate_up),
                     onClick = { navigate(FocusDirection.Up, KeyEvent.KEYCODE_DPAD_UP, -220) },
                 )
                 Row(
@@ -937,11 +992,11 @@ fun ClassicIntegratedPad(
                     ClassicDirectionButton(
                         label = "←",
                         modifier = Modifier.weight(1f),
-                        accessibilityLabel = "Navigate left",
+                        accessibilityLabel = stringResource(R.string.classic_navigate_left),
                         onClick = { navigate(FocusDirection.Left, KeyEvent.KEYCODE_DPAD_LEFT, 0) },
                     )
                     ClassicDirectionButton(
-                        label = "OK",
+                        label = stringResource(R.string.classic_ok),
                         modifier = Modifier.weight(1.1f),
                         center = true,
                         onClick = {
@@ -955,14 +1010,14 @@ fun ClassicIntegratedPad(
                     ClassicDirectionButton(
                         label = "→",
                         modifier = Modifier.weight(1f),
-                        accessibilityLabel = "Navigate right",
+                        accessibilityLabel = stringResource(R.string.classic_navigate_right),
                         onClick = { navigate(FocusDirection.Right, KeyEvent.KEYCODE_DPAD_RIGHT, 0) },
                     )
                 }
                 ClassicDirectionButton(
                     label = "↓",
                     modifier = Modifier.fillMaxWidth(),
-                    accessibilityLabel = "Navigate down",
+                    accessibilityLabel = stringResource(R.string.classic_navigate_down),
                     onClick = { navigate(FocusDirection.Down, KeyEvent.KEYCODE_DPAD_DOWN, 220) },
                 )
             }
@@ -971,14 +1026,14 @@ fun ClassicIntegratedPad(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 ClassicDeckButton(
-                    label = menuLabel,
+                    label = resolvedMenuLabel,
                     color = ClassicDeck,
                     borderColor = ClassicDeckBorder,
                     modifier = Modifier.weight(1f),
                     onClick = onMenu,
                 )
                 ClassicDeckButton(
-                    label = redLabel,
+                    label = resolvedRedLabel,
                     color = ClaroColors.Red,
                     borderColor = Color(0xFFE76674),
                     modifier = Modifier.weight(1f),
@@ -996,13 +1051,18 @@ private fun ClassicDeckButton(
     borderColor: Color,
     modifier: Modifier,
     onClick: (() -> Unit)?,
+    explicitIconKind: ClaroIconKind? = null,
 ) {
     val cleanLabel = label.replace(Regex("^[☎⌂✉↻＋✓…\\s]+"), "").trim().ifBlank { label }
+    val declineLabel = stringResource(R.string.classic_decline)
+    val endLabel = stringResource(R.string.classic_end)
     val haptics = LocalClaroHaptics.current
     val isHeavyAction = color == ClaroColors.Green || color == ClaroColors.Red
-    val iconKind = when {
+    val iconKind = explicitIconKind ?: when {
         cleanLabel.equals("Decline", ignoreCase = true) ||
-            cleanLabel.equals("End", ignoreCase = true) -> ClaroIconKind.END_CALL
+            cleanLabel.equals("End", ignoreCase = true) ||
+            cleanLabel.equals(declineLabel, ignoreCase = true) ||
+            cleanLabel.equals(endLabel, ignoreCase = true) -> ClaroIconKind.END_CALL
         label.startsWith("☎") -> ClaroIconKind.PHONE
         label.startsWith("⌂") -> ClaroIconKind.HOME
         label.startsWith("✉") -> ClaroIconKind.MESSAGES
@@ -1117,18 +1177,18 @@ fun ClassicNumericKeypad(
 ) {
     val haptics = LocalClaroHaptics.current
     val legends = mapOf(
-        '1' to ".,?!",
-        '2' to "ABC",
-        '3' to "DEF",
-        '4' to "GHI",
-        '5' to "JKL",
-        '6' to "MNO",
-        '7' to "PQRS",
-        '8' to "TUV",
-        '9' to "WXYZ",
-        '*' to "+",
-        '0' to "space",
-        '#' to "abc / 123",
+        '1' to stringResource(R.string.classic_keypad_legend_1),
+        '2' to stringResource(R.string.classic_keypad_legend_2),
+        '3' to stringResource(R.string.classic_keypad_legend_3),
+        '4' to stringResource(R.string.classic_keypad_legend_4),
+        '5' to stringResource(R.string.classic_keypad_legend_5),
+        '6' to stringResource(R.string.classic_keypad_legend_6),
+        '7' to stringResource(R.string.classic_keypad_legend_7),
+        '8' to stringResource(R.string.classic_keypad_legend_8),
+        '9' to stringResource(R.string.classic_keypad_legend_9),
+        '*' to stringResource(R.string.classic_keypad_legend_star),
+        '0' to stringResource(R.string.classic_keypad_space),
+        '#' to stringResource(R.string.classic_keypad_legend_pound),
     )
     val keys = listOf(
         listOf('1', '2', '3'),
@@ -1151,6 +1211,21 @@ fun ClassicNumericKeypad(
                         val legend = assignedName ?: legends.getValue(key)
                         val digitAction = onDigitSelected
                         val enabled = digitAction != null
+                        val keyDescription = if (
+                            (key == '1' || key == '2') && onLongDigitSelected != null
+                        ) {
+                            stringResource(
+                                R.string.classic_keypad_key_speed_dial,
+                                key.toString(),
+                                legend,
+                            )
+                        } else {
+                            stringResource(
+                                R.string.classic_keypad_key_description,
+                                key.toString(),
+                                legend,
+                            )
+                        }
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -1190,16 +1265,7 @@ fun ClassicNumericKeypad(
                                     },
                                 )
                                 .semantics {
-                                    contentDescription = buildString {
-                                        append(key)
-                                        if (legend.isNotBlank()) {
-                                            append(", ")
-                                            append(legend)
-                                        }
-                                        if ((key == '1' || key == '2') && onLongDigitSelected != null) {
-                                            append(". Hold for speed dial")
-                                        }
-                                    }
+                                    contentDescription = keyDescription
                                     role = Role.Button
                                 }
                                 .padding(horizontal = 4.dp, vertical = 2.dp),

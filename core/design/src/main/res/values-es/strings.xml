@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="design_unassigned_person">Añadir persona</string>
+    <string name="design_battery_percent">Batería al %1$d por ciento</string>
+    <string name="design_battery_percent_charging">Batería al %1$d por ciento, cargando</string>
+    <string name="design_signal_available">Señal móvil: %1$d de 4</string>
+    <string name="design_signal_no_sim">Señal móvil: Sin SIM</string>
+    <string name="design_signal_no_service">Señal móvil: Sin señal</string>
+    <string name="design_signal_airplane">Señal móvil: Modo avión</string>
+    <string name="design_signal_unknown">Señal móvil: Desconocida</string>
+</resources>

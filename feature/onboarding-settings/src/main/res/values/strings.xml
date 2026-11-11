@@ -1,8 +1,175 @@
-<resources>
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="onboarding_welcome">Welcome to Claro</string>
     <string name="touch_home">Touch Home</string>
     <string name="classic_phone">Classic Phone</string>
     <string name="settings">Settings</string>
     <string name="phone_style">Phone style</string>
     <string name="unlock">Unlock</string>
+
+    <string name="onb_language_english" translatable="false">English</string>
+    <string name="onb_language_spanish" translatable="false">Español</string>
+    <string name="onb_language_hebrew" translatable="false">עברית</string>
+    <string name="onb_date_format_pattern" translatable="false">dd/MM/YYYY</string>
+    <string name="onb_preview_sample_phone_time" translatable="false">202-555-0101 · 9:41</string>
+    <string name="onb_preview_sample_time" translatable="false">9:41</string>
+    <string name="onb_classic_preview_sms" translatable="false">SMS</string>
+    <string name="onb_classic_preview_sos" translatable="false">SOS</string>
+    <string name="onb_classic_preview_ok" translatable="false">OK</string>
+    <string name="onb_language_display_summary" translatable="false">%1$s · %2$s</string>
+    <string name="onb_bullet_item" translatable="false">• %1$s</string>
+
+    <string name="onb_cancel">Cancel</string>
+    <string name="onb_continue">Continue</string>
+    <string name="onb_save">Save</string>
+    <string name="onb_save_and_continue">Save and continue</string>
+
+    <string name="onb_step_choose_phone_style">Choose phone style</string>
+    <string name="onb_language_and_display_title">Language and display</string>
+    <string name="onb_settings_access">Settings access</string>
+    <string name="onb_step_people_and_speed_dial">People and speed dial</string>
+    <string name="onb_sos_contact_title">SOS contact</string>
+    <string name="onb_step_permissions_and_roles">Permissions and roles</string>
+    <string name="onb_step_handover_checklist">Handover checklist</string>
+    <string name="onb_step_setup_complete">Setup complete</string>
+    <string name="onb_setup_complete_body">Setup complete. Your Home screen is ready.</string>
+    <string name="onb_setup_step_progress" tools:ignore="PluralsCandidate">Setup step %1$d of %2$d</string>
+
+    <string name="onb_set_up_claro">Set up Claro</string>
+    <string name="onb_continue_free">Continue free</string>
+    <string name="onb_welcome_no_trial_note">Installing Claro does not start a trial or charge.</string>
+    <string name="onb_welcome_tagline">Your people. One touch away.</string>
+    <string name="onb_welcome_subtitle">A simpler home, phone and messages — set up for yourself or together with someone you trust.</string>
+    <string name="onb_welcome_permissions_sos_note">Android asks separately for Home, Phone, SMS and Camera access when needed. SOS calls one trusted person — it is not monitored emergency dispatch.</string>
+
+    <string name="onb_choose_a_style">Choose a style</string>
+    <string name="onb_use_style">Use %1$s</string>
+    <string name="onb_apply_style">Apply %1$s</string>
+    <string name="onb_phone_style_choice_body">Choose how Claro looks. Both styles share the same people, messages and settings.</string>
+    <string name="onb_phone_style_settings_body">Preview either style. Switching changes only the presentation — your contacts, messages and settings stay in place.</string>
+    <string name="onb_phone_style_pending_switch">A switch to %1$s is waiting for the current activity to finish.</string>
+    <string name="onb_touch_mode_card_summary">Photo contacts &amp; 2-column tiles</string>
+    <string name="onb_classic_mode_card_summary">Fixed keypad, D-pad &amp; Call/Home</string>
+    <string name="onb_mode_selected">✓ Selected</string>
+    <string name="onb_tap_to_choose">Tap to choose</string>
+    <string name="onb_classic_preview_date">Wed 11</string>
+
+    <string name="onb_section_language">Language</string>
+    <string name="onb_section_text_size">Text size</string>
+    <string name="onb_text_size_standard">Standard</string>
+    <string name="onb_text_size_large">Large</string>
+    <string name="onb_text_size_huge">Huge</string>
+    <string name="onb_high_contrast">High contrast</string>
+    <string name="onb_keypad_and_touch_vibration">Keypad &amp; touch vibration</string>
+    <string name="onb_preview_heading">Home</string>
+    <string name="onb_preview_labels">Phone · Messages · Settings</string>
+
+    <string name="onb_todays_date_title">Today\'s date?</string>
+    <string name="onb_forgot_pin">Forgot PIN?</string>
+    <string name="onb_date_gate_instructions">Enter today\'s local date as dd/MM/YYYY. This prevents accidental taps; it is not a security lock.</string>
+    <string name="onb_pin_gate_instructions">Enter your 6-digit caregiver PIN to open Settings.</string>
+    <string name="onb_date_field_supporting">2-digit day, 2-digit month, 4-digit year</string>
+    <string name="onb_six_digit_pin_label">6-digit PIN</string>
+    <string name="onb_confirm_six_digit_pin_label">Confirm 6-digit PIN</string>
+    <string name="onb_pin_digits_entered" tools:ignore="PluralsCandidate">%1$d of 6 PIN digits entered</string>
+    <string name="onb_save_access_method">Save access method</string>
+    <string name="onb_date_question_option_title">Date question (dd/MM/YYYY)</string>
+    <string name="onb_date_question_option_subtitle">No secret to remember · prevents accidental taps</string>
+    <string name="onb_caregiver_pin_option_title">Caregiver PIN</string>
+    <string name="onb_caregiver_pin_option_subtitle">6-digit PIN + 12+ character recovery secret</string>
+    <string name="onb_date_question_info">Anyone who knows today\'s local date (dd/MM/YYYY) can unlock Settings. There is no PIN or recovery phrase to store.</string>
+    <string name="onb_caregiver_pin_warning">Keep your 6-digit PIN and 12+ character recovery secret somewhere safe. Today\'s date cannot unlock or recover PIN mode.</string>
+    <string name="onb_recovery_secret_with_min_label">Recovery secret (12+ characters)</string>
+    <string name="onb_recovery_secret_min_progress" tools:ignore="PluralsCandidate">%1$d/12 minimum characters</string>
+
+    <string name="onb_recover_pin_title">Recover caregiver PIN</string>
+    <string name="onb_set_new_pin">Set new PIN</string>
+    <string name="onb_recover_pin_instructions">Use the recovery secret saved during setup. Today\'s date cannot bypass or reset a caregiver PIN.</string>
+    <string name="onb_recovery_secret_label">Recovery secret</string>
+    <string name="onb_new_six_digit_pin_label">New 6-digit PIN</string>
+    <string name="onb_confirm_new_pin_label">Confirm new PIN</string>
+    <string name="onb_recover_pin_lost_both_warning">Lost both the PIN and recovery secret? Reset Claro in Android app settings. Local Claro preferences and drafts are cleared; Android contacts, SMS and photos stay.</string>
+
+    <string name="onb_open_contacts_and_speed_dial">Open contacts &amp; speed dial</string>
+    <string name="onb_continue_setup_incomplete">Continue with setup incomplete</string>
+    <string name="onb_people_setup_body">Assign real Android contacts to the four Home portrait slots and optional Hold 1 / Hold 2 keys.</string>
+    <string name="onb_slot_set">Set</string>
+    <string name="onb_slot_open">Open</string>
+    <string name="onb_speed_dial_assigned">assigned</string>
+    <string name="onb_speed_dial_not_set">not set</string>
+    <string name="onb_people_setup_status_configured" tools:ignore="PluralsCandidate">%1$d of 4 Home people configured. Hold 1: %2$s · Hold 2: %3$s.</string>
+    <string name="onb_people_setup_status_empty">No Home people configured yet — unassigned slots stay visible as Add person. Hold 1: %1$s · Hold 2: %2$s.</string>
+    <string name="onb_people_setup_hold_note">Holding 1 or 2 places a call immediately without an extra confirmation screen.</string>
+
+    <string name="onb_configure_trusted_person">Configure trusted person</string>
+    <string name="onb_continue_sos_incomplete">Continue with SOS incomplete</string>
+    <string name="onb_sos_setup_body">SOS calls one trusted person after a 5-second countdown. It is not a monitoring service or emergency dispatch, and sends no SMS or location.</string>
+    <string name="onb_sos_setup_agreed_info">Trusted recipient recorded with agreement. Run a consented test call separately.</string>
+    <string name="onb_sos_setup_unconfigured_warning">SOS is not configured. No SOS call can start until a real recipient agrees.</string>
+
+    <string name="onb_continue_to_handover">Continue to handover</string>
+    <string name="onb_readiness_checklist_info">Each Android role or permission is requested separately. Missing access keeps native fallback actions visible.</string>
+    <string name="onb_back_to_settings">Back to Settings</string>
+    <string name="onb_readiness_settings_info">Allowed means Android granted access — it does not verify that a real call, SMS or SOS test succeeded.</string>
+    <string name="onb_allow_or_repair">Allow or repair</string>
+    <string name="onb_open_android_settings">Open Android settings</string>
+    <string name="onb_capability_home">Default home</string>
+    <string name="onb_capability_phone">Default phone</string>
+    <string name="onb_capability_messages">Default SMS</string>
+    <string name="onb_capability_contacts">Contacts</string>
+    <string name="onb_capability_notifications">Notifications</string>
+    <string name="onb_capability_media">Photos</string>
+    <string name="onb_capability_status_ready">Allowed · service test separate</string>
+    <string name="onb_capability_status_needs_attention">Access needed</string>
+    <string name="onb_capability_status_unavailable">Unavailable on this device</string>
+    <string name="onb_readiness_summary" tools:ignore="PluralsCandidate">%1$d of %2$d allowed</string>
+
+    <string name="onb_optional_plans">Optional plans</string>
+    <string name="onb_finish_setup">Finish setup</string>
+    <string name="onb_handover_body">Verify real service behavior together. Unchecked items remain honestly marked not tested.</string>
+    <string name="onb_handover_all_observed" tools:ignore="PluralsCandidate">All %1$d handover checks observed.</string>
+    <string name="onb_handover_progress_observed" tools:ignore="PluralsCandidate">%1$d of %2$d handover checks observed.</string>
+    <string name="onb_handover_outgoing_call">Outgoing call observed</string>
+    <string name="onb_handover_incoming_call">Incoming call observed</string>
+    <string name="onb_handover_sms_send">SMS send observed</string>
+    <string name="onb_handover_sms_receive">SMS receive observed</string>
+    <string name="onb_handover_default_sim">Default SIM checked</string>
+    <string name="onb_handover_ringtone">Audible ringtone checked</string>
+    <string name="onb_handover_home_return">Home return checked</string>
+    <string name="onb_handover_sos_test">Consented SOS test observed</string>
+    <string name="onb_allowed_apps_and_tiles_title">Allowed apps &amp; Home tiles</string>
+    <string name="onb_allowed_apps_and_tiles_subtitle">Choose optional extra apps for Home</string>
+
+    <string name="onb_done_lock">Done · lock</string>
+    <string name="onb_home_and_apps_title">Home &amp; apps</string>
+    <string name="onb_home_and_apps_subtitle">Allowed apps and extra Home tiles</string>
+    <string name="onb_people_and_speed_dial_amp_title">People &amp; speed dial</string>
+    <string name="onb_people_configured_short" tools:ignore="PluralsCandidate">%1$d/4 Home people configured</string>
+    <string name="onb_language_and_display_amp_title">Language &amp; display</string>
+    <string name="onb_language_display_summary_high_contrast">%1$s · %2$s · High contrast</string>
+    <string name="onb_sos_subtitle_configured">Trusted person agreed · test separate</string>
+    <string name="onb_sos_subtitle_not_configured">Not configured</string>
+    <string name="onb_permissions_and_roles_amp_title">Permissions &amp; roles</string>
+    <string name="onb_settings_access_date_subtitle">Today\'s date question</string>
+    <string name="onb_settings_access_pin_subtitle">Caregiver PIN · local recovery</string>
+    <string name="onb_membership_and_privacy_title">Membership &amp; privacy</string>
+    <string name="onb_membership_and_privacy_subtitle">Core features free · diagnostics off by default</string>
+    <string name="onb_reset_claro">Reset Claro</string>
+    <string name="onb_reset_claro_subtitle">Clear local Claro setup only</string>
+
+    <string name="onb_reset_claro_confirm_title">Reset Claro?</string>
+    <string name="onb_return_to_call">Return to call</string>
+    <string name="onb_reset_end_call_first">End your call first.</string>
+    <string name="onb_reset_all_changes_question">Reset all Claro changes?</string>
+    <string name="onb_reset_scope_warning">Resets Claro on this phone only. Device data and store purchases stay unchanged.</string>
+    <string name="onb_reset_cleared_heading">Cleared from Claro</string>
+    <string name="onb_reset_cleared_item_preferences">Claro preferences (phone style, language, text size, contrast, diagnostics)</string>
+    <string name="onb_reset_cleared_item_favorites">Home favorites and Hold 1 / Hold 2 speed dials</string>
+    <string name="onb_reset_cleared_item_photos_sos">Selected photo references and SOS contact assignment</string>
+    <string name="onb_reset_cleared_item_pin_drafts">Caregiver PIN, recovery secret and unsent Claro message drafts</string>
+    <string name="onb_reset_kept_heading">Kept on your phone</string>
+    <string name="onb_reset_kept_item_contacts">Android contacts and call log</string>
+    <string name="onb_reset_kept_item_sms">SMS and MMS conversations</string>
+    <string name="onb_reset_kept_item_photos">Device photos and videos</string>
+    <string name="onb_reset_kept_item_purchases">Google Play subscriptions and purchases</string>
 </resources>

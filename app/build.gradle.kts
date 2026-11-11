@@ -21,6 +21,11 @@ android {
     }
 
     buildFeatures { compose = true }
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

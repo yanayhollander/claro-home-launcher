@@ -1,3 +1,153 @@
-<resources>
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">Claro Home</string>
+
+    <string name="app_back">Back</string>
+    <string name="app_home">Home</string>
+    <string name="app_menu">Menu</string>
+    <string name="app_call">Call</string>
+    <string name="app_dismiss">Dismiss</string>
+    <string name="app_done">Done</string>
+    <string name="app_save">Save</string>
+    <string name="app_cancel">Cancel</string>
+    <string name="app_search">Search</string>
+    <string name="app_settings">Settings</string>
+    <string name="app_contacts">Contacts</string>
+    <string name="app_phone">Phone</string>
+    <string name="app_messages">Messages</string>
+    <string name="app_camera">Camera</string>
+    <string name="app_gallery">Gallery</string>
+    <string name="app_sos">SOS</string>
+    <string name="app_apps">Apps</string>
+
+    <string name="app_android_settings_unavailable">Android app settings are unavailable on this device.</string>
+    <string name="app_home_settings_unavailable">Home settings are unavailable on this device.</string>
+    <string name="app_missing_or_disabled_notice">This app is missing or disabled.</string>
+    <string name="app_could_not_open_notice">This app could not be opened.</string>
+    <string name="app_ask_caregiver_add_person">Ask your caregiver to add a person.</string>
+    <string name="app_contacts_permission_save">Contacts permission is needed to save.</string>
+    <string name="app_contacts_permission_delete">Contacts permission is needed to delete.</string>
+    <string name="app_contact_account_read_only">This contact account is read-only.</string>
+    <string name="app_contact_name_and_number_required">Name and number are required</string>
+    <string name="app_contact_not_saved">Contact was not saved</string>
+    <string name="app_contact_saved_could_not_open">Contact was saved but could not be opened</string>
+    <string name="app_contact_not_found">Contact not found</string>
+    <string name="app_contact_change_failed">Contact change failed</string>
+    <string name="app_contact_replace_sos_before_delete">Replace the SOS person before deleting this contact</string>
+    <string name="app_unable_to_restore_local_state">Unable to restore local state</string>
+    <string name="app_private_number">Private number</string>
+
+    <string name="app_unlock_incorrect">That answer was not correct.</string>
+    <string name="app_unlock_cooldown" tools:ignore="PluralsCandidate">Too many attempts. Try again in %1$d seconds.</string>
+    <string name="app_pin_changed">PIN changed.</string>
+    <string name="app_recovery_secret_incorrect">Recovery secret was not correct.</string>
+    <string name="app_recovery_cooldown" tools:ignore="PluralsCandidate">Recovery is paused for %1$d seconds.</string>
+    <string name="app_pin_use_six_digits">Use exactly 6 digits.</string>
+    <string name="app_pins_do_not_match">PINs do not match.</string>
+    <string name="app_pin_recovery_secret_min_length" tools:ignore="PluralsCandidate">Recovery secret must be at least %1$d characters.</string>
+    <string name="app_pin_recovery_only_pin_mode">PIN recovery is available only in caregiver PIN mode.</string>
+    <string name="app_pin_enter_same_twice">Enter the same 6-digit PIN twice.</string>
+    <string name="app_phone_style_deferred">Phone style will change after: %1$s</string>
+    <string name="app_blocker_active_call">active call</string>
+    <string name="app_blocker_sos">SOS</string>
+    <string name="app_blocker_purchase">purchase</string>
+    <string name="app_blocker_destructive_confirmation">confirmation</string>
+    <string name="app_blocker_external_system_ui">system screen</string>
+
+    <string name="app_badge_new_count" tools:ignore="PluralsCandidate">%1$d new</string>
+    <string name="app_badge_unknown">Access needed · count unknown</string>
+
+    <string name="app_home_and_apps">Home &amp; apps</string>
+    <string name="app_edit_apps">Edit apps</string>
+    <string name="app_apps_hiding_convenience_notice">Hiding apps here is a menu convenience only. It does not lock the device or block Android settings.</string>
+    <string name="app_no_eligible_apps">No eligible apps found on this device.</string>
+    <string name="app_no_apps_match_search">No apps match your search.</string>
+    <string name="app_no_allowed_apps_yet">No allowed apps yet.</string>
+    <string name="app_no_allowed_apps_on_home">No allowed apps on Home yet.</string>
+    <string name="app_unavailable_review_edit_apps">%1$s is missing or disabled. Ask a caregiver to review Edit apps.</string>
+    <string name="app_tab_all_allowed">All allowed</string>
+    <string name="app_tab_on_home">On home</string>
+    <string name="app_subtitle_on_home_external">On Home · opens outside Claro</string>
+    <string name="app_subtitle_opens_external">Opens outside Claro</string>
+    <string name="app_is_missing_or_disabled">App is missing or disabled</string>
+    <string name="app_show_on_home">Show on Home</string>
+
+    <string name="app_people_and_speed_dial">People &amp; speed dial</string>
+    <string name="app_favorite_slot">Slot %1$d</string>
+    <string name="app_not_set">Not set</string>
+    <string name="app_speed_dial_hold_slot">Hold %1$s · %2$s</string>
+    <string name="app_speed_dial_immediate_notice">Holding 1 or 2 calls immediately, without confirmation.</string>
+    <string name="app_clear_selected_slot">Clear selected slot</string>
+    <string name="app_no_contacts_available">No contacts are available. Allow Contacts access or add a contact in Android.</string>
+    <string name="app_load_contacts">Load contacts</string>
+    <string name="app_no_contacts_match_search">No contacts match your search.</string>
+
+    <string name="app_sos_non_dispatch_warning">Not an emergency service. Calls your contact only. No message or location sent.</string>
+    <string name="app_sos_calling_in">Calling in…</string>
+    <string name="app_call_for_help">Call for help</string>
+    <string name="app_call_in_5_seconds">Call in 5 seconds</string>
+    <string name="app_emergency_call">Emergency call</string>
+    <string name="app_sos_stop">STOP</string>
+    <string name="app_try_again">Try again</string>
+    <string name="app_sos_choose_agreed_contact">Choose a contact who has agreed in Settings.</string>
+    <string name="app_sos_choose_help_contact">Choose a help contact in Settings.</string>
+    <string name="app_sos_emergency_number_not_allowed">Emergency numbers cannot be saved as trusted contacts.</string>
+    <string name="app_sos_test_call_mode">Test call mode.</string>
+    <string name="app_sos_back_or_home_cancels">Back or Home cancels the call.</string>
+    <string name="app_sos_canceled_no_call">Canceled. No call started.</string>
+    <string name="app_sos_calling_unconfirmed">%1$s. Help is not confirmed.</string>
+    <string name="app_sos_failed_no_one_reached">%1$s. No one reached. No alert or location delivered.</string>
+    <string name="app_sos_contact_title">SOS contact</string>
+    <string name="app_choose_from_contacts">Choose from contacts</string>
+    <string name="app_selected_contact">Selected %1$s.</string>
+    <string name="app_trusted_person">Trusted person</string>
+    <string name="app_phone_number">Phone number</string>
+    <string name="app_sos_recipient_agreed">They agreed to receive help calls.</string>
+    <string name="app_sos_settings_warning">Not an emergency service. Needs mobile service and an answer. No message or location sent.</string>
+    <string name="app_sos_test_call">Test call</string>
+    <string name="app_sos_test_mode_notice">Test mode: tell your contact before placing a real test call.</string>
+    <string name="app_sos_start_test">Start test</string>
+    <string name="app_sos_test_requires_agreed_contact">Enter a non-emergency contact and confirm they agreed before testing.</string>
+    <string name="app_sos_outcome_dialing">Calling</string>
+    <string name="app_sos_outcome_ringing">Ringing</string>
+    <string name="app_sos_outcome_connected">Connected</string>
+    <string name="app_sos_outcome_ended">Call ended</string>
+    <string name="app_sos_outcome_busy">Line busy</string>
+    <string name="app_sos_outcome_no_answer">No answer</string>
+    <string name="app_sos_outcome_declined">Call declined</string>
+    <string name="app_sos_outcome_no_service">No mobile service</string>
+    <string name="app_sos_outcome_permission_lost">Phone access needs repair</string>
+    <string name="app_sos_outcome_unknown_failure">Call did not connect</string>
+
+    <string name="app_photo_deleted">Photo deleted.</string>
+    <string name="app_photo_delete_canceled">Delete canceled or denied. Photo kept.</string>
+    <string name="app_camera_photo_title">Camera photo %1$d</string>
+    <string name="app_picture_saved">Picture saved. Tap Gallery to view it.</string>
+    <string name="app_camera_canceled">Camera canceled. No picture saved.</string>
+    <string name="app_photo_selection_canceled">Photo selection canceled.</string>
+    <string name="app_selected_photo_title">Selected photo %1$d</string>
+    <string name="app_picture_added">Picture added to Claro.</string>
+    <string name="app_picture_added_temporary">Picture added. Android may ask you to select it again later.</string>
+    <string name="app_open_camera">Open camera</string>
+    <string name="app_camera_storage_unavailable">Camera or storage is unavailable.</string>
+    <string name="app_no_system_camera">No system camera is available.</string>
+    <string name="app_camera_external_notice">Opens the Android camera outside Claro. Camera controls are not enlarged by Claro.</string>
+    <string name="app_camera_take_picture_prompt">Take a picture in your phone\'s camera app, then return here.</string>
+    <string name="app_add_picture">Add picture</string>
+    <string name="app_picture_removed">Picture removed.</string>
+    <string name="app_picture_delete_failed">Could not delete. Picture kept.</string>
+    <string name="app_waiting_delete_confirmation">Waiting for Android delete confirmation.</string>
+    <string name="app_no_pictures_yet">No pictures yet.</string>
+    <string name="app_delete_photo">Delete photo</string>
+    <string name="app_remove_from_claro">Remove from Claro</string>
+    <string name="app_saved_by_claro">Saved by Claro</string>
+    <string name="app_device_photo_reference">Device photo reference</string>
+    <string name="app_photo_access_removed">Access was removed. Select this photo again.</string>
+    <string name="app_photo_cloud_unavailable">Connect to view cloud photos.</string>
+    <string name="app_photo_missing">This photo is missing.</string>
+    <string name="app_photo_previous">← Previous</string>
+    <string name="app_photo_next">Next →</string>
+    <string name="app_confirm_delete_device_photo">Delete this photo from your device? Android may ask you to confirm.</string>
+    <string name="app_confirm_remove_from_claro">Remove from Claro? The original stays on your device.</string>
+    <string name="app_all_pictures">All pictures</string>
 </resources>

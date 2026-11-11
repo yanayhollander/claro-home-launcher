@@ -26,7 +26,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
@@ -34,7 +36,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.clarohome.core.design.ClaroAvatar
@@ -47,6 +48,7 @@ import com.clarohome.core.design.ClaroInfoCard
 import com.clarohome.core.model.BatteryStatus
 import com.clarohome.core.model.CellularStatus
 import com.clarohome.feature.communication.AudioRoute
+import com.clarohome.feature.communication.CallFailure
 import com.clarohome.feature.communication.CallOutcome
 import com.clarohome.feature.communication.CallPhase
 import com.clarohome.feature.communication.CallerIdentity
@@ -54,11 +56,13 @@ import com.clarohome.feature.communication.CommunicationRoute
 import com.clarohome.feature.communication.CommunicationUiState
 import com.clarohome.feature.communication.ContactNumber
 import com.clarohome.feature.communication.formatCallDuration
+import com.clarohome.presentation.classic.R
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import java.util.Locale
 import kotlinx.coroutines.delay
 
 @Composable
@@ -230,7 +234,11 @@ fun ClassicCommunicationScreen(
         ) {
             ClassicSystemStatusBar(battery = battery, cellular = cellular)
             ClassicHeader(
-                title = if (optionsOpen) "Options" else classicTitle(state.route),
+                title = if (optionsOpen) {
+                    stringResource(R.string.classic_options)
+                } else {
+                    classicTitle(state.route)
+                },
                 centered = !optionsOpen && isCenteredHeaderRoute(state.route),
             )
             Column(
@@ -268,15 +276,15 @@ fun ClassicCommunicationScreen(
             }
         }
         ClassicIntegratedPad(
-            menuLabel = "Options",
+            menuLabel = stringResource(R.string.classic_options),
             greenLabel = when (state.route) {
-                CommunicationRoute.INCOMING_CALL -> "☎ Answer"
-                else -> "☎ Call"
+                CommunicationRoute.INCOMING_CALL -> "☎ ${stringResource(R.string.classic_answer)}"
+                else -> "☎ ${stringResource(R.string.classic_call)}"
             },
             redLabel = when (state.route) {
-                CommunicationRoute.INCOMING_CALL -> "☎ Decline"
-                CommunicationRoute.ACTIVE_CALL -> "End"
-                else -> "⌂ Home"
+                CommunicationRoute.INCOMING_CALL -> stringResource(R.string.classic_decline)
+                CommunicationRoute.ACTIVE_CALL -> stringResource(R.string.classic_end)
+                else -> "⌂ ${stringResource(R.string.classic_home)}"
             },
             onBack = backAction,
             onMenu = if (options.isNotEmpty() || optionsOpen) {
@@ -290,7 +298,11 @@ fun ClassicCommunicationScreen(
         )
         ClassicModeStatusStrip(
             modeLabel = if (state.route == CommunicationRoute.CONTACTS && !optionsOpen) {
-                if (contactsNumericMode) "Numbers" else "Letters"
+                if (contactsNumericMode) {
+                    stringResource(R.string.classic_mode_numbers)
+                } else {
+                    stringResource(R.string.classic_mode_letters)
+                }
             } else {
                 null
             },
@@ -316,6 +328,7 @@ fun ClassicCommunicationScreen(
     }
 }
 
+@Composable
 private fun buildClassicCommunicationOptions(
     state: CommunicationUiState,
     callbackAction: (() -> Unit)?,
@@ -328,116 +341,132 @@ private fun buildClassicCommunicationOptions(
     onSwap: () -> Unit,
     onRepairPhone: () -> Unit,
     onEmergencyDialer: () -> Unit,
-): List<ClassicOptionAction> = buildList {
-    when (state.route) {
-        CommunicationRoute.DIALER -> {
-            add(
-                ClassicOptionAction(
-                    label = "Delete character",
-                    enabled = state.digits.isNotEmpty(),
-                    onSelect = onBackspace,
-                ),
-            )
-            add(
-                ClassicOptionAction(
-                    label = "Clear text",
-                    enabled = state.digits.isNotEmpty(),
-                    onSelect = { repeat(state.digits.length) { onBackspace() } },
-                ),
-            )
-            add(ClassicOptionAction(label = "Contacts", onSelect = onOpenContacts))
-            if (state.qualification.needsRepair && state.qualification.telephonySupported) {
-                add(ClassicOptionAction(label = "Repair phone access", onSelect = onRepairPhone))
+): List<ClassicOptionAction> {
+    val deleteCharacterLabel = stringResource(R.string.classic_delete_character)
+    val clearTextLabel = stringResource(R.string.classic_clear_text)
+    val contactsLabel = stringResource(R.string.classic_contacts)
+    val repairPhoneLabel = stringResource(R.string.classic_repair_phone_access)
+    val emergencyCallLabel = stringResource(R.string.classic_emergency_call)
+    val earpieceLabel = stringResource(R.string.classic_earpiece)
+    val speakerLabel = stringResource(R.string.classic_speaker)
+    val unmuteLabel = stringResource(R.string.classic_unmute)
+    val muteLabel = stringResource(R.string.classic_mute)
+    val resumeLabel = stringResource(R.string.classic_resume_call)
+    val holdLabel = stringResource(R.string.classic_hold_call)
+    val swapLabel = stringResource(R.string.classic_swap_call)
+    val callBackLabel = stringResource(R.string.classic_call_back)
+
+    return buildList {
+        when (state.route) {
+            CommunicationRoute.DIALER -> {
+                add(
+                    ClassicOptionAction(
+                        label = deleteCharacterLabel,
+                        enabled = state.digits.isNotEmpty(),
+                        onSelect = onBackspace,
+                    ),
+                )
+                add(
+                    ClassicOptionAction(
+                        label = clearTextLabel,
+                        enabled = state.digits.isNotEmpty(),
+                        onSelect = { repeat(state.digits.length) { onBackspace() } },
+                    ),
+                )
+                add(ClassicOptionAction(label = contactsLabel, onSelect = onOpenContacts))
+                if (state.qualification.needsRepair && state.qualification.telephonySupported) {
+                    add(ClassicOptionAction(label = repairPhoneLabel, onSelect = onRepairPhone))
+                }
+                add(ClassicOptionAction(label = emergencyCallLabel, onSelect = onEmergencyDialer))
             }
-            add(ClassicOptionAction(label = "Emergency call", onSelect = onEmergencyDialer))
-        }
 
-        CommunicationRoute.CONTACTS -> {
-            add(
-                ClassicOptionAction(
-                    label = "Delete character",
-                    enabled = state.contactQuery.isNotEmpty(),
-                    onSelect = { onSearchContacts(state.contactQuery.dropLast(1)) },
-                ),
-            )
-            add(
-                ClassicOptionAction(
-                    label = "Clear text",
-                    enabled = state.contactQuery.isNotEmpty(),
-                    onSelect = { onSearchContacts("") },
-                ),
-            )
-            if (state.qualification.needsRepair && state.qualification.telephonySupported) {
-                add(ClassicOptionAction(label = "Repair phone access", onSelect = onRepairPhone))
+            CommunicationRoute.CONTACTS -> {
+                add(
+                    ClassicOptionAction(
+                        label = deleteCharacterLabel,
+                        enabled = state.contactQuery.isNotEmpty(),
+                        onSelect = { onSearchContacts(state.contactQuery.dropLast(1)) },
+                    ),
+                )
+                add(
+                    ClassicOptionAction(
+                        label = clearTextLabel,
+                        enabled = state.contactQuery.isNotEmpty(),
+                        onSelect = { onSearchContacts("") },
+                    ),
+                )
+                if (state.qualification.needsRepair && state.qualification.telephonySupported) {
+                    add(ClassicOptionAction(label = repairPhoneLabel, onSelect = onRepairPhone))
+                }
+                add(ClassicOptionAction(label = emergencyCallLabel, onSelect = onEmergencyDialer))
             }
-            add(ClassicOptionAction(label = "Emergency call", onSelect = onEmergencyDialer))
-        }
 
-        CommunicationRoute.CONTACT_DETAIL -> {
-            add(ClassicOptionAction(label = "Contacts", onSelect = onOpenContacts))
-            add(ClassicOptionAction(label = "Emergency call", onSelect = onEmergencyDialer))
-        }
-
-        CommunicationRoute.ACTIVE_CALL -> {
-            val call = state.call
-            val speakerActive = call?.audioRoute == AudioRoute.SPEAKER
-            add(
-                ClassicOptionAction(
-                    label = if (speakerActive) "Earpiece" else "Speaker",
-                    enabled = call?.capabilities?.canChangeAudioRoute == true,
-                    onSelect = {
-                        onAudioRoute(
-                            if (speakerActive) AudioRoute.EARPIECE else AudioRoute.SPEAKER,
-                        )
-                    },
-                ),
-            )
-            add(
-                ClassicOptionAction(
-                    label = if (call?.isMuted == true) "Unmute" else "Mute",
-                    enabled = call?.capabilities?.canMute == true,
-                    onSelect = onToggleMute,
-                ),
-            )
-            add(
-                ClassicOptionAction(
-                    label = if (call?.phase == CallPhase.ON_HOLD) "Resume" else "Hold",
-                    enabled = call?.capabilities?.canHold == true,
-                    onSelect = onToggleHold,
-                ),
-            )
-            add(
-                ClassicOptionAction(
-                    label = "Swap",
-                    enabled = call?.capabilities?.canSwap == true,
-                    onSelect = onSwap,
-                ),
-            )
-        }
-
-        CommunicationRoute.MISSED_CALL,
-        CommunicationRoute.CALL_UNANSWERED,
-        CommunicationRoute.CALL_ENDED,
-        CommunicationRoute.CALL_FAILED,
-        -> {
-            if (callbackAction != null) {
-                add(ClassicOptionAction(label = "Call back", onSelect = callbackAction))
+            CommunicationRoute.CONTACT_DETAIL -> {
+                add(ClassicOptionAction(label = contactsLabel, onSelect = onOpenContacts))
+                add(ClassicOptionAction(label = emergencyCallLabel, onSelect = onEmergencyDialer))
             }
-            add(ClassicOptionAction(label = "Contacts", onSelect = onOpenContacts))
-            if (state.qualification.needsRepair && state.qualification.telephonySupported) {
-                add(ClassicOptionAction(label = "Repair phone access", onSelect = onRepairPhone))
+
+            CommunicationRoute.ACTIVE_CALL -> {
+                val call = state.call
+                val speakerActive = call?.audioRoute == AudioRoute.SPEAKER
+                add(
+                    ClassicOptionAction(
+                        label = if (speakerActive) earpieceLabel else speakerLabel,
+                        enabled = call?.capabilities?.canChangeAudioRoute == true,
+                        onSelect = {
+                            onAudioRoute(
+                                if (speakerActive) AudioRoute.EARPIECE else AudioRoute.SPEAKER,
+                            )
+                        },
+                    ),
+                )
+                add(
+                    ClassicOptionAction(
+                        label = if (call?.isMuted == true) unmuteLabel else muteLabel,
+                        enabled = call?.capabilities?.canMute == true,
+                        onSelect = onToggleMute,
+                    ),
+                )
+                add(
+                    ClassicOptionAction(
+                        label = if (call?.phase == CallPhase.ON_HOLD) resumeLabel else holdLabel,
+                        enabled = call?.capabilities?.canHold == true,
+                        onSelect = onToggleHold,
+                    ),
+                )
+                add(
+                    ClassicOptionAction(
+                        label = swapLabel,
+                        enabled = call?.capabilities?.canSwap == true,
+                        onSelect = onSwap,
+                    ),
+                )
             }
-            add(ClassicOptionAction(label = "Emergency call", onSelect = onEmergencyDialer))
-        }
 
-        CommunicationRoute.CALL_CONFIRMATION -> {
-            add(ClassicOptionAction(label = "Contacts", onSelect = onOpenContacts))
-            add(ClassicOptionAction(label = "Emergency call", onSelect = onEmergencyDialer))
-        }
+            CommunicationRoute.MISSED_CALL,
+            CommunicationRoute.CALL_UNANSWERED,
+            CommunicationRoute.CALL_ENDED,
+            CommunicationRoute.CALL_FAILED,
+            -> {
+                if (callbackAction != null) {
+                    add(ClassicOptionAction(label = callBackLabel, onSelect = callbackAction))
+                }
+                add(ClassicOptionAction(label = contactsLabel, onSelect = onOpenContacts))
+                if (state.qualification.needsRepair && state.qualification.telephonySupported) {
+                    add(ClassicOptionAction(label = repairPhoneLabel, onSelect = onRepairPhone))
+                }
+                add(ClassicOptionAction(label = emergencyCallLabel, onSelect = onEmergencyDialer))
+            }
 
-        CommunicationRoute.INCOMING_CALL,
-        CommunicationRoute.EXTERNAL_HANDOFF,
-        -> Unit
+            CommunicationRoute.CALL_CONFIRMATION -> {
+                add(ClassicOptionAction(label = contactsLabel, onSelect = onOpenContacts))
+                add(ClassicOptionAction(label = emergencyCallLabel, onSelect = onEmergencyDialer))
+            }
+
+            CommunicationRoute.INCOMING_CALL,
+            CommunicationRoute.EXTERNAL_HANDOFF,
+            -> Unit
+        }
     }
 }
 
@@ -460,6 +489,11 @@ private fun ClassicCommunicationDisplay(
 ) {
     when (state.route) {
         CommunicationRoute.DIALER -> {
+            val numberDescription = if (state.digits.isBlank()) {
+                stringResource(R.string.classic_phone_number_empty)
+            } else {
+                stringResource(R.string.classic_phone_number_value, state.digits)
+            }
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -467,7 +501,9 @@ private fun ClassicCommunicationDisplay(
                 verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 ClassicLtrText(
-                    text = state.digits.ifBlank { "Enter a number" },
+                    text = state.digits.ifBlank {
+                        stringResource(R.string.classic_enter_number)
+                    },
                     color = ClassicInk,
                     fontSize = 34.sp,
                     lineHeight = 40.sp,
@@ -477,21 +513,21 @@ private fun ClassicCommunicationDisplay(
                         .fillMaxWidth()
                         .padding(horizontal = 6.dp, vertical = 10.dp)
                         .semantics {
-                            contentDescription = "Phone number ${state.digits.ifBlank { "empty" }}"
+                            contentDescription = numberDescription
                         },
                 )
                 if (!state.qualification.canOwnCalls) {
                     ClaroInfoCard(
                         text = if (!state.qualification.telephonySupported) {
-                            "Calling is not available on this device."
+                            stringResource(R.string.classic_calling_unavailable)
                         } else {
-                            "Phone access needs attention."
+                            stringResource(R.string.classic_phone_access_attention)
                         },
                         tone = ClaroBannerTone.WARNING,
                     )
                     if (state.qualification.telephonySupported) {
                         ClassicLightButton(
-                            label = "Repair phone access",
+                            label = stringResource(R.string.classic_repair_phone_access),
                             onClick = onRepairPhone,
                             color = ClaroColors.Blue,
                             textColor = Color.White,
@@ -503,11 +539,11 @@ private fun ClassicCommunicationDisplay(
                     val isMissed = entry.outcome == CallOutcome.MISSED_INCOMING
                     val timeLabel = formatCallHistoryTimestamp(entry.timestampMillis)
                     ClassicRowItem(
-                        title = entry.identity.accessibleName,
+                        title = entry.identity.classicAccessibleName(),
                         subtitle = if (isMissed) {
-                            "Missed · $timeLabel"
+                            stringResource(R.string.classic_history_missed, timeLabel)
                         } else {
-                            "Recent · $timeLabel"
+                            stringResource(R.string.classic_history_recent, timeLabel)
                         },
                         unreadDot = isMissed && !entry.isOpened,
                         onClick = { onOpenHistoryEntry(entry.id) },
@@ -523,7 +559,7 @@ private fun ClassicCommunicationDisplay(
                     )
                 }
                 ClassicRowItem(
-                    title = "Contacts",
+                    title = stringResource(R.string.classic_contacts),
                     onClick = onOpenContacts,
                     leading = {
                         ClaroIcon(
@@ -534,16 +570,20 @@ private fun ClassicCommunicationDisplay(
                     },
                 )
                 ClaroEmergencyButton(
-                    label = "Emergency call",
+                    label = stringResource(R.string.classic_emergency_call),
                     onClick = onEmergencyDialer,
                 )
                 state.message?.takeIf { it.isNotBlank() }?.let { msg ->
-                    ClaroInfoCard(text = msg, tone = ClaroBannerTone.INFO)
+                    ClaroInfoCard(
+                        text = localizeCommunicationMessage(msg, state.failure),
+                        tone = ClaroBannerTone.INFO,
+                    )
                 }
             }
         }
 
         CommunicationRoute.CONTACTS -> {
+            val searchLabel = stringResource(R.string.classic_search_name_or_number)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -551,7 +591,7 @@ private fun ClassicCommunicationDisplay(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(
-                    text = "Search name or number",
+                    text = searchLabel,
                     color = ClassicInk,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
@@ -560,14 +600,16 @@ private fun ClassicCommunicationDisplay(
                 OutlinedTextField(
                     value = state.contactQuery,
                     onValueChange = onSearchContacts,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { contentDescription = searchLabel },
                     singleLine = true,
                     textStyle = TextStyle(fontSize = 23.sp),
                     shape = RectangleShape,
                 )
                 if (!state.qualification.roleHeld && state.qualification.telephonySupported) {
                     ClassicLightButton(
-                        label = "Repair phone access",
+                        label = stringResource(R.string.classic_repair_phone_access),
                         onClick = onRepairPhone,
                         color = ClaroColors.WarningBg,
                         textColor = ClaroColors.WarningInk,
@@ -575,13 +617,16 @@ private fun ClassicCommunicationDisplay(
                     )
                 }
                 if (state.contactsLoading) {
-                    ClaroInfoCard(text = "Loading contacts…", tone = ClaroBannerTone.INFO)
+                    ClaroInfoCard(
+                        text = stringResource(R.string.classic_loading_contacts),
+                        tone = ClaroBannerTone.INFO,
+                    )
                 } else if (state.contacts.isEmpty()) {
                     ClaroInfoCard(
                         text = if (state.contactQuery.isBlank()) {
-                            "No contacts yet."
+                            stringResource(R.string.classic_no_contacts_yet)
                         } else {
-                            "No matches."
+                            stringResource(R.string.classic_no_matches)
                         },
                         tone = ClaroBannerTone.INFO,
                     )
@@ -602,7 +647,7 @@ private fun ClassicCommunicationDisplay(
                 }
                 if (state.contactsNextOffset != null && !state.contactsLoading) {
                     ClassicLightButton(
-                        label = "More contacts",
+                        label = stringResource(R.string.classic_more_contacts),
                         onClick = onLoadMoreContacts,
                     )
                 }
@@ -620,10 +665,14 @@ private fun ClassicCommunicationDisplay(
             ) {
                 if (contact == null) {
                     ClaroInfoCard(
-                        text = state.message ?: "Contact is no longer available",
+                        text = state.message?.let { localizeCommunicationMessage(it, state.failure) }
+                            ?: stringResource(R.string.classic_contact_unavailable),
                         tone = ClaroBannerTone.WARNING,
                     )
-                    ClassicLightButton(label = "Contacts", onClick = onOpenContacts)
+                    ClassicLightButton(
+                        label = stringResource(R.string.classic_contacts),
+                        onClick = onOpenContacts,
+                    )
                 } else {
                     ClaroAvatar(name = contact.displayName, size = 72.dp)
                     DisplayName(contact.displayName)
@@ -661,9 +710,9 @@ private fun ClassicCommunicationDisplay(
                         identity.isPrivate ||
                         identity.displayName.isNullOrBlank(),
                 )
-                DisplayName(identity?.accessibleName ?: "Unknown caller")
-                DisplayNumber(formatDisplayNumber(identity))
-                DisplayHint("Press Call to confirm")
+                DisplayName(identity.classicAccessibleName())
+                DisplayNumber(identity)
+                DisplayHint(stringResource(R.string.classic_press_call_to_confirm))
             }
         }
 
@@ -683,9 +732,9 @@ private fun ClassicCommunicationDisplay(
                         identity.isPrivate ||
                         identity.displayName.isNullOrBlank(),
                 )
-                DisplayName(identity?.accessibleName ?: "Unknown caller")
-                DisplayNumber(formatDisplayNumber(identity))
-                DisplayHint("Answer with the green key")
+                DisplayName(identity.classicAccessibleName())
+                DisplayNumber(identity)
+                DisplayHint(stringResource(R.string.classic_answer_with_green_key))
             }
         }
 
@@ -715,19 +764,31 @@ private fun ClassicCommunicationDisplay(
                     call?.phase in setOf(CallPhase.CONNECTED, CallPhase.ON_HOLD) &&
                     duration != null
                 ) {
-                    val stateWord = if (call?.phase == CallPhase.ON_HOLD) "On hold" else "Connected"
+                    val stateWord = if (call?.phase == CallPhase.ON_HOLD) {
+                        stringResource(R.string.classic_call_on_hold)
+                    } else {
+                        stringResource(R.string.classic_call_connected)
+                    }
                     val formattedDuration = duration.formatCallDuration()
+                    val statusLine = stringResource(
+                        R.string.classic_call_status_duration,
+                        stateWord,
+                        formattedDuration,
+                    )
                     Text(
                         text = buildAnnotatedString {
-                            append("$stateWord · ")
-                            withStyle(
-                                SpanStyle(
-                                    fontSize = 28.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF475569),
-                                ),
-                            ) {
-                                append(formattedDuration)
+                            append(statusLine)
+                            val durationStart = statusLine.indexOf(formattedDuration)
+                            if (durationStart >= 0) {
+                                addStyle(
+                                    SpanStyle(
+                                        fontSize = 28.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF475569),
+                                    ),
+                                    start = durationStart,
+                                    end = durationStart + formattedDuration.length,
+                                )
                             }
                         },
                         color = Color(0xFF55647B),
@@ -739,9 +800,11 @@ private fun ClassicCommunicationDisplay(
                 } else {
                     DisplayHint(
                         when (call?.phase) {
-                            CallPhase.DIALING -> "Dialing…"
-                            CallPhase.RINGING -> "Ringing…"
-                            else -> state.message ?: "Waiting for phone service"
+                            CallPhase.DIALING -> stringResource(R.string.classic_call_dialing)
+                            CallPhase.RINGING -> stringResource(R.string.classic_call_ringing)
+                            else -> state.message?.let {
+                                localizeCommunicationMessage(it, state.failure)
+                            } ?: stringResource(R.string.classic_waiting_phone_service)
                         },
                     )
                 }
@@ -752,15 +815,19 @@ private fun ClassicCommunicationDisplay(
                         resolvedIdentity.isPrivate ||
                         resolvedIdentity.displayName.isNullOrBlank(),
                 )
-                DisplayName(resolvedIdentity?.accessibleName ?: "Unknown caller")
-                DisplayNumber(formatDisplayNumber(resolvedIdentity))
+                DisplayName(resolvedIdentity.classicAccessibleName())
+                DisplayNumber(resolvedIdentity)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     val speakerActive = call?.audioRoute == AudioRoute.SPEAKER
                     ClassicLightButton(
-                        label = if (speakerActive) "Earpiece" else "Speaker",
+                        label = if (speakerActive) {
+                            stringResource(R.string.classic_earpiece)
+                        } else {
+                            stringResource(R.string.classic_speaker)
+                        },
                         onClick = {
                             onAudioRoute(
                                 if (speakerActive) AudioRoute.EARPIECE else AudioRoute.SPEAKER,
@@ -771,7 +838,11 @@ private fun ClassicCommunicationDisplay(
                         minHeight = 48,
                     )
                     ClassicLightButton(
-                        label = if (call?.isMuted == true) "Unmute" else "Mute",
+                        label = if (call?.isMuted == true) {
+                            stringResource(R.string.classic_unmute)
+                        } else {
+                            stringResource(R.string.classic_mute)
+                        },
                         onClick = onToggleMute,
                         modifier = Modifier.weight(1f),
                         enabled = call?.capabilities?.canMute == true,
@@ -783,14 +854,18 @@ private fun ClassicCommunicationDisplay(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     ClassicLightButton(
-                        label = if (call?.phase == CallPhase.ON_HOLD) "Resume" else "Hold",
+                        label = if (call?.phase == CallPhase.ON_HOLD) {
+                            stringResource(R.string.classic_resume_call)
+                        } else {
+                            stringResource(R.string.classic_hold_call)
+                        },
                         onClick = onToggleHold,
                         modifier = Modifier.weight(1f),
                         enabled = call?.capabilities?.canHold == true,
                         minHeight = 48,
                     )
                     ClassicLightButton(
-                        label = "Swap",
+                        label = stringResource(R.string.classic_swap_call),
                         onClick = onSwap,
                         modifier = Modifier.weight(1f),
                         enabled = call?.capabilities?.canSwap == true,
@@ -820,34 +895,38 @@ private fun ClassicCommunicationDisplay(
                         resolvedIdentity.isPrivate ||
                         resolvedIdentity.displayName.isNullOrBlank(),
                 )
-                DisplayName(resolvedIdentity?.accessibleName ?: "Unknown caller")
-                DisplayNumber(formatDisplayNumber(resolvedIdentity))
+                DisplayName(resolvedIdentity.classicAccessibleName())
+                DisplayNumber(resolvedIdentity)
                 when (state.route) {
                     CommunicationRoute.CALL_ENDED -> {
                         val duration = state.call?.connectedDurationMillis(SystemClock.elapsedRealtime())
                             ?: matchingHistory?.connectedDurationMillis
                         if (duration != null) {
-                            ClassicLtrText(
-                                text = "Duration · ${duration.formatCallDuration()}",
+                            Text(
+                                text = stringResource(
+                                    R.string.classic_call_duration,
+                                    duration.formatCallDuration(),
+                                ),
                                 color = Color(0xFF475569),
                                 fontSize = 22.sp,
                                 lineHeight = 26.sp,
                                 fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
                             )
                         } else {
-                            DisplayHint("Call ended")
+                            DisplayHint(stringResource(R.string.classic_call_ended))
                         }
                     }
 
                     CommunicationRoute.MISSED_CALL -> {
                         DisplayHint(
                             matchingHistory?.let { formatCallHistoryTimestamp(it.timestampMillis) }
-                                ?: "Missed call",
+                                ?: stringResource(R.string.classic_missed_call),
                         )
                     }
 
                     CommunicationRoute.CALL_UNANSWERED -> {
-                        DisplayHint("No answer")
+                        DisplayHint(stringResource(R.string.classic_no_answer))
                     }
 
                     else -> Unit
@@ -863,17 +942,23 @@ private fun ClassicCommunicationDisplay(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
+                val currentMessage = state.message
+                val failureText = when {
+                    state.failure != null -> state.failure.classicMessage()
+                    currentMessage != null -> localizeCommunicationMessage(currentMessage, null)
+                    else -> stringResource(R.string.classic_call_did_not_connect)
+                }
                 ClaroInfoCard(
-                    text = state.message ?: "The call did not connect",
+                    text = failureText,
                     tone = ClaroBannerTone.ERROR,
                 )
                 if (resolvedIdentity != null) {
-                    DisplayName(resolvedIdentity.accessibleName)
-                    DisplayNumber(formatDisplayNumber(resolvedIdentity))
+                    DisplayName(resolvedIdentity.classicAccessibleName())
+                    DisplayNumber(resolvedIdentity)
                 }
                 if (state.qualification.needsRepair && state.qualification.telephonySupported) {
                     ClassicLightButton(
-                        label = "Repair phone access",
+                        label = stringResource(R.string.classic_repair_phone_access),
                         onClick = onRepairPhone,
                         color = ClaroColors.Blue,
                         textColor = Color.White,
@@ -881,7 +966,7 @@ private fun ClassicCommunicationDisplay(
                     )
                 }
                 ClaroEmergencyButton(
-                    label = "Emergency call",
+                    label = stringResource(R.string.classic_emergency_call),
                     onClick = onEmergencyDialer,
                 )
             }
@@ -895,8 +980,11 @@ private fun ClassicCommunicationDisplay(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                DisplayName("System dialer")
-                DisplayHint(state.message ?: "Continue in the system emergency dialer")
+                DisplayName(stringResource(R.string.classic_system_dialer))
+                DisplayHint(
+                    state.message?.let { localizeCommunicationMessage(it, state.failure) }
+                        ?: stringResource(R.string.classic_continue_system_emergency_dialer),
+                )
             }
         }
     }
@@ -915,15 +1003,31 @@ private fun DisplayName(value: String) {
 }
 
 @Composable
-private fun DisplayNumber(value: String) {
-    ClassicLtrText(
-        text = value,
-        color = ClassicInk,
-        fontSize = 22.sp,
-        lineHeight = 26.sp,
-        fontWeight = FontWeight.Normal,
-        textAlign = TextAlign.Center,
-    )
+private fun DisplayNumber(identity: CallerIdentity?) {
+    val hasDirectNumber = identity?.isPrivate != true && !identity?.number.isNullOrBlank()
+    if (hasDirectNumber) {
+        ClassicLtrText(
+            text = identity?.number.orEmpty(),
+            color = ClassicInk,
+            fontSize = 22.sp,
+            lineHeight = 26.sp,
+            fontWeight = FontWeight.Normal,
+            textAlign = TextAlign.Center,
+        )
+    } else {
+        Text(
+            text = if (identity?.isPrivate == true) {
+                stringResource(R.string.classic_number_withheld)
+            } else {
+                stringResource(R.string.classic_number_unavailable)
+            },
+            color = ClassicInk,
+            fontSize = 22.sp,
+            lineHeight = 26.sp,
+            fontWeight = FontWeight.Normal,
+            textAlign = TextAlign.Center,
+        )
+    }
 }
 
 @Composable
@@ -938,22 +1042,70 @@ private fun DisplayHint(value: String) {
     )
 }
 
-private fun formatDisplayNumber(identity: CallerIdentity?): String = when {
-    identity?.isPrivate == true -> "Number withheld"
-    !identity?.number.isNullOrBlank() -> identity.number.orEmpty()
-    else -> "Number unavailable"
+@Composable
+private fun CallerIdentity?.classicAccessibleName(): String = when {
+    this == null -> stringResource(R.string.classic_unknown_caller)
+    isPrivate -> stringResource(R.string.classic_private_number)
+    !displayName.isNullOrBlank() -> displayName.orEmpty()
+    !number.isNullOrBlank() -> number.orEmpty()
+    else -> stringResource(R.string.classic_unknown_caller)
 }
 
+@Composable
+private fun CallFailure?.classicMessage(): String = when (this) {
+    CallFailure.INVALID_NUMBER -> stringResource(R.string.classic_call_failure_invalid_number)
+    CallFailure.NO_SIM -> stringResource(R.string.classic_call_failure_no_sim)
+    CallFailure.NO_SERVICE -> stringResource(R.string.classic_call_failure_no_service)
+    CallFailure.ROLE_LOST -> stringResource(R.string.classic_call_failure_role_lost)
+    CallFailure.PERMISSION_DENIED -> stringResource(R.string.classic_call_failure_permission_denied)
+    CallFailure.ACCOUNT_UNAVAILABLE ->
+        stringResource(R.string.classic_call_failure_account_unavailable)
+    CallFailure.NETWORK_FAILURE -> stringResource(R.string.classic_call_failure_network)
+    CallFailure.UNKNOWN, null -> stringResource(R.string.classic_call_did_not_connect)
+}
+
+@Composable
+private fun localizeCommunicationMessage(
+    rawMessage: String,
+    failure: CallFailure?,
+): String {
+    if (failure != null) return failure.classicMessage()
+    val holdNotSetMatch = Regex("^Hold ([12]) is not set$").matchEntire(rawMessage)
+    if (holdNotSetMatch != null) {
+        return stringResource(R.string.classic_hold_slot_not_set, holdNotSetMatch.groupValues[1])
+    }
+    val holdRepairMatch = Regex("^Ask your caregiver to repair Hold ([12])$").matchEntire(rawMessage)
+    if (holdRepairMatch != null) {
+        return stringResource(
+            R.string.classic_hold_slot_needs_repair,
+            holdRepairMatch.groupValues[1],
+        )
+    }
+    return when (rawMessage) {
+        "Call canceled" -> stringResource(R.string.classic_msg_call_canceled)
+        "Continue in the system emergency dialer" ->
+            stringResource(R.string.classic_continue_system_emergency_dialer)
+        "Contact is no longer available" -> stringResource(R.string.classic_contact_unavailable)
+        else -> rawMessage
+    }
+}
+
+@Composable
 private fun formatCallHistoryTimestamp(timestampMillis: Long): String {
-    if (timestampMillis <= 0L) return "Recent"
+    if (timestampMillis <= 0L) return stringResource(R.string.classic_timestamp_recent)
+    val locale = LocalConfiguration.current.locales[0] ?: Locale.ENGLISH
     val zone = ZoneId.systemDefault()
     val zonedTime = Instant.ofEpochMilli(timestampMillis).atZone(zone)
-    val timeText = zonedTime.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))
+    val timeText = zonedTime.format(
+        DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withLocale(locale),
+    )
     return if (zonedTime.toLocalDate() == LocalDate.now(zone)) {
-        "Today · $timeText"
+        stringResource(R.string.classic_timestamp_today, timeText)
     } else {
-        val dateText = zonedTime.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT))
-        "$dateText · $timeText"
+        val dateText = zonedTime.format(
+            DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT).withLocale(locale),
+        )
+        stringResource(R.string.classic_timestamp_date_time, dateText, timeText)
     }
 }
 
@@ -974,16 +1126,17 @@ private fun isCenteredHeaderRoute(route: CommunicationRoute): Boolean = when (ro
     -> false
 }
 
+@Composable
 private fun classicTitle(route: CommunicationRoute): String = when (route) {
-    CommunicationRoute.DIALER -> "Phone"
-    CommunicationRoute.CONTACTS -> "Contacts"
-    CommunicationRoute.CONTACT_DETAIL -> "Contact"
-    CommunicationRoute.CALL_CONFIRMATION -> "Confirm call"
-    CommunicationRoute.INCOMING_CALL -> "Incoming call"
-    CommunicationRoute.ACTIVE_CALL -> "Call"
-    CommunicationRoute.CALL_ENDED -> "Call ended"
-    CommunicationRoute.MISSED_CALL -> "Missed call"
-    CommunicationRoute.CALL_UNANSWERED -> "No answer"
-    CommunicationRoute.CALL_FAILED -> "Call failed"
-    CommunicationRoute.EXTERNAL_HANDOFF -> "System dialer"
+    CommunicationRoute.DIALER -> stringResource(R.string.classic_phone_title)
+    CommunicationRoute.CONTACTS -> stringResource(R.string.classic_contacts)
+    CommunicationRoute.CONTACT_DETAIL -> stringResource(R.string.classic_contact)
+    CommunicationRoute.CALL_CONFIRMATION -> stringResource(R.string.classic_confirm_call)
+    CommunicationRoute.INCOMING_CALL -> stringResource(R.string.classic_incoming_call)
+    CommunicationRoute.ACTIVE_CALL -> stringResource(R.string.classic_active_call_title)
+    CommunicationRoute.CALL_ENDED -> stringResource(R.string.classic_call_ended)
+    CommunicationRoute.MISSED_CALL -> stringResource(R.string.classic_missed_call)
+    CommunicationRoute.CALL_UNANSWERED -> stringResource(R.string.classic_no_answer)
+    CommunicationRoute.CALL_FAILED -> stringResource(R.string.classic_call_failed)
+    CommunicationRoute.EXTERNAL_HANDOFF -> stringResource(R.string.classic_system_dialer)
 }

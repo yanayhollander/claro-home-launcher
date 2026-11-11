@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="comm_channel_incoming_calls_name">Incoming calls</string>
+    <string name="comm_channel_incoming_calls_description">Incoming phone calls</string>
+    <string name="comm_notification_incoming_call_text">Incoming call</string>
+    <string name="comm_notification_action_decline">Decline</string>
+    <string name="comm_notification_action_answer">Answer</string>
+    <string name="comm_caller_private_number">Private number</string>
+    <string name="comm_caller_unknown">Unknown caller</string>
+    <string name="comm_contact_name_and_number_required">Name and number are required</string>
+    <string name="comm_contact_not_saved">Contact was not saved</string>
+    <string name="comm_contact_saved_not_opened">Contact was saved but could not be opened</string>
+    <string name="comm_contact_not_found">Contact not found</string>
+    <string name="comm_contact_change_failed">Contact change failed</string>
+    <string name="comm_channel_messages_name">Messages</string>
+    <string name="comm_channel_messages_description">Incoming text and multimedia messages</string>
+    <string name="comm_notification_new_sms_title">New message</string>
+    <string name="comm_notification_new_sms_text">Open Claro to read it</string>
+    <string name="comm_notification_new_mms_title">New multimedia message</string>
+    <string name="comm_notification_new_mms_text">Open Claro to download or review the failure</string>
+    <string name="comm_mms_fallback_subject">Multimedia message</string>
+    <string name="comm_mms_group_or_multimedia">Group or multimedia message</string>
+    <string name="comm_mms_download_required_subject">Multimedia message — download required</string>
+</resources>

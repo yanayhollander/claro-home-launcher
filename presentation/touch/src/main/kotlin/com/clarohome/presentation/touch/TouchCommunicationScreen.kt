@@ -44,8 +44,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -76,6 +78,7 @@ import com.clarohome.core.design.LocalClaroHaptics
 import com.clarohome.feature.communication.AssignmentStatus
 import com.clarohome.feature.communication.AudioRoute
 import com.clarohome.feature.communication.CallDirection
+import com.clarohome.feature.communication.CallFailure
 import com.clarohome.feature.communication.CallHistoryEntry
 import com.clarohome.feature.communication.CallOutcome
 import com.clarohome.feature.communication.CallPhase
@@ -86,14 +89,21 @@ import com.clarohome.feature.communication.CommunicationUiState
 import com.clarohome.feature.communication.ContactNumber
 import com.clarohome.feature.communication.PhoneContactsCoordinator
 import com.clarohome.feature.communication.formatCallDuration
+import com.clarohome.presentation.touch.R
 import java.text.DateFormat
 import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.delay
 
-private enum class DialerTab(val label: String) {
-    KEYPAD("Keypad"),
-    RECENT("Recent"),
-    MISSED("Missed"),
+private enum class DialerTab {
+    KEYPAD,
+    RECENT,
+    MISSED,
+}
+
+private enum class ContactEditorError {
+    INVALID_PRIMARY,
+    INVALID_SECONDARY,
 }
 
 @Composable
@@ -133,7 +143,7 @@ fun TouchCommunicationScreen(
     var draftName by rememberSaveable { mutableStateOf("") }
     var draftPrimaryNumber by rememberSaveable { mutableStateOf("") }
     var draftSecondaryNumber by rememberSaveable { mutableStateOf("") }
-    var editorError by rememberSaveable { mutableStateOf<String?>(null) }
+    var editorError by rememberSaveable { mutableStateOf<ContactEditorError?>(null) }
 
     Column(
         modifier = Modifier
@@ -149,7 +159,7 @@ fun TouchCommunicationScreen(
                     name = draftName,
                     primaryNumber = draftPrimaryNumber,
                     secondaryNumber = draftSecondaryNumber,
-                    errorMessage = editorError,
+                    errorMessage = editorError?.message(),
                     onNameChange = {
                         draftName = it
                         editorError = null
@@ -170,10 +180,10 @@ fun TouchCommunicationScreen(
                             PhoneContactsCoordinator.normalizeDialString(draftSecondaryNumber)
                         when {
                             trimmedName.isBlank() || normalizedPrimary.length < 3 -> {
-                                editorError = "Enter a name and a valid mobile number."
+                                editorError = ContactEditorError.INVALID_PRIMARY
                             }
                             draftSecondaryNumber.isNotBlank() && normalizedSecondary.length < 3 -> {
-                                editorError = "Enter a valid second number or leave it empty."
+                                editorError = ContactEditorError.INVALID_SECONDARY
                             }
                             else -> {
                                 editorMode = null
@@ -303,7 +313,7 @@ fun TouchCommunicationScreen(
             )
 
             state.route == CommunicationRoute.EXTERNAL_HANDOFF -> {
-                ClaroHeader(title = "Emergency dialer")
+                ClaroHeader(title = stringResource(R.string.touch_emergency_dialer_title))
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -312,12 +322,13 @@ fun TouchCommunicationScreen(
                     verticalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
                 ) {
                     ClaroInfoCard(
-                        text = state.message ?: "Continue in the system emergency dialer.",
+                        text = state.message?.let { localizedPhoneMessage(it, state.failure) }
+                            ?: stringResource(R.string.touch_emergency_handoff_message),
                     )
                 }
                 ClaroActionDock {
                     ClaroPrimaryButton(
-                        label = "Home",
+                        label = stringResource(R.string.touch_action_home),
                         onClick = onHome,
                         containerColor = ClaroColors.Blue,
                     )
@@ -341,7 +352,7 @@ private fun ColumnScope.TouchDialerRoute(
 ) {
     var selectedTab by rememberSaveable { mutableStateOf(DialerTab.KEYPAD) }
 
-    ClaroHeader(title = "Phone")
+    ClaroHeader(title = stringResource(R.string.touch_tile_phone))
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -365,7 +376,7 @@ private fun ColumnScope.TouchDialerRoute(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = tab.label,
+                    text = tab.label(),
                     color = if (isSelected) Color.White else Color(0xFF26364E),
                     fontSize = 20.sp,
                     lineHeight = 24.sp,
@@ -388,21 +399,21 @@ private fun ColumnScope.TouchDialerRoute(
             if (state.qualification.needsRepair) {
                 ClaroInfoCard(
                     text = if (!state.qualification.telephonySupported) {
-                        "Calling is not available on this device."
+                        stringResource(R.string.touch_calling_unavailable_device)
                     } else {
-                        "Phone access needs attention."
+                        stringResource(R.string.touch_phone_access_attention)
                     },
                     tone = ClaroBannerTone.WARNING,
                 )
                 if (state.qualification.telephonySupported) {
                     ClaroSecondaryButton(
-                        label = "Repair phone access",
+                        label = stringResource(R.string.touch_repair_phone_access),
                         onClick = onRepairPhone,
                     )
                 }
             }
             state.message?.let { message ->
-                ClaroInfoCard(text = message)
+                ClaroInfoCard(text = localizedPhoneMessage(message, state.failure))
             }
             DialNumberDisplayRow(
                 digits = state.digits,
@@ -419,19 +430,19 @@ private fun ColumnScope.TouchDialerRoute(
                 onDirectCall = onDirectCall,
             )
             ClaroEmergencyButton(
-                label = "Emergency call",
+                label = stringResource(R.string.touch_emergency_call),
                 onClick = onEmergencyDialer,
             )
         }
         ClaroActionDock {
             ClaroPrimaryButton(
-                label = "Call",
+                label = stringResource(R.string.touch_action_call),
                 onClick = onCallEnteredNumber,
                 containerColor = ClaroColors.Green,
                 icon = ClaroIconKind.PHONE,
             )
             ClaroSecondaryButton(
-                label = "Contacts",
+                label = stringResource(R.string.touch_contacts),
                 onClick = onOpenContacts,
                 icon = ClaroIconKind.CONTACT,
             )
@@ -458,15 +469,15 @@ private fun ColumnScope.TouchDialerRoute(
                     Column(verticalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap)) {
                         ClaroInfoCard(
                             text = if (!state.qualification.telephonySupported) {
-                                "Calling is not available on this device."
+                                stringResource(R.string.touch_calling_unavailable_device)
                             } else {
-                                "Phone and call log access are needed to view recent calls."
+                                stringResource(R.string.touch_call_log_access_needed)
                             },
                             tone = ClaroBannerTone.WARNING,
                         )
                         if (state.qualification.telephonySupported) {
                             ClaroPrimaryButton(
-                                label = "Repair phone access",
+                                label = stringResource(R.string.touch_repair_phone_access),
                                 onClick = onRepairPhone,
                                 containerColor = ClaroColors.Blue,
                             )
@@ -475,14 +486,14 @@ private fun ColumnScope.TouchDialerRoute(
                 }
             } else if (filteredHistory.isEmpty()) {
                 item(key = "history-empty") {
-                    ClaroInfoCard(text = "No calls yet.")
+                    ClaroInfoCard(text = stringResource(R.string.touch_no_calls_yet))
                 }
             } else {
                 itemsIndexed(filteredHistory, key = { _, entry -> entry.id }) { index, entry ->
                     val unread =
                         entry.outcome == CallOutcome.MISSED_INCOMING && !entry.isOpened
                     ClaroRowButton(
-                        title = entry.identity.accessibleName,
+                        title = entry.identity.localizedCallerName(),
                         subtitle = entry.historySubtitle(),
                         unreadDot = unread,
                         leading = {
@@ -500,14 +511,14 @@ private fun ColumnScope.TouchDialerRoute(
             }
             item(key = "history-emergency") {
                 ClaroEmergencyButton(
-                    label = "Emergency call",
+                    label = stringResource(R.string.touch_emergency_call),
                     onClick = onEmergencyDialer,
                 )
             }
         }
         ClaroActionDock {
             ClaroSecondaryButton(
-                label = "Contacts",
+                label = stringResource(R.string.touch_contacts),
                 onClick = onOpenContacts,
                 icon = ClaroIconKind.CONTACT,
             )
@@ -521,6 +532,13 @@ private fun DialNumberDisplayRow(
     onBackspace: () -> Unit,
 ) {
     val isEmpty = digits.isBlank()
+    val enterNumberLabel = stringResource(R.string.touch_enter_a_number)
+    val numberDescription = if (isEmpty) {
+        stringResource(R.string.touch_dial_number_empty_a11y)
+    } else {
+        stringResource(R.string.touch_dial_number_value_a11y, digits)
+    }
+    val backspaceDescription = stringResource(R.string.touch_backspace)
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
@@ -533,19 +551,30 @@ private fun DialNumberDisplayRow(
                 .background(Color.White)
                 .padding(horizontal = 8.dp, vertical = 8.dp)
                 .semantics {
-                    contentDescription = "Phone number ${digits.ifBlank { "empty" }}"
+                    contentDescription = numberDescription
                 },
             contentAlignment = Alignment.Center,
         ) {
-            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            if (isEmpty) {
                 Text(
-                    text = digits.ifBlank { "Enter a number" },
-                    color = if (isEmpty) ClaroColors.Muted else ClaroColors.Ink,
+                    text = enterNumberLabel,
+                    color = ClaroColors.Muted,
                     fontSize = 34.sp,
                     lineHeight = 40.sp,
-                    fontWeight = if (isEmpty) FontWeight.Normal else FontWeight.SemiBold,
+                    fontWeight = FontWeight.Normal,
                     textAlign = TextAlign.Center,
                 )
+            } else {
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                    Text(
+                        text = digits,
+                        color = ClaroColors.Ink,
+                        fontSize = 34.sp,
+                        lineHeight = 40.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
         }
         val haptics = LocalClaroHaptics.current
@@ -557,7 +586,7 @@ private fun DialNumberDisplayRow(
             enabled = !isEmpty,
             modifier = Modifier
                 .size(64.dp)
-                .semantics { contentDescription = "Backspace" },
+                .semantics { contentDescription = backspaceDescription },
             shape = RoundedCornerShape(3.dp),
             border = BorderStroke(1.dp, ClaroColors.Border),
             colors = ButtonDefaults.outlinedButtonColors(
@@ -593,10 +622,18 @@ private fun SpeedDialShortcutBar(
             val assignment = state.assignments.firstOrNull { it.slot == slot }
             val nameLabel = assignment?.displayNameSnapshot?.ifBlank { "—" } ?: "—"
             val statusHint = when {
-                assignment == null -> "Speed dial $slot not set"
+                assignment == null -> stringResource(R.string.touch_speed_dial_not_set, slot)
                 assignment.status != AssignmentStatus.RESOLVED ->
-                    "Speed dial $slot, ${assignment.displayNameSnapshot}, needs repair"
-                else -> "Hold $slot to call ${assignment.displayNameSnapshot}"
+                    stringResource(
+                        R.string.touch_speed_dial_needs_repair,
+                        slot,
+                        assignment.displayNameSnapshot,
+                    )
+                else -> stringResource(
+                    R.string.touch_speed_dial_hold_to_call,
+                    slot,
+                    assignment.displayNameSnapshot,
+                )
             }
             Box(
                 modifier = Modifier
@@ -625,7 +662,7 @@ private fun SpeedDialShortcutBar(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "$slot · $nameLabel",
+                    text = stringResource(R.string.touch_speed_dial_chip, slot, nameLabel),
                     color = ClaroColors.Ink,
                     fontSize = 17.sp,
                     lineHeight = 20.sp,
@@ -671,6 +708,20 @@ private fun DialKeypadGrid(
                         val assignedName = speedDialSlot?.let { slot ->
                             state.assignments.firstOrNull { it.slot == slot }?.displayNameSnapshot
                         }
+                        val keyDescription = when {
+                            !assignedName.isNullOrBlank() ->
+                                stringResource(
+                                    R.string.touch_keypad_digit_hold_call,
+                                    digit.toString(),
+                                    assignedName,
+                                )
+                            speedDialSlot != null ->
+                                stringResource(
+                                    R.string.touch_keypad_digit_hold_speed_dial,
+                                    digit.toString(),
+                                )
+                            else -> digit.toString()
+                        }
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -692,14 +743,7 @@ private fun DialKeypadGrid(
                                     },
                                 )
                                 .semantics {
-                                    contentDescription = buildString {
-                                        append(digit)
-                                        if (assignedName != null) {
-                                            append(". Hold to call $assignedName")
-                                        } else if (speedDialSlot != null) {
-                                            append(". Hold for speed dial")
-                                        }
-                                    }
+                                    contentDescription = keyDescription
                                     role = Role.Button
                                 }
                                 .padding(vertical = 4.dp),
@@ -739,7 +783,7 @@ private fun ColumnScope.ContactListRoute(
     onRepairPhone: () -> Unit,
     onAddPerson: () -> Unit,
 ) {
-    ClaroHeader(title = "Contacts")
+    ClaroHeader(title = stringResource(R.string.touch_contacts))
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -750,7 +794,7 @@ private fun ColumnScope.ContactListRoute(
             ),
         verticalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
     ) {
-        PhoneFieldLabel("Search name or number")
+        PhoneFieldLabel(stringResource(R.string.touch_search_name_or_number))
         OutlinedTextField(
             value = state.contactQuery,
             onValueChange = onSearch,
@@ -764,18 +808,18 @@ private fun ColumnScope.ContactListRoute(
         )
         if (!state.qualification.roleHeld) {
             ClaroInfoCard(
-                text = "Contacts are available, but phone access needs repair.",
+                text = stringResource(R.string.touch_contacts_phone_needs_repair),
                 tone = ClaroBannerTone.WARNING,
             )
             if (state.qualification.telephonySupported) {
                 ClaroSecondaryButton(
-                    label = "Repair phone access",
+                    label = stringResource(R.string.touch_repair_phone_access),
                     onClick = onRepairPhone,
                 )
             }
         }
         state.message?.let { message ->
-            ClaroInfoCard(text = message)
+            ClaroInfoCard(text = localizedPhoneMessage(message, state.failure))
         }
     }
     LazyColumn(
@@ -788,7 +832,11 @@ private fun ColumnScope.ContactListRoute(
         if (!state.contactsLoading && state.contacts.isEmpty()) {
             item(key = "contacts-empty") {
                 ClaroInfoCard(
-                    text = if (state.contactQuery.isBlank()) "No contacts yet." else "No matches.",
+                    text = if (state.contactQuery.isBlank()) {
+                        stringResource(R.string.touch_no_contacts_yet)
+                    } else {
+                        stringResource(R.string.touch_no_matches)
+                    },
                 )
             }
         }
@@ -809,20 +857,20 @@ private fun ColumnScope.ContactListRoute(
         if (state.contactsNextOffset != null && !state.contactsLoading) {
             item(key = "contacts-load-more") {
                 ClaroSecondaryButton(
-                    label = "Load more contacts",
+                    label = stringResource(R.string.touch_load_more_contacts),
                     onClick = onLoadMore,
                 )
             }
         }
         if (state.contactsLoading) {
             item(key = "contacts-loading") {
-                ClaroInfoCard(text = "Loading contacts")
+                ClaroInfoCard(text = stringResource(R.string.touch_loading_contacts))
             }
         }
     }
     ClaroActionDock {
         ClaroSecondaryButton(
-            label = "Add person",
+            label = stringResource(R.string.touch_add_person),
             onClick = onAddPerson,
             icon = ClaroIconKind.CONTACT,
         )
@@ -842,9 +890,10 @@ private fun ColumnScope.ContactDetailRoute(
 ) {
     val contact = state.selectedContact
     var confirmDelete by rememberSaveable(contact?.lookupKey) { mutableStateOf(false) }
+    val contactTitleFallback = stringResource(R.string.touch_contact_title)
 
     if (contact == null) {
-        ClaroHeader(title = "Contact")
+        ClaroHeader(title = contactTitleFallback)
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -853,13 +902,14 @@ private fun ColumnScope.ContactDetailRoute(
             verticalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
         ) {
             ClaroInfoCard(
-                text = state.message ?: "Contact is no longer available",
+                text = state.message?.let { localizedPhoneMessage(it, state.failure) }
+                    ?: stringResource(R.string.touch_contact_unavailable),
                 tone = ClaroBannerTone.WARNING,
             )
         }
         ClaroActionDock {
             ClaroPrimaryButton(
-                label = "Contacts",
+                label = stringResource(R.string.touch_contacts),
                 onClick = onOpenContacts,
                 containerColor = ClaroColors.Blue,
                 icon = ClaroIconKind.CONTACT,
@@ -872,7 +922,7 @@ private fun ColumnScope.ContactDetailRoute(
     val isSosLinked = linkedAssignments.any { it.slot.equals("sos", ignoreCase = true) }
     val isSpeedDialLinked = linkedAssignments.any { !it.slot.equals("sos", ignoreCase = true) }
 
-    ClaroHeader(title = contact.displayName.ifBlank { "Contact" })
+    ClaroHeader(title = contact.displayName.ifBlank { contactTitleFallback })
     Column(
         modifier = Modifier
             .weight(1f)
@@ -903,24 +953,31 @@ private fun ColumnScope.ContactDetailRoute(
         }
 
         state.message?.let { message ->
-            ClaroInfoCard(text = message)
+            ClaroInfoCard(text = localizedPhoneMessage(message, state.failure))
         }
 
         if (confirmDelete && canManageContacts) {
             ClaroInfoCard(
                 text = when {
                     isSosLinked ->
-                        "${contact.displayName} is your SOS contact. Replace the SOS contact in Settings before deleting."
+                        stringResource(R.string.touch_contact_delete_sos_blocked, contact.displayName)
                     isSpeedDialLinked ->
-                        "Delete ${contact.displayName}? Speed-dial and favorite shortcuts using this contact will be cleared."
+                        stringResource(
+                            R.string.touch_contact_delete_confirm_speed_dial,
+                            contact.displayName,
+                        )
                     else ->
-                        "Delete ${contact.displayName}? Favorites using this contact will be cleared."
+                        stringResource(
+                            R.string.touch_contact_delete_confirm_favorites,
+                            contact.displayName,
+                        )
                 },
                 tone = if (isSosLinked) ClaroBannerTone.ERROR else ClaroBannerTone.WARNING,
             )
         } else {
             val multipleNumbers = contact.numbers.size > 1
             contact.numbers.forEach { number ->
+                val numberLabel = number.localizedLabel()
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -934,7 +991,7 @@ private fun ColumnScope.ContactDetailRoute(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = number.label,
+                            text = numberLabel,
                             color = ClaroColors.Muted,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -950,9 +1007,13 @@ private fun ColumnScope.ContactDetailRoute(
                     }
                     ClaroPrimaryButton(
                         label = if (multipleNumbers) {
-                            "Call ${number.label} · ${number.value}"
+                            stringResource(
+                                R.string.touch_call_labeled_number,
+                                numberLabel,
+                                number.value,
+                            )
                         } else {
-                            "Call ${contact.displayName}"
+                            stringResource(R.string.touch_favorite_action_call, contact.displayName)
                         },
                         onClick = { onChooseNumber(number) },
                         containerColor = ClaroColors.Green,
@@ -960,9 +1021,9 @@ private fun ColumnScope.ContactDetailRoute(
                     )
                     ClaroSecondaryButton(
                         label = if (multipleNumbers) {
-                            "Write a message · ${number.label}"
+                            stringResource(R.string.touch_write_message_labeled, numberLabel)
                         } else {
-                            "Write a message"
+                            stringResource(R.string.touch_write_message)
                         },
                         onClick = { onMessageNumber(number.value, contact.displayName) },
                         icon = ClaroIconKind.MESSAGES,
@@ -975,12 +1036,12 @@ private fun ColumnScope.ContactDetailRoute(
     ClaroActionDock {
         if (confirmDelete && canManageContacts) {
             ClaroSecondaryButton(
-                label = "Cancel",
+                label = stringResource(R.string.touch_action_cancel),
                 onClick = { confirmDelete = false },
             )
             if (!isSosLinked) {
                 ClaroPrimaryButton(
-                    label = "Delete",
+                    label = stringResource(R.string.touch_action_delete),
                     onClick = {
                         confirmDelete = false
                         onDeleteContact(contact.lookupKey)
@@ -990,12 +1051,12 @@ private fun ColumnScope.ContactDetailRoute(
             }
         } else {
             ClaroSecondaryButton(
-                label = "Edit",
+                label = stringResource(R.string.touch_action_edit),
                 enabled = contact.canEdit,
                 onClick = { onEditContact(contact) },
             )
             ClaroSecondaryButton(
-                label = "Delete",
+                label = stringResource(R.string.touch_action_delete),
                 enabled = contact.canDelete,
                 onClick = {
                     if (canManageContacts) {
@@ -1022,7 +1083,13 @@ private fun ColumnScope.ContactEditorView(
     onSave: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    ClaroHeader(title = if (isEdit) "Edit contact" else "Add contact")
+    ClaroHeader(
+        title = if (isEdit) {
+            stringResource(R.string.touch_edit_contact_title)
+        } else {
+            stringResource(R.string.touch_add_contact_title)
+        },
+    )
     Column(
         modifier = Modifier
             .weight(1f)
@@ -1034,7 +1101,7 @@ private fun ColumnScope.ContactEditorView(
         errorMessage?.let { error ->
             ClaroInfoCard(text = error, tone = ClaroBannerTone.ERROR)
         }
-        PhoneFieldLabel("Name")
+        PhoneFieldLabel(stringResource(R.string.touch_field_name))
         OutlinedTextField(
             value = name,
             onValueChange = onNameChange,
@@ -1046,7 +1113,7 @@ private fun ColumnScope.ContactEditorView(
             shape = RoundedCornerShape(2.dp),
             colors = claroTextFieldColors(),
         )
-        PhoneFieldLabel("Mobile number")
+        PhoneFieldLabel(stringResource(R.string.touch_field_mobile_number))
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
             OutlinedTextField(
                 value = primaryNumber,
@@ -1061,7 +1128,7 @@ private fun ColumnScope.ContactEditorView(
                 colors = claroTextFieldColors(),
             )
         }
-        PhoneFieldLabel("Other number (optional)")
+        PhoneFieldLabel(stringResource(R.string.touch_field_other_number_optional))
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
             OutlinedTextField(
                 value = secondaryNumber,
@@ -1079,12 +1146,12 @@ private fun ColumnScope.ContactEditorView(
     }
     ClaroActionDock {
         ClaroPrimaryButton(
-            label = "Save",
+            label = stringResource(R.string.touch_action_save),
             onClick = onSave,
             containerColor = ClaroColors.Blue,
         )
         ClaroSecondaryButton(
-            label = "Cancel",
+            label = stringResource(R.string.touch_action_cancel),
             onClick = onCancel,
         )
     }
@@ -1097,7 +1164,7 @@ private fun ColumnScope.CallConfirmationRoute(
     onCancel: () -> Unit,
 ) {
     val identity = state.pendingIdentity
-    ClaroHeader(title = "Call?", centered = true)
+    ClaroHeader(title = stringResource(R.string.touch_call_confirm_title), centered = true)
     Column(
         modifier = Modifier
             .weight(1f)
@@ -1110,14 +1177,14 @@ private fun ColumnScope.CallConfirmationRoute(
         CenteredCallerBlock(
             identity = identity,
             avatarSizeDp = 112,
-            fallbackTitle = "Unknown number",
+            fallbackTitle = stringResource(R.string.touch_unknown_number),
         )
         if (!state.qualification.canOwnCalls) {
             ClaroInfoCard(
                 text = if (!state.qualification.telephonySupported) {
-                    "No SIM. Calling unavailable."
+                    stringResource(R.string.touch_no_sim_calling_unavailable)
                 } else {
-                    "Phone access needs attention."
+                    stringResource(R.string.touch_phone_access_attention)
                 },
                 tone = ClaroBannerTone.WARNING,
             )
@@ -1125,14 +1192,14 @@ private fun ColumnScope.CallConfirmationRoute(
     }
     ClaroActionDock {
         ClaroPrimaryButton(
-            label = "Call",
+            label = stringResource(R.string.touch_action_call),
             onClick = onConfirm,
             modifier = Modifier.heightIn(min = 80.dp),
             containerColor = ClaroColors.Green,
             icon = ClaroIconKind.PHONE,
         )
         ClaroSecondaryButton(
-            label = "Cancel",
+            label = stringResource(R.string.touch_action_cancel),
             onClick = onCancel,
         )
     }
@@ -1147,19 +1214,20 @@ private fun ColumnScope.IncomingCallRoute(
     val displayName = identity?.displayName?.takeIf { it.isNotBlank() }
     val number = identity?.number?.takeIf { it.isNotBlank() }
     val callerName = when {
-        identity == null -> "Unknown caller"
-        identity.isPrivate -> "Private number"
+        identity == null -> stringResource(R.string.touch_caller_unknown)
+        identity.isPrivate -> stringResource(R.string.touch_caller_private)
         displayName != null -> displayName
-        else -> "Unknown caller"
+        else -> stringResource(R.string.touch_caller_unknown)
     }
+    val isPrivate = identity?.isPrivate == true
     val callerNumber = when {
         identity == null -> null
-        identity.isPrivate -> "Number withheld"
+        isPrivate -> stringResource(R.string.touch_number_withheld)
         number != null -> number
         else -> null
     }
 
-    ClaroHeader(title = "Incoming call", centered = true)
+    ClaroHeader(title = stringResource(R.string.touch_incoming_call_title), centered = true)
     Column(
         modifier = Modifier
             .weight(1f)
@@ -1173,7 +1241,7 @@ private fun ColumnScope.IncomingCallRoute(
         ClaroAvatar(
             name = identity?.displayName,
             size = 112.dp,
-            isUnassigned = identity?.isPrivate == true || identity?.displayName.isNullOrBlank(),
+            isUnassigned = isPrivate || identity?.displayName.isNullOrBlank(),
         )
         Text(
             text = callerName,
@@ -1183,28 +1251,38 @@ private fun ColumnScope.IncomingCallRoute(
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
         )
-        callerNumber?.let { number ->
-            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        callerNumber?.let { line ->
+            if (isPrivate) {
                 Text(
-                    text = number,
+                    text = line,
                     color = ClaroColors.Muted,
                     fontSize = 23.sp,
                     lineHeight = 28.sp,
                     textAlign = TextAlign.Center,
                 )
+            } else {
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                    Text(
+                        text = line,
+                        color = ClaroColors.Muted,
+                        fontSize = 23.sp,
+                        lineHeight = 28.sp,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
         }
     }
     ClaroActionDock {
         ClaroPrimaryButton(
-            label = "Answer",
+            label = stringResource(R.string.touch_action_answer),
             onClick = onAnswer,
             modifier = Modifier.heightIn(min = 80.dp),
             containerColor = ClaroColors.Green,
             icon = ClaroIconKind.PHONE,
         )
         ClaroPrimaryButton(
-            label = "Decline",
+            label = stringResource(R.string.touch_action_decline),
             onClick = onDecline,
             containerColor = ClaroColors.Red,
             icon = ClaroIconKind.END_CALL,
@@ -1226,8 +1304,9 @@ private fun ColumnScope.ActiveCallRoute(
     val identity = call?.identity ?: state.pendingIdentity
     var showDtmfPad by rememberSaveable { mutableStateOf(false) }
     var dtmfTones by rememberSaveable { mutableStateOf("") }
+    val activeCallTitle = stringResource(R.string.touch_active_call_title)
 
-    ClaroHeader(title = "Call", centered = true)
+    ClaroHeader(title = activeCallTitle, centered = true)
     Column(
         modifier = Modifier
             .weight(1f)
@@ -1240,16 +1319,17 @@ private fun ColumnScope.ActiveCallRoute(
         CenteredCallerBlock(
             identity = identity,
             avatarSizeDp = 96,
-            fallbackTitle = "Call",
+            fallbackTitle = activeCallTitle,
         )
         val phaseLabel = when (call?.phase) {
-            CallPhase.DIALING -> "Dialing"
-            CallPhase.RINGING -> "Ringing"
-            CallPhase.CONNECTED -> "Connected"
-            CallPhase.ON_HOLD -> "On hold"
-            CallPhase.INCOMING -> "Incoming"
-            CallPhase.DISCONNECTED -> "Disconnected"
-            CallPhase.IDLE, null -> state.message ?: "Waiting for phone service"
+            CallPhase.DIALING -> stringResource(R.string.touch_call_phase_dialing)
+            CallPhase.RINGING -> stringResource(R.string.touch_call_phase_ringing)
+            CallPhase.CONNECTED -> stringResource(R.string.touch_call_phase_connected)
+            CallPhase.ON_HOLD -> stringResource(R.string.touch_call_phase_on_hold)
+            CallPhase.INCOMING -> stringResource(R.string.touch_call_phase_incoming)
+            CallPhase.DISCONNECTED -> stringResource(R.string.touch_call_phase_disconnected)
+            CallPhase.IDLE, null -> state.message?.let { localizedPhoneMessage(it, state.failure) }
+                ?: stringResource(R.string.touch_call_phase_waiting_service)
         }
         val durationMillis = rememberConnectedDuration(call?.connectedAtElapsedMillis)
         Row(
@@ -1288,7 +1368,7 @@ private fun ColumnScope.ActiveCallRoute(
         }
 
         if (call?.audioRoute == AudioRoute.BLUETOOTH) {
-            ClaroInfoCard(text = "Bluetooth")
+            ClaroInfoCard(text = stringResource(R.string.touch_audio_bluetooth))
         }
 
         if (call != null) {
@@ -1301,7 +1381,7 @@ private fun ColumnScope.ActiveCallRoute(
                     horizontalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
                 ) {
                     CallControlTile(
-                        label = "Speaker",
+                        label = stringResource(R.string.touch_call_control_speaker),
                         icon = ClaroIconKind.SPEAKER,
                         active = call.audioRoute == AudioRoute.SPEAKER,
                         enabled = call.capabilities.canChangeAudioRoute,
@@ -1317,7 +1397,7 @@ private fun ColumnScope.ActiveCallRoute(
                         modifier = Modifier.weight(1f),
                     )
                     CallControlTile(
-                        label = "Mute",
+                        label = stringResource(R.string.touch_call_control_mute),
                         icon = ClaroIconKind.MICROPHONE,
                         active = call.isMuted,
                         enabled = call.capabilities.canMute,
@@ -1330,7 +1410,11 @@ private fun ColumnScope.ActiveCallRoute(
                     horizontalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
                 ) {
                     CallControlTile(
-                        label = if (call.phase == CallPhase.ON_HOLD) "Resume" else "Hold",
+                        label = if (call.phase == CallPhase.ON_HOLD) {
+                            stringResource(R.string.touch_call_control_resume)
+                        } else {
+                            stringResource(R.string.touch_call_control_hold)
+                        },
                         icon = null,
                         active = call.phase == CallPhase.ON_HOLD,
                         enabled = call.capabilities.canHold,
@@ -1338,7 +1422,7 @@ private fun ColumnScope.ActiveCallRoute(
                         modifier = Modifier.weight(1f),
                     )
                     CallControlTile(
-                        label = "Keypad",
+                        label = stringResource(R.string.touch_tab_keypad),
                         icon = ClaroIconKind.APPS,
                         active = showDtmfPad,
                         enabled = call.capabilities.canSendDtmf,
@@ -1348,7 +1432,7 @@ private fun ColumnScope.ActiveCallRoute(
                 }
                 if (call.capabilities.canSwap) {
                     ClaroSecondaryButton(
-                        label = "Swap calls",
+                        label = stringResource(R.string.touch_call_control_swap),
                         onClick = onSwap,
                     )
                 }
@@ -1367,7 +1451,7 @@ private fun ColumnScope.ActiveCallRoute(
     }
     ClaroActionDock {
         ClaroPrimaryButton(
-            label = "End",
+            label = stringResource(R.string.touch_action_end_call),
             onClick = onEnd,
             modifier = Modifier.heightIn(min = 76.dp),
             containerColor = ClaroColors.Red,
@@ -1503,9 +1587,9 @@ private fun ColumnScope.CallOutcomeRoute(
     val identity = state.call?.identity ?: state.pendingIdentity
     val canReturnCall = identity?.canReturnCall == true
     val title = when (state.route) {
-        CommunicationRoute.MISSED_CALL -> "Missed call"
-        CommunicationRoute.CALL_UNANSWERED -> "No answer"
-        else -> "Call ended"
+        CommunicationRoute.MISSED_CALL -> stringResource(R.string.touch_outcome_missed_call_title)
+        CommunicationRoute.CALL_UNANSWERED -> stringResource(R.string.touch_history_status_no_answer)
+        else -> stringResource(R.string.touch_outcome_call_ended)
     }
 
     ClaroHeader(title = title, centered = true)
@@ -1520,12 +1604,12 @@ private fun ColumnScope.CallOutcomeRoute(
     ) {
         if (state.route == CommunicationRoute.MISSED_CALL && !state.qualification.roleHeld) {
             ClaroInfoCard(
-                text = "Phone access needs attention.",
+                text = stringResource(R.string.touch_phone_access_attention),
                 tone = ClaroBannerTone.WARNING,
             )
             if (state.qualification.telephonySupported) {
                 ClaroSecondaryButton(
-                    label = "Repair phone access",
+                    label = stringResource(R.string.touch_repair_phone_access),
                     onClick = onRepairPhone,
                 )
             }
@@ -1534,16 +1618,17 @@ private fun ColumnScope.CallOutcomeRoute(
         val displayName = identity?.displayName?.takeIf { it.isNotBlank() }
         val rawNumber = identity?.number?.takeIf { it.isNotBlank() }
         val callerName = when {
-            identity == null -> "Unknown caller"
-            identity.isPrivate -> "Private number"
+            identity == null -> stringResource(R.string.touch_caller_unknown)
+            identity.isPrivate -> stringResource(R.string.touch_caller_private)
             displayName != null -> displayName
             rawNumber != null -> rawNumber
-            else -> "Unknown caller"
+            else -> stringResource(R.string.touch_caller_unknown)
         }
-        val numberLine = when {
-            identity == null -> "Number withheld"
-            !canReturnCall -> "Number withheld"
-            else -> rawNumber
+        val withheld = identity == null || !canReturnCall
+        val numberLine = if (withheld) {
+            stringResource(R.string.touch_number_withheld)
+        } else {
+            rawNumber
         }
 
         Spacer(modifier = Modifier.height(6.dp))
@@ -1552,16 +1637,29 @@ private fun ColumnScope.CallOutcomeRoute(
             size = 112.dp,
             isUnassigned = identity?.isPrivate == true || identity?.displayName.isNullOrBlank(),
         )
-        Text(
-            text = callerName,
-            color = ClaroColors.Ink,
-            fontSize = 34.sp,
-            lineHeight = 40.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-        )
-        if (!numberLine.isNullOrBlank() && numberLine != callerName) {
+        if (displayName == null && rawNumber != null && callerName == rawNumber) {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                Text(
+                    text = callerName,
+                    color = ClaroColors.Ink,
+                    fontSize = 34.sp,
+                    lineHeight = 40.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        } else {
+            Text(
+                text = callerName,
+                color = ClaroColors.Ink,
+                fontSize = 34.sp,
+                lineHeight = 40.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+            )
+        }
+        if (!numberLine.isNullOrBlank() && numberLine != callerName) {
+            if (withheld) {
                 Text(
                     text = numberLine,
                     color = ClaroColors.Muted,
@@ -1569,6 +1667,16 @@ private fun ColumnScope.CallOutcomeRoute(
                     lineHeight = 28.sp,
                     textAlign = TextAlign.Center,
                 )
+            } else {
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                    Text(
+                        text = numberLine,
+                        color = ClaroColors.Muted,
+                        fontSize = 23.sp,
+                        lineHeight = 28.sp,
+                        textAlign = TextAlign.Center,
+                    )
+                }
             }
         }
 
@@ -1579,11 +1687,12 @@ private fun ColumnScope.CallOutcomeRoute(
         }
         if (state.route == CommunicationRoute.CALL_ENDED && connectedDuration != null) {
             val formatted = connectedDuration.formatCallDuration()
+            val durationDescription = stringResource(R.string.touch_call_duration_a11y, formatted)
             Row(
                 modifier = Modifier
                     .padding(vertical = 8.dp)
                     .semantics(mergeDescendants = true) {
-                        contentDescription = "Call duration $formatted"
+                        contentDescription = durationDescription
                     },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1609,12 +1718,16 @@ private fun ColumnScope.CallOutcomeRoute(
         } else {
             Text(
                 text = when (state.route) {
-                    CommunicationRoute.MISSED_CALL -> "Missed incoming call"
-                    CommunicationRoute.CALL_UNANSWERED -> "No answer"
+                    CommunicationRoute.MISSED_CALL ->
+                        stringResource(R.string.touch_outcome_missed_incoming)
+                    CommunicationRoute.CALL_UNANSWERED ->
+                        stringResource(R.string.touch_history_status_no_answer)
                     else -> when (state.call?.outcome) {
-                        CallOutcome.DECLINED_INCOMING -> "Call declined"
-                        CallOutcome.CANCELED_OUTGOING -> "Call canceled"
-                        else -> "Call ended"
+                        CallOutcome.DECLINED_INCOMING ->
+                            stringResource(R.string.touch_outcome_call_declined)
+                        CallOutcome.CANCELED_OUTGOING ->
+                            stringResource(R.string.touch_outcome_call_canceled)
+                        else -> stringResource(R.string.touch_outcome_call_ended)
                     }
                 },
                 color = ClaroColors.Muted,
@@ -1626,11 +1739,11 @@ private fun ColumnScope.CallOutcomeRoute(
     }
 
     ClaroActionDock {
-        if (canReturnCall && identity != null) {
+        if (canReturnCall) {
             val primaryLabel = when (state.route) {
-                CommunicationRoute.MISSED_CALL -> "Call back"
-                CommunicationRoute.CALL_UNANSWERED -> "Try again"
-                else -> "Call again"
+                CommunicationRoute.MISSED_CALL -> stringResource(R.string.touch_action_call_back)
+                CommunicationRoute.CALL_UNANSWERED -> stringResource(R.string.touch_action_try_again)
+                else -> stringResource(R.string.touch_action_call_again)
             }
             ClaroPrimaryButton(
                 label = primaryLabel,
@@ -1639,17 +1752,17 @@ private fun ColumnScope.CallOutcomeRoute(
                 icon = ClaroIconKind.PHONE,
             )
             ClaroSecondaryButton(
-                label = "Message",
-                onClick = { onMessageNumber(identity.number.orEmpty(), identity.displayName) },
+                label = stringResource(R.string.touch_action_message),
+                onClick = { onMessageNumber(identity?.number.orEmpty(), identity?.displayName) },
                 icon = ClaroIconKind.MESSAGES,
             )
             ClaroSecondaryButton(
-                label = "Home",
+                label = stringResource(R.string.touch_action_home),
                 onClick = onHome,
             )
         } else {
             ClaroPrimaryButton(
-                label = "Home",
+                label = stringResource(R.string.touch_action_home),
                 onClick = onHome,
                 containerColor = ClaroColors.Blue,
             )
@@ -1666,7 +1779,7 @@ private fun ColumnScope.CallFailedRoute(
     onHome: () -> Unit,
 ) {
     val identity = state.pendingIdentity ?: state.call?.identity
-    ClaroHeader(title = "Call not connected")
+    ClaroHeader(title = stringResource(R.string.touch_call_not_connected_title))
     Column(
         modifier = Modifier
             .weight(1f)
@@ -1676,10 +1789,12 @@ private fun ColumnScope.CallFailedRoute(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         ClaroInfoCard(
-            text = state.message ?: "The call did not connect",
+            text = state.message?.let { localizedPhoneMessage(it, state.failure) }
+                ?: stringResource(R.string.touch_call_did_not_connect),
             tone = ClaroBannerTone.ERROR,
         )
         identity?.let { target ->
+            val targetTitle = target.localizedCallerName()
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1695,13 +1810,24 @@ private fun ColumnScope.CallFailedRoute(
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     val targetNumber = target.number?.takeIf { it.isNotBlank() }
-                    Text(
-                        text = target.accessibleName,
-                        color = ClaroColors.Ink,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    if (targetNumber != null && targetNumber != target.accessibleName) {
+                    if (!target.isPrivate && target.displayName.isNullOrBlank() && targetNumber != null) {
+                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                            Text(
+                                text = targetTitle,
+                                color = ClaroColors.Ink,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = targetTitle,
+                            color = ClaroColors.Ink,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                    if (!target.isPrivate && targetNumber != null && targetNumber != targetTitle) {
                         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                             Text(
                                 text = targetNumber,
@@ -1714,26 +1840,26 @@ private fun ColumnScope.CallFailedRoute(
             }
         }
         ClaroEmergencyButton(
-            label = "Emergency call",
+            label = stringResource(R.string.touch_emergency_call),
             onClick = onEmergencyDialer,
         )
     }
     ClaroActionDock {
         if (state.qualification.needsRepair && state.qualification.telephonySupported) {
             ClaroPrimaryButton(
-                label = "Repair phone access",
+                label = stringResource(R.string.touch_repair_phone_access),
                 onClick = onRepairPhone,
                 containerColor = ClaroColors.Blue,
             )
         } else if (identity?.canReturnCall == true) {
             ClaroPrimaryButton(
-                label = "Try again",
+                label = stringResource(R.string.touch_action_try_again),
                 onClick = onRetryCall,
                 containerColor = ClaroColors.Blue,
             )
         }
         ClaroSecondaryButton(
-            label = "Home",
+            label = stringResource(R.string.touch_action_home),
             onClick = onHome,
         )
     }
@@ -1747,8 +1873,8 @@ private fun CenteredCallerBlock(
 ) {
     val displayName = identity?.displayName?.takeIf { it.isNotBlank() }
     val number = identity?.number?.takeIf { it.isNotBlank() }
-    val title = identity?.accessibleName?.ifBlank { fallbackTitle } ?: fallbackTitle
-    val showNumberBelow = number != null && number != title
+    val title = identity?.localizedCallerName(fallbackTitle)?.ifBlank { fallbackTitle } ?: fallbackTitle
+    val showNumberBelow = identity?.isPrivate != true && number != null && number != title
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1761,7 +1887,7 @@ private fun CenteredCallerBlock(
             size = avatarSizeDp.dp,
             isUnassigned = identity?.isPrivate == true || displayName == null,
         )
-        if (displayName == null && number != null) {
+        if (identity?.isPrivate != true && displayName == null && number != null) {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                 Text(
                     text = title,
@@ -1850,17 +1976,104 @@ private fun retryTargetCall(
     onCallEnteredNumber()
 }
 
+@Composable
+private fun DialerTab.label(): String = when (this) {
+    DialerTab.KEYPAD -> stringResource(R.string.touch_tab_keypad)
+    DialerTab.RECENT -> stringResource(R.string.touch_tab_recent)
+    DialerTab.MISSED -> stringResource(R.string.touch_tab_missed)
+}
+
+@Composable
+private fun ContactEditorError.message(): String = when (this) {
+    ContactEditorError.INVALID_PRIMARY -> stringResource(R.string.touch_contact_error_primary)
+    ContactEditorError.INVALID_SECONDARY -> stringResource(R.string.touch_contact_error_secondary)
+}
+
+@Composable
+internal fun ContactNumber.localizedLabel(): String = when (label.trim().lowercase(Locale.ROOT)) {
+    "mobile" -> stringResource(R.string.touch_number_label_mobile)
+    "home" -> stringResource(R.string.touch_number_label_home)
+    "work" -> stringResource(R.string.touch_number_label_work)
+    "other" -> stringResource(R.string.touch_number_label_other)
+    else -> label
+}
+
+@Composable
+private fun CallerIdentity.localizedCallerName(
+    fallback: String = stringResource(R.string.touch_caller_unknown),
+): String = when {
+    isPrivate -> stringResource(R.string.touch_caller_private)
+    !displayName.isNullOrBlank() -> displayName.orEmpty()
+    !number.isNullOrBlank() -> number.orEmpty()
+    else -> fallback
+}
+
+@Composable
+private fun localizedPhoneMessage(message: String, failure: CallFailure?): String {
+    when {
+        message == "Enter a phone number" ->
+            return stringResource(R.string.touch_phone_err_enter_number)
+        message == "Enter a valid phone number" ->
+            return stringResource(R.string.touch_phone_err_valid_number)
+        message == "This caller cannot be called back" ->
+            return stringResource(R.string.touch_phone_err_cannot_call_back)
+        message == "Call canceled" ->
+            return stringResource(R.string.touch_outcome_call_canceled)
+        message == "Waiting for phone service" ->
+            return stringResource(R.string.touch_call_phase_waiting_service)
+        message == "Continue in the system emergency dialer" ||
+            message == "Continue in the system emergency dialer." ->
+            return stringResource(R.string.touch_emergency_handoff_message)
+        message == "Contact is no longer available" ->
+            return stringResource(R.string.touch_contact_unavailable)
+        message.startsWith("Hold ") && message.endsWith(" is not set") -> {
+            val slot = message.removePrefix("Hold ").removeSuffix(" is not set")
+            return stringResource(R.string.touch_phone_hold_slot_not_set, slot)
+        }
+        message.startsWith("Ask your caregiver to repair Hold ") -> {
+            val slot = message.removePrefix("Ask your caregiver to repair Hold ")
+            return stringResource(R.string.touch_phone_hold_slot_repair, slot)
+        }
+        message.startsWith("Starting call to ") -> {
+            val target = message.removePrefix("Starting call to ")
+            val localizedTarget = when (target) {
+                "Private number" -> stringResource(R.string.touch_caller_private)
+                "Unknown caller" -> stringResource(R.string.touch_caller_unknown)
+                else -> target
+            }
+            return stringResource(R.string.touch_phone_starting_call, localizedTarget)
+        }
+    }
+    return when (failure) {
+        CallFailure.INVALID_NUMBER -> stringResource(R.string.touch_phone_err_valid_number)
+        CallFailure.NO_SIM -> stringResource(R.string.touch_phone_err_no_sim)
+        CallFailure.NO_SERVICE -> stringResource(R.string.touch_phone_err_no_service)
+        CallFailure.ROLE_LOST -> stringResource(R.string.touch_phone_err_role_lost)
+        CallFailure.PERMISSION_DENIED -> stringResource(R.string.touch_phone_err_permission_denied)
+        CallFailure.ACCOUNT_UNAVAILABLE -> stringResource(R.string.touch_phone_err_account_unavailable)
+        CallFailure.NETWORK_FAILURE -> stringResource(R.string.touch_phone_err_network_failure)
+        CallFailure.UNKNOWN -> stringResource(R.string.touch_call_did_not_connect)
+        null -> message
+    }
+}
+
+@Composable
 private fun CallHistoryEntry.historySubtitle(): String {
     val status = when (outcome) {
-        CallOutcome.MISSED_INCOMING -> "Missed"
-        CallOutcome.UNANSWERED_OUTGOING -> "No answer"
-        CallOutcome.DECLINED_INCOMING -> "Declined"
-        CallOutcome.CANCELED_OUTGOING -> "Canceled"
-        CallOutcome.FAILED -> "Not connected"
-        CallOutcome.ENDED -> if (direction == CallDirection.INCOMING) "Incoming" else "Outgoing"
+        CallOutcome.MISSED_INCOMING -> stringResource(R.string.touch_history_status_missed)
+        CallOutcome.UNANSWERED_OUTGOING -> stringResource(R.string.touch_history_status_no_answer)
+        CallOutcome.DECLINED_INCOMING -> stringResource(R.string.touch_history_status_declined)
+        CallOutcome.CANCELED_OUTGOING -> stringResource(R.string.touch_history_status_canceled)
+        CallOutcome.FAILED -> stringResource(R.string.touch_history_status_not_connected)
+        CallOutcome.ENDED -> if (direction == CallDirection.INCOMING) {
+            stringResource(R.string.touch_history_status_incoming)
+        } else {
+            stringResource(R.string.touch_history_status_outgoing)
+        }
     }
-    val timeText = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(timestampMillis))
-    return "$status · $timeText"
+    val locale = LocalConfiguration.current.locales.get(0) ?: Locale.ENGLISH
+    val timeText = DateFormat.getTimeInstance(DateFormat.SHORT, locale).format(Date(timestampMillis))
+    return stringResource(R.string.touch_history_subtitle, status, timeText)
 }
 
 private fun keypadLetters(digit: Char): String? = when (digit) {

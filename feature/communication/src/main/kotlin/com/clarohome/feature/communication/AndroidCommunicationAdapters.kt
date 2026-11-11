@@ -304,10 +304,10 @@ class AndroidTelecomGateway @Inject constructor(
         manager.createNotificationChannel(
             NotificationChannel(
                 INCOMING_CALL_CHANNEL,
-                "Incoming calls",
+                context.getString(R.string.comm_channel_incoming_calls_name),
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
-                description = "Incoming phone calls"
+                description = context.getString(R.string.comm_channel_incoming_calls_description)
                 setSound(null, null)
                 lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
             },
@@ -324,8 +324,8 @@ class AndroidTelecomGateway @Inject constructor(
         val declineIntent = incomingActionIntent(callId, ACTION_DECLINE)
         val notification = NotificationCompat.Builder(context, INCOMING_CALL_CHANNEL)
             .setSmallIcon(android.R.drawable.sym_action_call)
-            .setContentTitle(identity.accessibleName)
-            .setContentText("Incoming call")
+            .setContentTitle(identity.localizedTitle(context))
+            .setContentText(context.getString(R.string.comm_notification_incoming_call_text))
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -335,10 +335,14 @@ class AndroidTelecomGateway @Inject constructor(
             .setFullScreenIntent(contentIntent, true)
             .addAction(
                 android.R.drawable.ic_menu_close_clear_cancel,
-                "Decline",
+                context.getString(R.string.comm_notification_action_decline),
                 declineIntent,
             )
-            .addAction(android.R.drawable.sym_action_call, "Answer", answerIntent)
+            .addAction(
+                android.R.drawable.sym_action_call,
+                context.getString(R.string.comm_notification_action_answer),
+                answerIntent,
+            )
             .build()
         manager.notify(callId.hashCode(), notification)
     }
@@ -472,7 +476,11 @@ class AndroidContactsGateway @Inject constructor(
         if (!context.hasPermission(Manifest.permission.WRITE_CONTACTS)) {
             return ContactWriteResult.PermissionDenied
         }
-        if (!mutation.isValid()) return ContactWriteResult.Failed("Name and number are required")
+        if (!mutation.isValid()) {
+            return ContactWriteResult.Failed(
+                context.getString(R.string.comm_contact_name_and_number_required),
+            )
+        }
         val operations = arrayListOf(
             ContentProviderOperation.newInsert(ContactsContract.RawContacts.CONTENT_URI)
                 .withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, null)
@@ -508,9 +516,13 @@ class AndroidContactsGateway @Inject constructor(
         return runCatching {
             val result = resolver.applyBatch(ContactsContract.AUTHORITY, operations)
             val rawContactId = result.firstOrNull()?.uri?.let(ContentUris::parseId)
-                ?: return ContactWriteResult.Failed("Contact was not saved")
+                ?: return ContactWriteResult.Failed(
+                    context.getString(R.string.comm_contact_not_saved),
+                )
             val lookupKey = lookupKeyForRawContact(rawContactId)
-                ?: return ContactWriteResult.Failed("Contact was saved but could not be opened")
+                ?: return ContactWriteResult.Failed(
+                    context.getString(R.string.comm_contact_saved_not_opened),
+                )
             ContactWriteResult.Saved(lookupKey)
         }.contactWriteFailure()
     }
@@ -522,8 +534,14 @@ class AndroidContactsGateway @Inject constructor(
         if (!context.hasPermission(Manifest.permission.WRITE_CONTACTS)) {
             return ContactWriteResult.PermissionDenied
         }
-        if (!mutation.isValid()) return ContactWriteResult.Failed("Name and number are required")
-        val contact = get(lookupKey) ?: return ContactWriteResult.Failed("Contact not found")
+        if (!mutation.isValid()) {
+            return ContactWriteResult.Failed(
+                context.getString(R.string.comm_contact_name_and_number_required),
+            )
+        }
+        val contact = get(lookupKey) ?: return ContactWriteResult.Failed(
+            context.getString(R.string.comm_contact_not_found),
+        )
         val contactId = resolver.query(
             ContactsContract.Contacts.CONTENT_URI,
             arrayOf(ContactsContract.Contacts._ID),
@@ -532,7 +550,9 @@ class AndroidContactsGateway @Inject constructor(
             null,
         )?.use { cursor ->
             if (cursor.moveToFirst()) cursor.getLong(0) else null
-        } ?: return ContactWriteResult.Failed("Contact not found")
+        } ?: return ContactWriteResult.Failed(
+            context.getString(R.string.comm_contact_not_found),
+        )
         return runCatching {
             val rawContactId = firstWritableRawContactId(contactId)
                 ?: return ContactWriteResult.AccountReadOnly
@@ -679,7 +699,9 @@ class AndroidContactsGateway @Inject constructor(
                 when (it) {
                     is SecurityException -> ContactWriteResult.PermissionDenied
                     is UnsupportedOperationException -> ContactWriteResult.AccountReadOnly
-                    else -> ContactWriteResult.Failed(it.message ?: "Contact change failed")
+                    else -> ContactWriteResult.Failed(
+                        it.message ?: context.getString(R.string.comm_contact_change_failed),
+                    )
                 }
             },
         )
@@ -866,6 +888,13 @@ private fun Call.direction(): CallDirection =
     } else {
         CallDirection.OUTGOING
     }
+
+private fun CallerIdentity.localizedTitle(context: Context): String = when {
+    isPrivate -> context.getString(R.string.comm_caller_private_number)
+    !displayName.isNullOrBlank() -> displayName
+    !number.isNullOrBlank() -> number
+    else -> context.getString(R.string.comm_caller_unknown)
+}
 
 private fun Call.identity(): CallerIdentity {
     val handle = details.handle

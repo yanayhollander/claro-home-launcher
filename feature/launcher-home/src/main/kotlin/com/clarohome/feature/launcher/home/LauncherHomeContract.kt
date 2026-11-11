@@ -24,8 +24,8 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Inject
 import javax.inject.Singleton
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 object LauncherHomeContract : FeatureContract {
@@ -83,12 +83,13 @@ class AndroidLauncherStatusReader @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) : LauncherStatusReader {
     override fun read(): LauncherStatusSnapshot {
-        val now = ZonedDateTime.now()
+        val now = Date()
         val locale = Locale.getDefault()
+        val datePattern = DateFormat.getBestDateTimePattern(locale, "EEEdMMM")
         val timePattern = if (DateFormat.is24HourFormat(context)) "H:mm" else "h:mm"
         return LauncherStatusSnapshot(
-            dayAndDate = now.format(DateTimeFormatter.ofPattern("EEE d MMM", locale)),
-            time = now.format(DateTimeFormatter.ofPattern(timePattern, locale)),
+            dayAndDate = SimpleDateFormat(datePattern, locale).format(now),
+            time = SimpleDateFormat(timePattern, locale).format(now),
             battery = readBattery(),
             cellular = readCellular(),
         )

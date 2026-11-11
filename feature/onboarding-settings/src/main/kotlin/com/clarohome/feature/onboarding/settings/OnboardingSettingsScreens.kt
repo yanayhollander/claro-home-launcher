@@ -1,5 +1,6 @@
 package com.clarohome.feature.onboarding.settings
 
+import android.content.res.Configuration
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,12 +38,15 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -74,6 +78,7 @@ import com.clarohome.core.design.ClaroRowButton
 import com.clarohome.core.design.ClaroScreenScaffold
 import com.clarohome.core.design.ClaroSecondaryButton
 import com.clarohome.core.design.LocalClaroHaptics
+import com.clarohome.core.design.toLocale
 import com.clarohome.core.model.AppLanguage
 import com.clarohome.core.model.CapabilityStatus
 import com.clarohome.core.model.ClaroPreferences
@@ -166,7 +171,7 @@ fun OnboardingFlow(
             message = message,
         ) {
             ClaroInfoCard(
-                text = "Setup complete. Your Home screen is ready.",
+                text = stringResource(R.string.onb_setup_complete_body),
                 tone = ClaroBannerTone.SUCCESS,
             )
         }
@@ -185,7 +190,9 @@ fun AccessGateScreen(
     val isDateMode = mode == SettingsAccessMode.DATE_QUESTION
 
     ClaroScreenScaffold(
-        title = if (isDateMode) "Today's date?" else "Settings access",
+        title = stringResource(
+            if (isDateMode) R.string.onb_todays_date_title else R.string.onb_settings_access,
+        ),
         modifier = Modifier.testTag("onboarding-screen"),
         bannerText = message,
         bannerTone = messageBannerTone(message),
@@ -196,12 +203,12 @@ fun AccessGateScreen(
             )
             if (mode == SettingsAccessMode.CAREGIVER_PIN) {
                 ClaroSecondaryButton(
-                    label = "Forgot PIN?",
+                    label = stringResource(R.string.onb_forgot_pin),
                     onClick = onRecoverPin,
                 )
             }
             ClaroSecondaryButton(
-                label = "Cancel",
+                label = stringResource(R.string.onb_cancel),
                 onClick = onCancel,
             )
         },
@@ -227,11 +234,13 @@ fun AccessGateScreen(
                 )
             }
             Text(
-                text = if (isDateMode) {
-                    "Enter today's local date as dd/MM/YYYY. This prevents accidental taps; it is not a security lock."
-                } else {
-                    "Enter your 6-digit caregiver PIN to open Settings."
-                },
+                text = stringResource(
+                    if (isDateMode) {
+                        R.string.onb_date_gate_instructions
+                    } else {
+                        R.string.onb_pin_gate_instructions
+                    },
+                ),
                 color = ClaroColors.Ink,
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
@@ -245,7 +254,7 @@ fun AccessGateScreen(
             } else {
                 PinIndicatorDots(filledCount = input.length)
                 ClaroPinField(
-                    label = "6-digit PIN",
+                    label = stringResource(R.string.onb_six_digit_pin_label),
                     value = input,
                     onValueChange = { input = it },
                 )
@@ -265,17 +274,17 @@ fun PinRecoveryScreen(
     var confirmation by rememberSaveable { mutableStateOf("") }
 
     ClaroScreenScaffold(
-        title = "Recover caregiver PIN",
+        title = stringResource(R.string.onb_recover_pin_title),
         modifier = Modifier.testTag("onboarding-screen"),
         bannerText = message,
         bannerTone = messageBannerTone(message),
         dock = {
             ClaroPrimaryButton(
-                label = "Set new PIN",
+                label = stringResource(R.string.onb_set_new_pin),
                 onClick = { onRecover(recovery, pin, confirmation) },
             )
             ClaroSecondaryButton(
-                label = "Cancel",
+                label = stringResource(R.string.onb_cancel),
                 onClick = onCancel,
             )
         },
@@ -305,28 +314,27 @@ fun PinRecoveryScreen(
                 }
             }
             Text(
-                text = "Use the recovery secret saved during setup. Today's date cannot bypass or reset a caregiver PIN.",
+                text = stringResource(R.string.onb_recover_pin_instructions),
                 color = ClaroColors.Ink,
                 style = MaterialTheme.typography.bodyLarge,
             )
             ClaroSecretField(
-                label = "Recovery secret",
+                label = stringResource(R.string.onb_recovery_secret_label),
                 value = recovery,
                 onValueChange = { recovery = it },
             )
             ClaroPinField(
-                label = "New 6-digit PIN",
+                label = stringResource(R.string.onb_new_six_digit_pin_label),
                 value = pin,
                 onValueChange = { pin = it },
             )
             ClaroPinField(
-                label = "Confirm new PIN",
+                label = stringResource(R.string.onb_confirm_new_pin_label),
                 value = confirmation,
                 onValueChange = { confirmation = it },
             )
             ClaroInfoCard(
-                text = "Lost both the PIN and recovery secret? Reset Claro in Android app settings. " +
-                    "Local Claro preferences and drafts are cleared; Android contacts, SMS and photos stay.",
+                text = stringResource(R.string.onb_recover_pin_lost_both_warning),
                 tone = ClaroBannerTone.WARNING,
             )
         }
@@ -352,7 +360,7 @@ fun SettingsHubScreen(
         modifier = Modifier.testTag("onboarding-screen"),
         dock = {
             ClaroPrimaryButton(
-                label = "Done · lock",
+                label = stringResource(R.string.onb_done_lock),
                 icon = ClaroIconKind.LOCK,
                 onClick = onLockAndExit,
             )
@@ -372,8 +380,8 @@ fun SettingsHubScreen(
                 onClick = onPhoneStyle,
             )
             ClaroRowButton(
-                title = "Home & apps",
-                subtitle = "Allowed apps and extra Home tiles",
+                title = stringResource(R.string.onb_home_and_apps_title),
+                subtitle = stringResource(R.string.onb_home_and_apps_subtitle),
                 leading = {
                     ClaroIcon(
                         kind = ClaroIconKind.APPS,
@@ -384,8 +392,11 @@ fun SettingsHubScreen(
                 onClick = onHomeAndApps,
             )
             ClaroRowButton(
-                title = "People & speed dial",
-                subtitle = "${preferences.onboarding.favoriteSlotsAssigned}/4 Home people configured",
+                title = stringResource(R.string.onb_people_and_speed_dial_amp_title),
+                subtitle = stringResource(
+                    R.string.onb_people_configured_short,
+                    preferences.onboarding.favoriteSlotsAssigned,
+                ),
                 leading = {
                     ClaroIcon(
                         kind = ClaroIconKind.CONTACT,
@@ -396,12 +407,19 @@ fun SettingsHubScreen(
                 onClick = onPeople,
             )
             ClaroRowButton(
-                title = "Language & display",
-                subtitle = buildString {
-                    append(preferences.language.displayName())
-                    append(" · ")
-                    append(preferences.textSize.displayName())
-                    if (preferences.highContrast) append(" · High contrast")
+                title = stringResource(R.string.onb_language_and_display_amp_title),
+                subtitle = if (preferences.highContrast) {
+                    stringResource(
+                        R.string.onb_language_display_summary_high_contrast,
+                        preferences.language.displayName(),
+                        preferences.textSize.displayName(),
+                    )
+                } else {
+                    stringResource(
+                        R.string.onb_language_display_summary,
+                        preferences.language.displayName(),
+                        preferences.textSize.displayName(),
+                    )
                 },
                 leading = {
                     ClaroIcon(
@@ -413,12 +431,14 @@ fun SettingsHubScreen(
                 onClick = onDisplayLanguage,
             )
             ClaroRowButton(
-                title = "SOS contact",
-                subtitle = if (preferences.onboarding.sosRecipientAgreed) {
-                    "Trusted person agreed · test separate"
-                } else {
-                    "Not configured"
-                },
+                title = stringResource(R.string.onb_sos_contact_title),
+                subtitle = stringResource(
+                    if (preferences.onboarding.sosRecipientAgreed) {
+                        R.string.onb_sos_subtitle_configured
+                    } else {
+                        R.string.onb_sos_subtitle_not_configured
+                    },
+                ),
                 leading = {
                     ClaroIcon(
                         kind = ClaroIconKind.SOS,
@@ -429,7 +449,7 @@ fun SettingsHubScreen(
                 onClick = onSafety,
             )
             ClaroRowButton(
-                title = "Permissions & roles",
+                title = stringResource(R.string.onb_permissions_and_roles_amp_title),
                 subtitle = readinessSummary(preferences),
                 leading = {
                     ClaroIcon(
@@ -441,12 +461,14 @@ fun SettingsHubScreen(
                 onClick = onReadiness,
             )
             ClaroRowButton(
-                title = "Settings access",
-                subtitle = if (preferences.accessProtection.mode == SettingsAccessMode.DATE_QUESTION) {
-                    "Today's date question"
-                } else {
-                    "Caregiver PIN · local recovery"
-                },
+                title = stringResource(R.string.onb_settings_access),
+                subtitle = stringResource(
+                    if (preferences.accessProtection.mode == SettingsAccessMode.DATE_QUESTION) {
+                        R.string.onb_settings_access_date_subtitle
+                    } else {
+                        R.string.onb_settings_access_pin_subtitle
+                    },
+                ),
                 leading = {
                     ClaroIcon(
                         kind = ClaroIconKind.LOCK,
@@ -457,8 +479,8 @@ fun SettingsHubScreen(
                 onClick = onAccessMethod,
             )
             ClaroRowButton(
-                title = "Membership & privacy",
-                subtitle = "Core features free · diagnostics off by default",
+                title = stringResource(R.string.onb_membership_and_privacy_title),
+                subtitle = stringResource(R.string.onb_membership_and_privacy_subtitle),
                 leading = {
                     ClaroIcon(
                         kind = ClaroIconKind.SETTINGS,
@@ -469,8 +491,8 @@ fun SettingsHubScreen(
                 onClick = onMembershipPrivacy,
             )
             ClaroRowButton(
-                title = "Reset Claro",
-                subtitle = "Clear local Claro setup only",
+                title = stringResource(R.string.onb_reset_claro),
+                subtitle = stringResource(R.string.onb_reset_claro_subtitle),
                 leading = {
                     ClaroIcon(
                         kind = ClaroIconKind.BACKSPACE,
@@ -498,13 +520,13 @@ fun AccessMethodSettingsScreen(
     var recovery by rememberSaveable { mutableStateOf("") }
 
     ClaroScreenScaffold(
-        title = "Settings access",
+        title = stringResource(R.string.onb_settings_access),
         modifier = Modifier.testTag("onboarding-screen"),
         bannerText = message,
         bannerTone = messageBannerTone(message),
         dock = {
             ClaroPrimaryButton(
-                label = "Save access method",
+                label = stringResource(R.string.onb_save_access_method),
                 onClick = {
                     if (mode == SettingsAccessMode.DATE_QUESTION) {
                         onUseDateQuestion()
@@ -514,7 +536,7 @@ fun AccessMethodSettingsScreen(
                 },
             )
             ClaroSecondaryButton(
-                label = "Cancel",
+                label = stringResource(R.string.onb_cancel),
                 onClick = onCancel,
             )
         },
@@ -550,17 +572,17 @@ fun PhoneStyleSettingsScreen(
         bannerTone = messageBannerTone(message),
         dock = {
             ClaroPrimaryButton(
-                label = "Apply ${preview.localizedDisplayName()}",
+                label = stringResource(R.string.onb_apply_style, preview.localizedDisplayName()),
                 onClick = { onApply(preview) },
             )
             ClaroSecondaryButton(
-                label = "Cancel",
+                label = stringResource(R.string.onb_cancel),
                 onClick = onCancel,
             )
         },
     ) {
         Text(
-            text = "Preview either style. Switching changes only the presentation — your contacts, messages and settings stay in place.",
+            text = stringResource(R.string.onb_phone_style_settings_body),
             color = ClaroColors.Ink,
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
@@ -572,7 +594,10 @@ fun PhoneStyleSettingsScreen(
         )
         if (pending != null) {
             ClaroInfoCard(
-                text = "A switch to ${pending.localizedDisplayName()} is waiting for the current activity to finish.",
+                text = stringResource(
+                    R.string.onb_phone_style_pending_switch,
+                    pending.localizedDisplayName(),
+                ),
                 tone = ClaroBannerTone.WARNING,
             )
         }
@@ -592,11 +617,11 @@ fun DisplayLanguageSettingsScreen(
     var hapticFeedback by rememberSaveable { mutableStateOf(preferences.hapticFeedback) }
 
     ClaroScreenScaffold(
-        title = "Language and display",
+        title = stringResource(R.string.onb_language_and_display_title),
         modifier = Modifier.testTag("onboarding-screen"),
         dock = {
             ClaroPrimaryButton(
-                label = "Save",
+                label = stringResource(R.string.onb_save),
                 onClick = {
                     if (onApplyWithHaptics != null) {
                         onApplyWithHaptics(language, textSize, highContrast, hapticFeedback)
@@ -606,7 +631,7 @@ fun DisplayLanguageSettingsScreen(
                 },
             )
             ClaroSecondaryButton(
-                label = "Cancel",
+                label = stringResource(R.string.onb_cancel),
                 onClick = onCancel,
             )
         },
@@ -631,11 +656,11 @@ fun ReadinessSettingsScreen(
     onBack: () -> Unit,
 ) {
     ClaroScreenScaffold(
-        title = "Permissions & roles",
+        title = stringResource(R.string.onb_permissions_and_roles_amp_title),
         modifier = Modifier.testTag("onboarding-screen"),
         dock = {
             ClaroPrimaryButton(
-                label = "Back to Settings",
+                label = stringResource(R.string.onb_back_to_settings),
                 onClick = onBack,
             )
         },
@@ -645,7 +670,7 @@ fun ReadinessSettingsScreen(
             onRequest = onRequest,
         )
         ClaroInfoCard(
-            text = "Allowed means Android granted access — it does not verify that a real call, SMS or SOS test succeeded.",
+            text = stringResource(R.string.onb_readiness_settings_info),
             tone = ClaroBannerTone.INFO,
         )
     }
@@ -664,30 +689,30 @@ fun ResetClaroScreen(
     }
 
     ClaroScreenScaffold(
-        title = "Reset Claro?",
+        title = stringResource(R.string.onb_reset_claro_confirm_title),
         modifier = Modifier.testTag("onboarding-screen"),
         dock = {
             when {
                 hasActiveCall -> {
                     ClaroPrimaryButton(
-                        label = "Return to call",
+                        label = stringResource(R.string.onb_return_to_call),
                         icon = ClaroIconKind.PHONE,
                         containerColor = ClaroColors.Green,
                         onClick = onReturnToCall,
                     )
                     ClaroSecondaryButton(
-                        label = "Cancel",
+                        label = stringResource(R.string.onb_cancel),
                         onClick = onCancel,
                     )
                 }
                 confirming -> {
                     ClaroPrimaryButton(
-                        label = "Reset Claro",
+                        label = stringResource(R.string.onb_reset_claro),
                         containerColor = ClaroColors.Red,
                         onClick = onConfirmReset,
                     )
                     ClaroSecondaryButton(
-                        label = "Cancel",
+                        label = stringResource(R.string.onb_cancel),
                         onClick = {
                             confirming = false
                             onCancel()
@@ -696,12 +721,12 @@ fun ResetClaroScreen(
                 }
                 else -> {
                     ClaroPrimaryButton(
-                        label = "Continue",
+                        label = stringResource(R.string.onb_continue),
                         containerColor = ClaroColors.Red,
                         onClick = { confirming = true },
                     )
                     ClaroSecondaryButton(
-                        label = "Cancel",
+                        label = stringResource(R.string.onb_cancel),
                         onClick = onCancel,
                     )
                 }
@@ -710,40 +735,40 @@ fun ResetClaroScreen(
     ) {
         if (hasActiveCall) {
             ClaroInfoCard(
-                text = "End your call first.",
+                text = stringResource(R.string.onb_reset_end_call_first),
                 tone = ClaroBannerTone.ERROR,
             )
         } else if (confirming) {
             ClaroInfoCard(
-                text = "Reset all Claro changes?",
+                text = stringResource(R.string.onb_reset_all_changes_question),
                 tone = ClaroBannerTone.WARNING,
             )
         } else {
             ClaroInfoCard(
-                text = "Resets Claro on this phone only. Device data and store purchases stay unchanged.",
+                text = stringResource(R.string.onb_reset_scope_warning),
                 tone = ClaroBannerTone.WARNING,
             )
         }
         ResetScopeCard(
-            heading = "Cleared from Claro",
+            heading = stringResource(R.string.onb_reset_cleared_heading),
             accentColor = ClaroColors.Red,
             backgroundColor = ClaroColors.PaleRed,
             items = listOf(
-                "Claro preferences (phone style, language, text size, contrast, diagnostics)",
-                "Home favorites and Hold 1 / Hold 2 speed dials",
-                "Selected photo references and SOS contact assignment",
-                "Caregiver PIN, recovery secret and unsent Claro message drafts",
+                stringResource(R.string.onb_reset_cleared_item_preferences),
+                stringResource(R.string.onb_reset_cleared_item_favorites),
+                stringResource(R.string.onb_reset_cleared_item_photos_sos),
+                stringResource(R.string.onb_reset_cleared_item_pin_drafts),
             ),
         )
         ResetScopeCard(
-            heading = "Kept on your phone",
+            heading = stringResource(R.string.onb_reset_kept_heading),
             accentColor = ClaroColors.Green,
             backgroundColor = ClaroColors.PaleGreen,
             items = listOf(
-                "Android contacts and call log",
-                "SMS and MMS conversations",
-                "Device photos and videos",
-                "Google Play subscriptions and purchases",
+                stringResource(R.string.onb_reset_kept_item_contacts),
+                stringResource(R.string.onb_reset_kept_item_sms),
+                stringResource(R.string.onb_reset_kept_item_photos),
+                stringResource(R.string.onb_reset_kept_item_purchases),
             ),
         )
     }
@@ -761,15 +786,15 @@ private fun WelcomeStep(
         bannerTone = messageBannerTone(message),
         dock = {
             ClaroPrimaryButton(
-                label = "Set up Claro",
+                label = stringResource(R.string.onb_set_up_claro),
                 onClick = onContinue,
             )
             ClaroSecondaryButton(
-                label = "Continue free",
+                label = stringResource(R.string.onb_continue_free),
                 onClick = onContinue,
             )
             Text(
-                text = "Installing Claro does not start a trial or charge.",
+                text = stringResource(R.string.onb_welcome_no_trial_note),
                 color = Color(0xFFE2E8F0),
                 fontSize = 16.sp,
                 lineHeight = 20.sp,
@@ -801,7 +826,7 @@ private fun WelcomeStep(
                 )
             }
             Text(
-                text = "Your people. One touch away.",
+                text = stringResource(R.string.onb_welcome_tagline),
                 color = ClaroColors.Ink,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
@@ -809,15 +834,14 @@ private fun WelcomeStep(
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                text = "A simpler home, phone and messages — set up for yourself or together with someone you trust.",
+                text = stringResource(R.string.onb_welcome_subtitle),
                 color = ClaroColors.Muted,
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
             ClaroInfoCard(
-                text = "Android asks separately for Home, Phone, SMS and Camera access when needed. " +
-                    "SOS calls one trusted person — it is not monitored emergency dispatch.",
+                text = stringResource(R.string.onb_welcome_permissions_sos_note),
                 tone = ClaroBannerTone.INFO,
             )
         }
@@ -839,14 +863,16 @@ private fun PhoneStyleChoice(
         message = message,
         dock = {
             ClaroPrimaryButton(
-                label = selected?.let { "Use ${it.localizedDisplayName()}" } ?: "Choose a style",
+                label = selected?.let {
+                    stringResource(R.string.onb_use_style, it.localizedDisplayName())
+                } ?: stringResource(R.string.onb_choose_a_style),
                 enabled = selected != null,
                 onClick = onContinue,
             )
         },
     ) {
         Text(
-            text = "Choose how Claro looks. Both styles share the same people, messages and settings.",
+            text = stringResource(R.string.onb_phone_style_choice_body),
             color = ClaroColors.Ink,
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.padding(horizontal = 4.dp),
@@ -879,7 +905,7 @@ private fun LanguageDisplayOnboardingStep(
         message = message,
         dock = {
             ClaroPrimaryButton(
-                label = "Save and continue",
+                label = stringResource(R.string.onb_save_and_continue),
                 onClick = { onSave(language, textSize, highContrast, hapticFeedback) },
             )
         },
@@ -915,7 +941,7 @@ private fun AccessSetupOnboardingStep(
         message = message,
         dock = {
             ClaroPrimaryButton(
-                label = "Save access method",
+                label = stringResource(R.string.onb_save_access_method),
                 onClick = {
                     if (mode == SettingsAccessMode.DATE_QUESTION) {
                         onDateQuestion()
@@ -956,18 +982,20 @@ private fun PeopleSetupStep(
         message = message,
         dock = {
             ClaroPrimaryButton(
-                label = "Open contacts & speed dial",
+                label = stringResource(R.string.onb_open_contacts_and_speed_dial),
                 icon = ClaroIconKind.CONTACT,
                 onClick = onOpenPeopleSetup,
             )
             ClaroSecondaryButton(
-                label = if (assigned > 0) "Continue" else "Continue with setup incomplete",
+                label = stringResource(
+                    if (assigned > 0) R.string.onb_continue else R.string.onb_continue_setup_incomplete,
+                ),
                 onClick = onContinue,
             )
         },
     ) {
         Text(
-            text = "Assign real Android contacts to the four Home portrait slots and optional Hold 1 / Hold 2 keys.",
+            text = stringResource(R.string.onb_people_setup_body),
             color = ClaroColors.Ink,
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.padding(horizontal = 4.dp),
@@ -979,8 +1007,7 @@ private fun PeopleSetupStep(
                 .padding(8.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            val sampleNames = listOf("Slot 1", "Slot 2", "Slot 3", "Slot 4")
-            sampleNames.forEachIndexed { index, label ->
+            repeat(4) { index ->
                 val isAssigned = index < assigned
                 Column(
                     modifier = Modifier.weight(1f),
@@ -988,13 +1015,15 @@ private fun PeopleSetupStep(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     ClaroAvatar(
-                        name = if (isAssigned) label else null,
+                        name = if (isAssigned) (index + 1).toString() else null,
                         size = 48.dp,
                         paletteSeed = index,
                         isUnassigned = !isAssigned,
                     )
                     Text(
-                        text = if (isAssigned) "Set" else "Open",
+                        text = stringResource(
+                            if (isAssigned) R.string.onb_slot_set else R.string.onb_slot_open,
+                        ),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (isAssigned) ClaroColors.Green else ClaroColors.Muted,
@@ -1002,20 +1031,31 @@ private fun PeopleSetupStep(
                 }
             }
         }
+        val speedOneStatus = stringResource(
+            if (speedOne) R.string.onb_speed_dial_assigned else R.string.onb_speed_dial_not_set,
+        )
+        val speedTwoStatus = stringResource(
+            if (speedTwo) R.string.onb_speed_dial_assigned else R.string.onb_speed_dial_not_set,
+        )
         ClaroInfoCard(
-            text = buildString {
-                if (assigned > 0) {
-                    append("$assigned of 4 Home people configured. ")
-                } else {
-                    append("No Home people configured yet — unassigned slots stay visible as Add person. ")
-                }
-                append("Hold 1: ${if (speedOne) "assigned" else "not set"} · ")
-                append("Hold 2: ${if (speedTwo) "assigned" else "not set"}.")
+            text = if (assigned > 0) {
+                stringResource(
+                    R.string.onb_people_setup_status_configured,
+                    assigned,
+                    speedOneStatus,
+                    speedTwoStatus,
+                )
+            } else {
+                stringResource(
+                    R.string.onb_people_setup_status_empty,
+                    speedOneStatus,
+                    speedTwoStatus,
+                )
             },
             tone = if (assigned == 4) ClaroBannerTone.SUCCESS else ClaroBannerTone.INFO,
         )
         Text(
-            text = "Holding 1 or 2 places a call immediately without an extra confirmation screen.",
+            text = stringResource(R.string.onb_people_setup_hold_note),
             color = ClaroColors.Muted,
             fontSize = 18.sp,
             lineHeight = 23.sp,
@@ -1037,12 +1077,14 @@ private fun SosSetupStep(
         message = message,
         dock = {
             ClaroPrimaryButton(
-                label = "Configure trusted person",
+                label = stringResource(R.string.onb_configure_trusted_person),
                 icon = ClaroIconKind.SOS,
                 onClick = onOpenSosSetup,
             )
             ClaroSecondaryButton(
-                label = if (agreed) "Continue" else "Continue with SOS incomplete",
+                label = stringResource(
+                    if (agreed) R.string.onb_continue else R.string.onb_continue_sos_incomplete,
+                ),
                 onClick = onContinue,
             )
         },
@@ -1068,16 +1110,18 @@ private fun SosSetupStep(
                 )
             }
             Text(
-                text = "SOS calls one trusted person after a 5-second countdown. It is not a monitoring service or emergency dispatch, and sends no SMS or location.",
+                text = stringResource(R.string.onb_sos_setup_body),
                 color = ClaroColors.Ink,
                 style = MaterialTheme.typography.bodyLarge,
             )
             ClaroInfoCard(
-                text = if (agreed) {
-                    "Trusted recipient recorded with agreement. Run a consented test call separately."
-                } else {
-                    "SOS is not configured. No SOS call can start until a real recipient agrees."
-                },
+                text = stringResource(
+                    if (agreed) {
+                        R.string.onb_sos_setup_agreed_info
+                    } else {
+                        R.string.onb_sos_setup_unconfigured_warning
+                    },
+                ),
                 tone = if (agreed) ClaroBannerTone.SUCCESS else ClaroBannerTone.WARNING,
             )
         }
@@ -1097,7 +1141,7 @@ private fun ReadinessChecklist(
         message = message,
         dock = {
             ClaroPrimaryButton(
-                label = "Continue to handover",
+                label = stringResource(R.string.onb_continue_to_handover),
                 onClick = onContinue,
             )
         },
@@ -1107,7 +1151,7 @@ private fun ReadinessChecklist(
             onRequest = onRequest,
         )
         ClaroInfoCard(
-            text = "Each Android role or permission is requested separately. Missing access keeps native fallback actions visible.",
+            text = stringResource(R.string.onb_readiness_checklist_info),
             tone = ClaroBannerTone.INFO,
         )
     }
@@ -1130,27 +1174,31 @@ private fun HandoverChecklist(
         message = message,
         dock = {
             ClaroSecondaryButton(
-                label = "Optional plans",
+                label = stringResource(R.string.onb_optional_plans),
                 onClick = onOpenPlans,
             )
             ClaroPrimaryButton(
-                label = "Finish setup",
+                label = stringResource(R.string.onb_finish_setup),
                 icon = ClaroIconKind.CHECK,
                 onClick = onFinish,
             )
         },
     ) {
         Text(
-            text = "Verify real service behavior together. Unchecked items remain honestly marked not tested.",
+            text = stringResource(R.string.onb_handover_body),
             color = ClaroColors.Ink,
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.padding(horizontal = 4.dp),
         )
         ClaroInfoCard(
             text = if (allChecked) {
-                "All ${HandoverCheck.entries.size} handover checks observed."
+                stringResource(R.string.onb_handover_all_observed, HandoverCheck.entries.size)
             } else {
-                "${checked.size} of ${HandoverCheck.entries.size} handover checks observed."
+                stringResource(
+                    R.string.onb_handover_progress_observed,
+                    checked.size,
+                    HandoverCheck.entries.size,
+                )
             },
             tone = if (allChecked) ClaroBannerTone.SUCCESS else ClaroBannerTone.INFO,
         )
@@ -1189,8 +1237,8 @@ private fun HandoverChecklist(
             }
         }
         ClaroRowButton(
-            title = "Allowed apps & Home tiles",
-            subtitle = "Choose optional extra apps for Home",
+            title = stringResource(R.string.onb_allowed_apps_and_tiles_title),
+            subtitle = stringResource(R.string.onb_allowed_apps_and_tiles_subtitle),
             leading = {
                 ClaroIcon(
                     kind = ClaroIconKind.APPS,
@@ -1233,13 +1281,18 @@ private fun OnboardingProgressBar(
     stepIndex: Int,
     totalSteps: Int,
 ) {
+    val progressDescription = stringResource(
+        R.string.onb_setup_step_progress,
+        stepIndex,
+        totalSteps,
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color.White)
             .padding(horizontal = 6.dp, vertical = 5.dp)
             .semantics {
-                contentDescription = "Setup step $stepIndex of $totalSteps"
+                contentDescription = progressDescription
             },
         horizontalArrangement = Arrangement.spacedBy(3.dp),
     ) {
@@ -1346,18 +1399,22 @@ private fun VisualModeCard(
             }
             ModePreview(mode = mode)
             Text(
-                text = if (mode == VisualMode.TOUCH) {
-                    "Photo contacts & 2-column tiles"
-                } else {
-                    "Fixed keypad, D-pad & Call/Home"
-                },
+                text = stringResource(
+                    if (mode == VisualMode.TOUCH) {
+                        R.string.onb_touch_mode_card_summary
+                    } else {
+                        R.string.onb_classic_mode_card_summary
+                    },
+                ),
                 color = ClaroColors.Muted,
                 fontSize = 15.sp,
                 lineHeight = 19.sp,
                 minLines = 2,
             )
             Text(
-                text = if (selected) "✓ Selected" else "Tap to choose",
+                text = stringResource(
+                    if (selected) R.string.onb_mode_selected else R.string.onb_tap_to_choose,
+                ),
                 color = if (selected) ClaroColors.Blue else ClaroColors.Muted,
                 fontSize = 16.sp,
                 lineHeight = 20.sp,
@@ -1380,7 +1437,6 @@ private fun ModePreview(mode: VisualMode) {
 
 @Composable
 private fun TouchShellPreview() {
-    val samplePeople = listOf("Mira", "Daniel", "Leah", "Noah")
     val tileRows = listOf(
         listOf(
             Triple(ClaroColors.PaleGreen, ClaroColors.Green, ClaroIconKind.PHONE),
@@ -1431,7 +1487,7 @@ private fun TouchShellPreview() {
                 )
             }
             Text(
-                text = "9:41",
+                text = stringResource(R.string.onb_preview_sample_time),
                 color = Color.White,
                 fontSize = 11.sp,
                 lineHeight = 12.sp,
@@ -1449,7 +1505,7 @@ private fun TouchShellPreview() {
                 .height(38.dp),
             horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            samplePeople.forEachIndexed { index, name ->
+            repeat(4) { index ->
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -1458,7 +1514,7 @@ private fun TouchShellPreview() {
                     contentAlignment = Alignment.Center,
                 ) {
                     ClaroAvatar(
-                        name = name,
+                        name = (index + 1).toString(),
                         size = 28.dp,
                         paletteSeed = index,
                     )
@@ -1494,7 +1550,6 @@ private fun TouchShellPreview() {
 
 @Composable
 private fun ClassicShellPreview() {
-    val samplePeople = listOf("Mira", "Daniel", "Leah", "Noah")
     val keypadRows = listOf(
         listOf("1", "2", "3"),
         listOf("4", "5", "6"),
@@ -1528,14 +1583,14 @@ private fun ClassicShellPreview() {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "9:41",
+                    text = stringResource(R.string.onb_preview_sample_time),
                     color = ClaroColors.Ink,
                     fontSize = 13.sp,
                     lineHeight = 14.sp,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = "Wed 11",
+                    text = stringResource(R.string.onb_classic_preview_date),
                     color = ClaroColors.Muted,
                     fontSize = 9.sp,
                     lineHeight = 10.sp,
@@ -1547,7 +1602,7 @@ private fun ClassicShellPreview() {
                     .height(34.dp),
                 horizontalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                samplePeople.forEachIndexed { index, name ->
+                repeat(4) { index ->
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -1556,7 +1611,7 @@ private fun ClassicShellPreview() {
                         contentAlignment = Alignment.Center,
                     ) {
                         ClaroAvatar(
-                            name = name,
+                            name = (index + 1).toString(),
                             size = 24.dp,
                             paletteSeed = index,
                         )
@@ -1583,7 +1638,7 @@ private fun ClassicShellPreview() {
                         size = 11.dp,
                     )
                     Text(
-                        text = "SMS",
+                        text = stringResource(R.string.onb_classic_preview_sms),
                         color = ClaroColors.Blue,
                         fontSize = 8.sp,
                         lineHeight = 9.sp,
@@ -1604,7 +1659,7 @@ private fun ClassicShellPreview() {
                         size = 11.dp,
                     )
                     Text(
-                        text = "SOS",
+                        text = stringResource(R.string.onb_classic_preview_sos),
                         color = Color.White,
                         fontSize = 8.sp,
                         lineHeight = 9.sp,
@@ -1702,7 +1757,7 @@ private fun ClassicShellPreview() {
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "OK",
+                        text = stringResource(R.string.onb_classic_preview_ok),
                         color = Color.White,
                         fontSize = 8.sp,
                         lineHeight = 9.sp,
@@ -1790,7 +1845,7 @@ private fun LanguageDisplayFields(
     hapticFeedback: Boolean = true,
     onHapticFeedbackChange: (Boolean) -> Unit = {},
 ) {
-    SectionLabel("Language")
+    SectionLabel(stringResource(R.string.onb_section_language))
     AppLanguage.entries.forEach { option ->
         ChoiceRow(
             label = option.displayName(),
@@ -1799,7 +1854,7 @@ private fun LanguageDisplayFields(
         )
     }
     Spacer(Modifier.height(4.dp))
-    SectionLabel("Text size")
+    SectionLabel(stringResource(R.string.onb_section_text_size))
     TextSize.entries.forEach { option ->
         ChoiceRow(
             label = option.displayName(),
@@ -1809,12 +1864,12 @@ private fun LanguageDisplayFields(
     }
     Spacer(Modifier.height(4.dp))
     ToggleRow(
-        label = "High contrast",
+        label = stringResource(R.string.onb_high_contrast),
         checked = highContrast,
         onChecked = onHighContrastChange,
     )
     ToggleRow(
-        label = "Keypad & touch vibration",
+        label = stringResource(R.string.onb_keypad_and_touch_vibration),
         checked = hapticFeedback,
         onChecked = onHapticFeedbackChange,
     )
@@ -1832,10 +1887,23 @@ private fun LanguageLivePreviewCard(
     textSize: TextSize,
     highContrast: Boolean,
 ) {
+    val baseContext = LocalContext.current
+    val baseConfig = LocalConfiguration.current
+    val previewLocale = remember(language) { language.toLocale() }
     val previewDirection = if (language == AppLanguage.HEBREW) {
         LayoutDirection.Rtl
     } else {
         LayoutDirection.Ltr
+    }
+    val previewConfig = remember(baseConfig, previewLocale) {
+        @android.annotation.SuppressLint("AppBundleLocaleChanges")
+        Configuration(baseConfig).apply {
+            setLocale(previewLocale)
+            setLayoutDirection(previewLocale)
+        }
+    }
+    val previewContext = remember(baseContext, previewConfig) {
+        baseContext.createConfigurationContext(previewConfig)
     }
     val previewScale = when (textSize) {
         TextSize.STANDARD -> 1f
@@ -1846,7 +1914,11 @@ private fun LanguageLivePreviewCard(
     val inkColor = if (highContrast) Color.Black else ClaroColors.InfoBlueInk
     val borderColor = if (highContrast) Color.Black else ClaroColors.Blue
 
-    CompositionLocalProvider(LocalLayoutDirection provides previewDirection) {
+    CompositionLocalProvider(
+        LocalConfiguration provides previewConfig,
+        LocalContext provides previewContext,
+        LocalLayoutDirection provides previewDirection,
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1856,7 +1928,7 @@ private fun LanguageLivePreviewCard(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
-                text = language.previewHeading(),
+                text = stringResource(R.string.onb_preview_heading),
                 color = inkColor,
                 fontSize = (24 * previewScale).sp,
                 lineHeight = (29 * previewScale).sp,
@@ -1864,14 +1936,14 @@ private fun LanguageLivePreviewCard(
                 modifier = Modifier.semantics { heading() },
             )
             Text(
-                text = language.previewLabels(),
+                text = stringResource(R.string.onb_preview_labels),
                 color = inkColor,
                 fontSize = (20 * previewScale).sp,
                 lineHeight = (25 * previewScale).sp,
             )
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                 Text(
-                    text = "202-555-0101 · 9:41",
+                    text = stringResource(R.string.onb_preview_sample_phone_time),
                     color = inkColor,
                     fontSize = (19 * previewScale).sp,
                     lineHeight = (24 * previewScale).sp,
@@ -1894,42 +1966,45 @@ private fun AccessSetupFields(
     onRecoveryChange: (String) -> Unit,
 ) {
     ChoiceRow(
-        label = "Date question (dd/MM/YYYY)",
-        subtitle = "No secret to remember · prevents accidental taps",
+        label = stringResource(R.string.onb_date_question_option_title),
+        subtitle = stringResource(R.string.onb_date_question_option_subtitle),
         selected = mode == SettingsAccessMode.DATE_QUESTION,
         onClick = { onModeChange(SettingsAccessMode.DATE_QUESTION) },
     )
     ChoiceRow(
-        label = "Caregiver PIN",
-        subtitle = "6-digit PIN + 12+ character recovery secret",
+        label = stringResource(R.string.onb_caregiver_pin_option_title),
+        subtitle = stringResource(R.string.onb_caregiver_pin_option_subtitle),
         selected = mode == SettingsAccessMode.CAREGIVER_PIN,
         onClick = { onModeChange(SettingsAccessMode.CAREGIVER_PIN) },
     )
     if (mode == SettingsAccessMode.DATE_QUESTION) {
         ClaroInfoCard(
-            text = "Anyone who knows today's local date (dd/MM/YYYY) can unlock Settings. There is no PIN or recovery phrase to store.",
+            text = stringResource(R.string.onb_date_question_info),
             tone = ClaroBannerTone.INFO,
         )
     } else {
         ClaroInfoCard(
-            text = "Keep your 6-digit PIN and 12+ character recovery secret somewhere safe. Today's date cannot unlock or recover PIN mode.",
+            text = stringResource(R.string.onb_caregiver_pin_warning),
             tone = ClaroBannerTone.WARNING,
         )
         ClaroPinField(
-            label = "6-digit PIN",
+            label = stringResource(R.string.onb_six_digit_pin_label),
             value = pin,
             onValueChange = onPinChange,
         )
         ClaroPinField(
-            label = "Confirm 6-digit PIN",
+            label = stringResource(R.string.onb_confirm_six_digit_pin_label),
             value = confirmation,
             onValueChange = onConfirmationChange,
         )
         ClaroSecretField(
-            label = "Recovery secret (12+ characters)",
+            label = stringResource(R.string.onb_recovery_secret_with_min_label),
             value = recovery,
             onValueChange = onRecoveryChange,
-            supportingText = "${recovery.length}/12 minimum characters",
+            supportingText = stringResource(
+                R.string.onb_recovery_secret_min_progress,
+                recovery.length,
+            ),
         )
     }
 }
@@ -1983,11 +2058,13 @@ private fun ReadinessRows(
             }
             if (status != CapabilityStatus.READY) {
                 ClaroSecondaryButton(
-                    label = if (status == CapabilityStatus.UNAVAILABLE) {
-                        "Open Android settings"
-                    } else {
-                        "Allow or repair"
-                    },
+                    label = stringResource(
+                        if (status == CapabilityStatus.UNAVAILABLE) {
+                            R.string.onb_open_android_settings
+                        } else {
+                            R.string.onb_allow_or_repair
+                        },
+                    ),
                     onClick = { onRequest(capability) },
                 )
             }
@@ -2021,7 +2098,7 @@ private fun ResetScopeCard(
         )
         items.forEach { item ->
             Text(
-                text = "• $item",
+                text = stringResource(R.string.onb_bullet_item, item),
                 color = ClaroColors.Ink,
                 fontSize = 19.sp,
                 lineHeight = 24.sp,
@@ -2161,12 +2238,16 @@ private fun ToggleRow(
 
 @Composable
 private fun PinIndicatorDots(filledCount: Int) {
+    val pinDigitsDescription = stringResource(
+        R.string.onb_pin_digits_entered,
+        filledCount.coerceIn(0, 6),
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
             .semantics {
-                contentDescription = "${filledCount.coerceIn(0, 6)} of 6 PIN digits entered"
+                contentDescription = pinDigitsDescription
             },
         horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
@@ -2201,9 +2282,9 @@ private fun ClaroDateField(
                 onValueChange(formatDateDigits(next.text))
             },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("dd/MM/YYYY") },
+            label = { Text(stringResource(R.string.onb_date_format_pattern)) },
             supportingText = {
-                Text("2-digit day, 2-digit month, 4-digit year")
+                Text(stringResource(R.string.onb_date_field_supporting))
             },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Number,
@@ -2299,24 +2380,31 @@ private fun messageBannerTone(message: String?): ClaroBannerTone {
     if (message.isNullOrBlank()) return ClaroBannerTone.INFO
     val lower = message.lowercase()
     return when {
-        "changed" in lower || "saved" in lower -> ClaroBannerTone.SUCCESS
-        "try again in" in lower || "paused" in lower || "will change after" in lower ->
+        "changed" in lower || "saved" in lower ||
+            "actualizado" in lower || "guardado" in lower ||
+            "שונה" in lower || "נשמר" in lower -> ClaroBannerTone.SUCCESS
+        "try again in" in lower || "paused" in lower || "will change after" in lower ||
+            "intentarlo en" in lower || "en pausa" in lower || "cambiará después" in lower ||
+            "נסו שוב בעוד" in lower || "מושהה" in lower || "ישתנה לאחר" in lower ->
             ClaroBannerTone.WARNING
         else -> ClaroBannerTone.ERROR
     }
 }
 
-private fun OnboardingStep.title() = when (this) {
-    OnboardingStep.WELCOME -> "Welcome to Claro"
-    OnboardingStep.PHONE_STYLE -> "Choose phone style"
-    OnboardingStep.LANGUAGE_AND_DISPLAY -> "Language and display"
-    OnboardingStep.SETTINGS_ACCESS -> "Settings access"
-    OnboardingStep.PEOPLE_AND_SPEED_DIAL -> "People and speed dial"
-    OnboardingStep.SOS_CONTACT -> "SOS contact"
-    OnboardingStep.ROLE_READINESS -> "Permissions and roles"
-    OnboardingStep.HANDOVER -> "Handover checklist"
-    OnboardingStep.COMPLETE -> "Setup complete"
-}
+@Composable
+private fun OnboardingStep.title() = stringResource(
+    when (this) {
+        OnboardingStep.WELCOME -> R.string.onboarding_welcome
+        OnboardingStep.PHONE_STYLE -> R.string.onb_step_choose_phone_style
+        OnboardingStep.LANGUAGE_AND_DISPLAY -> R.string.onb_language_and_display_title
+        OnboardingStep.SETTINGS_ACCESS -> R.string.onb_settings_access
+        OnboardingStep.PEOPLE_AND_SPEED_DIAL -> R.string.onb_step_people_and_speed_dial
+        OnboardingStep.SOS_CONTACT -> R.string.onb_sos_contact_title
+        OnboardingStep.ROLE_READINESS -> R.string.onb_step_permissions_and_roles
+        OnboardingStep.HANDOVER -> R.string.onb_step_handover_checklist
+        OnboardingStep.COMPLETE -> R.string.onb_step_setup_complete
+    },
+)
 
 @Composable
 private fun VisualMode.localizedDisplayName() = when (this) {
@@ -2324,38 +2412,35 @@ private fun VisualMode.localizedDisplayName() = when (this) {
     VisualMode.CLASSIC -> stringResource(R.string.classic_phone)
 }
 
-private fun AppLanguage.displayName() = when (this) {
-    AppLanguage.ENGLISH -> "English"
-    AppLanguage.SPANISH -> "Español"
-    AppLanguage.HEBREW -> "עברית"
-}
+@Composable
+private fun AppLanguage.displayName() = stringResource(
+    when (this) {
+        AppLanguage.ENGLISH -> R.string.onb_language_english
+        AppLanguage.SPANISH -> R.string.onb_language_spanish
+        AppLanguage.HEBREW -> R.string.onb_language_hebrew
+    },
+)
 
-private fun AppLanguage.previewHeading() = when (this) {
-    AppLanguage.ENGLISH -> "Home"
-    AppLanguage.SPANISH -> "Inicio"
-    AppLanguage.HEBREW -> "בית"
-}
+@Composable
+private fun TextSize.displayName() = stringResource(
+    when (this) {
+        TextSize.STANDARD -> R.string.onb_text_size_standard
+        TextSize.LARGE -> R.string.onb_text_size_large
+        TextSize.HUGE -> R.string.onb_text_size_huge
+    },
+)
 
-private fun AppLanguage.previewLabels() = when (this) {
-    AppLanguage.ENGLISH -> "Phone · Messages · Settings"
-    AppLanguage.SPANISH -> "Teléfono · Mensajes · Configuración"
-    AppLanguage.HEBREW -> "טלפון · הודעות · הגדרות"
-}
-
-private fun TextSize.displayName() = when (this) {
-    TextSize.STANDARD -> "Standard"
-    TextSize.LARGE -> "Large"
-    TextSize.HUGE -> "Huge"
-}
-
-private fun ReadinessCapability.displayName() = when (this) {
-    ReadinessCapability.HOME -> "Default home"
-    ReadinessCapability.PHONE -> "Default phone"
-    ReadinessCapability.MESSAGES -> "Default SMS"
-    ReadinessCapability.CONTACTS -> "Contacts"
-    ReadinessCapability.NOTIFICATIONS -> "Notifications"
-    ReadinessCapability.MEDIA -> "Photos"
-}
+@Composable
+private fun ReadinessCapability.displayName() = stringResource(
+    when (this) {
+        ReadinessCapability.HOME -> R.string.onb_capability_home
+        ReadinessCapability.PHONE -> R.string.onb_capability_phone
+        ReadinessCapability.MESSAGES -> R.string.onb_capability_messages
+        ReadinessCapability.CONTACTS -> R.string.onb_capability_contacts
+        ReadinessCapability.NOTIFICATIONS -> R.string.onb_capability_notifications
+        ReadinessCapability.MEDIA -> R.string.onb_capability_media
+    },
+)
 
 private fun ReadinessCapability.iconKind() = when (this) {
     ReadinessCapability.HOME -> ClaroIconKind.HOME
@@ -2366,24 +2451,35 @@ private fun ReadinessCapability.iconKind() = when (this) {
     ReadinessCapability.MEDIA -> ClaroIconKind.GALLERY
 }
 
-private fun CapabilityStatus.displayName() = when (this) {
-    CapabilityStatus.READY -> "Allowed · service test separate"
-    CapabilityStatus.NEEDS_ATTENTION -> "Access needed"
-    CapabilityStatus.UNAVAILABLE -> "Unavailable on this device"
-}
+@Composable
+private fun CapabilityStatus.displayName() = stringResource(
+    when (this) {
+        CapabilityStatus.READY -> R.string.onb_capability_status_ready
+        CapabilityStatus.NEEDS_ATTENTION -> R.string.onb_capability_status_needs_attention
+        CapabilityStatus.UNAVAILABLE -> R.string.onb_capability_status_unavailable
+    },
+)
 
-private fun HandoverCheck.displayName() = when (this) {
-    HandoverCheck.OUTGOING_CALL -> "Outgoing call observed"
-    HandoverCheck.INCOMING_CALL -> "Incoming call observed"
-    HandoverCheck.SMS_SEND -> "SMS send observed"
-    HandoverCheck.SMS_RECEIVE -> "SMS receive observed"
-    HandoverCheck.DEFAULT_SIM -> "Default SIM checked"
-    HandoverCheck.RINGTONE -> "Audible ringtone checked"
-    HandoverCheck.HOME_RETURN -> "Home return checked"
-    HandoverCheck.SOS_TEST -> "Consented SOS test observed"
-}
+@Composable
+private fun HandoverCheck.displayName() = stringResource(
+    when (this) {
+        HandoverCheck.OUTGOING_CALL -> R.string.onb_handover_outgoing_call
+        HandoverCheck.INCOMING_CALL -> R.string.onb_handover_incoming_call
+        HandoverCheck.SMS_SEND -> R.string.onb_handover_sms_send
+        HandoverCheck.SMS_RECEIVE -> R.string.onb_handover_sms_receive
+        HandoverCheck.DEFAULT_SIM -> R.string.onb_handover_default_sim
+        HandoverCheck.RINGTONE -> R.string.onb_handover_ringtone
+        HandoverCheck.HOME_RETURN -> R.string.onb_handover_home_return
+        HandoverCheck.SOS_TEST -> R.string.onb_handover_sos_test
+    },
+)
 
+@Composable
 private fun readinessSummary(preferences: ClaroPreferences): String {
     val ready = preferences.onboarding.readiness.values.count { it == CapabilityStatus.READY }
-    return "$ready of ${ReadinessCapability.entries.size} allowed"
+    return stringResource(
+        R.string.onb_readiness_summary,
+        ready,
+        ReadinessCapability.entries.size,
+    )
 }

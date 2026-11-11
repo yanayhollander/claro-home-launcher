@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="onboarding_welcome">ברוכים הבאים ל-Claro</string>
     <string name="touch_home">מסך בית במגע</string>
@@ -5,4 +6,158 @@
     <string name="settings">הגדרות</string>
     <string name="phone_style">סגנון הטלפון</string>
     <string name="unlock">פתיחה</string>
+
+    <string name="onb_cancel">ביטול</string>
+    <string name="onb_continue">המשך</string>
+    <string name="onb_save">שמירה</string>
+    <string name="onb_save_and_continue">שמירה והמשך</string>
+
+    <string name="onb_step_choose_phone_style">בחירת סגנון הטלפון</string>
+    <string name="onb_language_and_display_title">שפה ותצוגה</string>
+    <string name="onb_settings_access">גישה להגדרות</string>
+    <string name="onb_step_people_and_speed_dial">אנשי קשר וחיוג מהיר</string>
+    <string name="onb_sos_contact_title">איש קשר לחירום (SOS)</string>
+    <string name="onb_step_permissions_and_roles">הרשאות וברירות מחדל</string>
+    <string name="onb_step_handover_checklist">רשימת בדיקה למסירה</string>
+    <string name="onb_step_setup_complete">ההגדרה הושלמה</string>
+    <string name="onb_setup_complete_body">ההגדרה הושלמה. מסך הבית שלכם מוכן.</string>
+    <string name="onb_setup_step_progress">שלב הגדרה %1$d מתוך %2$d</string>
+
+    <string name="onb_set_up_claro">הגדרת Claro</string>
+    <string name="onb_continue_free">המשך בחינם</string>
+    <string name="onb_welcome_no_trial_note">התקנת Claro אינה מתחילה תקופת ניסיון ואינה כרוכה בתשלום.</string>
+    <string name="onb_welcome_tagline">האנשים הקרובים אליכם. בנגיעה אחת.</string>
+    <string name="onb_welcome_subtitle">מסך בית, טלפון והודעות פשוטים וברורים יותר — להגדרה עצמית או יחד עם אדם קרוב.</string>
+    <string name="onb_welcome_permissions_sos_note">Android מבקשת בנפרד גישה למסך הבית, לטלפון, ל-SMS ולמצלמה בעת הצורך. לחצן SOS מתקשר לאיש קשר אחד שבחרתם — זה אינו מוקד חירום מאויש.</string>
+
+    <string name="onb_choose_a_style">בחרו סגנון</string>
+    <string name="onb_use_style">בחירת %1$s</string>
+    <string name="onb_apply_style">החלת %1$s</string>
+    <string name="onb_phone_style_choice_body">בחרו איך Claro ייראה. שני הסגנונות חולקים את אותם אנשי קשר, הודעות והגדרות.</string>
+    <string name="onb_phone_style_settings_body">אפשר להתרשם משני הסגנונות. המעבר משנה רק את התצוגה — אנשי הקשר, ההודעות וההגדרות נשמרים במלואם.</string>
+    <string name="onb_phone_style_pending_switch">המעבר אל %1$s ממתין לסיום הפעולה הנוכחית.</string>
+    <string name="onb_touch_mode_card_summary">אנשי קשר עם תמונה וכפתורים ב-2 עמודות</string>
+    <string name="onb_classic_mode_card_summary">מקשים קבועים, חיצים וכפתורי שיחה/בית</string>
+    <string name="onb_mode_selected">✓ נבחר</string>
+    <string name="onb_tap_to_choose">הקישו לבחירה</string>
+    <string name="onb_classic_preview_date">ד׳ 11</string>
+
+    <string name="onb_section_language">שפה</string>
+    <string name="onb_section_text_size">גודל טקסט</string>
+    <string name="onb_text_size_standard">רגיל</string>
+    <string name="onb_text_size_large">גדול</string>
+    <string name="onb_text_size_huge">ענק</string>
+    <string name="onb_high_contrast">ניגודיות גבוהה</string>
+    <string name="onb_keypad_and_touch_vibration">רטט במקשים ובמגע</string>
+    <string name="onb_preview_heading">בית</string>
+    <string name="onb_preview_labels">טלפון · הודעות · הגדרות</string>
+
+    <string name="onb_todays_date_title">מה התאריך היום?</string>
+    <string name="onb_forgot_pin">שכחתם את הקוד?</string>
+    <string name="onb_date_gate_instructions">הזינו את התאריך של היום במבנה dd/MM/YYYY. שלב זה מונע לחיצות אקראיות ואינו נעילת אבטחה.</string>
+    <string name="onb_pin_gate_instructions">הזינו קוד בן 6 ספרות של בן משפחה או מלווה כדי לפתוח את ההגדרות.</string>
+    <string name="onb_date_field_supporting">יום ב-2 ספרות, חודש ב-2 ספרות, שנה ב-4 ספרות</string>
+    <string name="onb_six_digit_pin_label">קוד PIN בן 6 ספרות</string>
+    <string name="onb_confirm_six_digit_pin_label">אימות קוד PIN בן 6 ספרות</string>
+    <string name="onb_pin_digits_entered">הוזנו %1$d מתוך 6 ספרות של הקוד</string>
+    <string name="onb_save_access_method">שמירת שיטת הגישה</string>
+    <string name="onb_date_question_option_title">שאלת תאריך (dd/MM/YYYY)</string>
+    <string name="onb_date_question_option_subtitle">ללא סיסמה לזכור · מונע לחיצות בטעות</string>
+    <string name="onb_caregiver_pin_option_title">קוד PIN למלווה</string>
+    <string name="onb_caregiver_pin_option_subtitle">קוד בן 6 ספרות + צופן שחזור של 12 תווים לפחות</string>
+    <string name="onb_date_question_info">כל מי שיודע מה התאריך של היום (dd/MM/YYYY) יכול לפתוח את ההגדרות. אין צורך לשמור קוד PIN או צופן שחזור.</string>
+    <string name="onb_caregiver_pin_warning">שמרו במקום בטוח את קוד ה-PIN בן 6 הספרות ואת צופן השחזור (12 תווים לפחות). התאריך של היום אינו פותח ואינו משחזר מצב קוד PIN.</string>
+    <string name="onb_recovery_secret_with_min_label">צופן שחזור (12 תווים לפחות)</string>
+    <string name="onb_recovery_secret_min_progress">%1$d/12 תווים לפחות</string>
+
+    <string name="onb_recover_pin_title">שחזור קוד PIN למלווה</string>
+    <string name="onb_set_new_pin">קביעת קוד PIN חדש</string>
+    <string name="onb_recover_pin_instructions">השתמשו בצופן השחזור שנשמר בעת ההגדרה. התאריך של היום אינו יכול לעקוף או לאפס קוד PIN למלווה.</string>
+    <string name="onb_recovery_secret_label">צופן שחזור</string>
+    <string name="onb_new_six_digit_pin_label">קוד PIN חדש בן 6 ספרות</string>
+    <string name="onb_confirm_new_pin_label">אימות קוד PIN חדש</string>
+    <string name="onb_recover_pin_lost_both_warning">איבדתם גם את קוד ה-PIN וגם את צופן השחזור? אפסו את Claro בהגדרות היישומים של Android. ההעדפות המקומיות והטיוטות של Claro יימחקו; אנשי הקשר, הודעות ה-SMS והתמונות בטלפון יישמרו.</string>
+
+    <string name="onb_open_contacts_and_speed_dial">פתיחת אנשי קשר וחיוג מהיר</string>
+    <string name="onb_continue_setup_incomplete">המשך ללא השלמת ההגדרה</string>
+    <string name="onb_people_setup_body">שייכו אנשי קשר מהטלפון לארבעת המקומות עם תמונה במסך הבית, ולפי הצורך גם ללחיצה ארוכה על מקשים 1 ו-2.</string>
+    <string name="onb_slot_set">מוגדר</string>
+    <string name="onb_slot_open">פנוי</string>
+    <string name="onb_speed_dial_assigned">משויך</string>
+    <string name="onb_speed_dial_not_set">לא הוגדר</string>
+    <string name="onb_people_setup_status_configured">%1$d מתוך 4 אנשי קשר במסך הבית הוגדרו. לחיצה ארוכה על 1: %2$s · לחיצה ארוכה על 2: %3$s.</string>
+    <string name="onb_people_setup_status_empty">עדיין לא הוגדרו אנשי קשר במסך הבית — מקומות פנויים יוצגו בתור הוספת איש קשר. לחיצה ארוכה על 1: %1$s · לחיצה ארוכה על 2: %2$s.</string>
+    <string name="onb_people_setup_hold_note">לחיצה ארוכה על 1 או 2 מוציאה שיחה מיד, ללא מסך אישור נוסף.</string>
+
+    <string name="onb_configure_trusted_person">הגדרת איש קשר מהימן</string>
+    <string name="onb_continue_sos_incomplete">המשך ללא השלמת SOS</string>
+    <string name="onb_sos_setup_body">לחצן SOS מתקשר לאיש קשר מהימן אחד לאחר ספירה לאחור של 5 שניות. זה אינו מוקד מצוקה או שירות חירום, ולא נשלחים בו SMS או מיקום.</string>
+    <string name="onb_sos_setup_agreed_info">איש הקשר המהימן נשמר בהסכמתו. מומלץ לבצע שיחת בדיקה מתואמת בנפרד.</string>
+    <string name="onb_sos_setup_unconfigured_warning">לחצן SOS אינו מוגדר. לא ניתן להתחיל שיחת SOS עד שאיש קשר אמיתי יאשר זאת.</string>
+
+    <string name="onb_continue_to_handover">המשך לבדיקת המסירה</string>
+    <string name="onb_readiness_checklist_info">כל הרשאה או ברירת מחדל ב-Android מתבקשת בנפרד. אם חסרה גישה, הפעולות הרגילות של המכשיר יישארו זמינות.</string>
+    <string name="onb_back_to_settings">חזרה להגדרות</string>
+    <string name="onb_readiness_settings_info">הסימון מאושר מציין ש-Android העניקה הרשאה — אך אינו מוודא ששיחה, הודעת SMS או בדיקת SOS אכן הצליחו בפועל.</string>
+    <string name="onb_allow_or_repair">אישור או תיקון</string>
+    <string name="onb_open_android_settings">פתיחת הגדרות Android</string>
+    <string name="onb_capability_home">מסך בית ברירת מחדל</string>
+    <string name="onb_capability_phone">חייגן ברירת מחדל</string>
+    <string name="onb_capability_messages">יישום SMS ברירת מחדל</string>
+    <string name="onb_capability_contacts">אנשי קשר</string>
+    <string name="onb_capability_notifications">התראות</string>
+    <string name="onb_capability_media">תמונות</string>
+    <string name="onb_capability_status_ready">מאושר · בדיקת השירות בנפרד</string>
+    <string name="onb_capability_status_needs_attention">נדרשת הרשאה</string>
+    <string name="onb_capability_status_unavailable">לא זמין במכשיר זה</string>
+    <string name="onb_readiness_summary">%1$d מתוך %2$d אושרו</string>
+
+    <string name="onb_optional_plans">תוכניות רשות</string>
+    <string name="onb_finish_setup">סיום ההגדרה</string>
+    <string name="onb_handover_body">בדקו יחד שהשירותים פועלים בפועל. סעיפים שלא יסומנו יישארו מסומנים בכנות ככאלה שטרם נבדקו.</string>
+    <string name="onb_handover_all_observed">כל %1$d בדיקות המסירה בוצעו.</string>
+    <string name="onb_handover_progress_observed">בוצעו %1$d מתוך %2$d בדיקות מסירה.</string>
+    <string name="onb_handover_outgoing_call">שיחה יוצאת נבדקה</string>
+    <string name="onb_handover_incoming_call">שיחה נכנסת נבדקה</string>
+    <string name="onb_handover_sms_send">שליחת SMS נבדקה</string>
+    <string name="onb_handover_sms_receive">קבלת SMS נבדקה</string>
+    <string name="onb_handover_default_sim">כרטיס SIM ברירת מחדל נבדק</string>
+    <string name="onb_handover_ringtone">עוצמת הצלצול נבדקה</string>
+    <string name="onb_handover_home_return">חזרה למסך הבית נבדקה</string>
+    <string name="onb_handover_sos_test">בדיקת SOS מתואמת בוצעה</string>
+    <string name="onb_allowed_apps_and_tiles_title">יישומים מורשים וכפתורים במסך הבית</string>
+    <string name="onb_allowed_apps_and_tiles_subtitle">בחירת יישומים נוספים למסך הבית</string>
+
+    <string name="onb_done_lock">סיום · נעילה</string>
+    <string name="onb_home_and_apps_title">מסך הבית ויישומים</string>
+    <string name="onb_home_and_apps_subtitle">יישומים מורשים וכפתורים נוספים במסך הבית</string>
+    <string name="onb_people_and_speed_dial_amp_title">אנשי קשר וחיוג מהיר</string>
+    <string name="onb_people_configured_short">%1$d/4 אנשי קשר הוגדרו במסך הבית</string>
+    <string name="onb_language_and_display_amp_title">שפה ותצוגה</string>
+    <string name="onb_language_display_summary_high_contrast">%1$s · %2$s · ניגודיות גבוהה</string>
+    <string name="onb_sos_subtitle_configured">איש קשר מהימן אושר · בדיקה בנפרד</string>
+    <string name="onb_sos_subtitle_not_configured">לא הוגדר</string>
+    <string name="onb_permissions_and_roles_amp_title">הרשאות וברירות מחדל</string>
+    <string name="onb_settings_access_date_subtitle">שאלה עם התאריך של היום</string>
+    <string name="onb_settings_access_pin_subtitle">קוד PIN למלווה · שחזור מקומי</string>
+    <string name="onb_membership_and_privacy_title">מינוי ופרטיות</string>
+    <string name="onb_membership_and_privacy_subtitle">תכונות הליבה בחינם · אבחון כבוי כברירת מחדל</string>
+    <string name="onb_reset_claro">איפוס Claro</string>
+    <string name="onb_reset_claro_subtitle">ניקוי ההגדרות המקומיות של Claro בלבד</string>
+
+    <string name="onb_reset_claro_confirm_title">לאפס את Claro?</string>
+    <string name="onb_return_to_call">חזרה לשיחה</string>
+    <string name="onb_reset_end_call_first">סיימו תחילה את השיחה.</string>
+    <string name="onb_reset_all_changes_question">לאפס את כל השינויים ב-Claro?</string>
+    <string name="onb_reset_scope_warning">מאפס את Claro בטלפון זה בלבד. נתוני המכשיר והרכישות בחנות נשארים ללא שינוי.</string>
+    <string name="onb_reset_cleared_heading">יימחק מתוך Claro</string>
+    <string name="onb_reset_cleared_item_preferences">העדפות Claro (סגנון הטלפון, שפה, גודל טקסט, ניגודיות ואבחון)</string>
+    <string name="onb_reset_cleared_item_favorites">מועדפים במסך הבית וחיוג מהיר בלחיצה ארוכה על 1 ו-2</string>
+    <string name="onb_reset_cleared_item_photos_sos">קישורים לתמונות שנבחרו ושיוך איש הקשר ל-SOS</string>
+    <string name="onb_reset_cleared_item_pin_drafts">קוד PIN למלווה, צופן שחזור וטיוטות הודעות שלא נשלחו ב-Claro</string>
+    <string name="onb_reset_kept_heading">נשמר בטלפון שלכם</string>
+    <string name="onb_reset_kept_item_contacts">אנשי הקשר ויומן השיחות של Android</string>
+    <string name="onb_reset_kept_item_sms">שיחות הודעות SMS ו-MMS</string>
+    <string name="onb_reset_kept_item_photos">תמונות וסרטונים במכשיר</string>
+    <string name="onb_reset_kept_item_purchases">מינויים ורכישות ב-Google Play</string>
 </resources>

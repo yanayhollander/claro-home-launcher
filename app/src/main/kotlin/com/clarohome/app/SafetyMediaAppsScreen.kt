@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.res.Resources
 import android.net.Uri
 import android.os.Build
 import android.os.SystemClock
@@ -50,7 +51,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -168,15 +171,13 @@ fun SafetyMediaAppsScreen(
     }
 }
 
-private const val NON_DISPATCH_SOS_WARNING =
-    "Not an emergency service. Calls your contact only. No message or location sent."
-
 @Composable
 private fun SosScreen(
     state: SosState,
     viewModel: MainViewModel,
     onOpenProtectedSosSettings: () -> Unit,
 ) {
+    val resources = LocalResources.current
     var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
 
     LaunchedEffect(state) {
@@ -186,7 +187,12 @@ private fun SosScreen(
         }
     }
 
-    val title = if (state is SosState.CountingDown) "Calling in…" else "Call for help"
+    val title = if (state is SosState.CountingDown) {
+        stringResource(R.string.app_sos_calling_in)
+    } else {
+        stringResource(R.string.app_call_for_help)
+    }
+    val nonDispatchWarning = stringResource(R.string.app_sos_non_dispatch_warning)
 
     ClaroScreenScaffold(
         title = title,
@@ -195,46 +201,46 @@ private fun SosScreen(
             when (state) {
                 is SosState.Armed -> {
                     ClaroSecondaryButton(
-                        label = "Settings",
+                        label = stringResource(R.string.app_settings),
                         onClick = onOpenProtectedSosSettings,
                     )
                     ClaroPrimaryButton(
-                        label = "Call in 5 seconds",
+                        label = stringResource(R.string.app_call_in_5_seconds),
                         onClick = { viewModel.startSos(false, SystemClock.elapsedRealtime()) },
                         containerColor = ClaroColors.Red,
                         enabled = state.contact.recipientConsented,
                     )
                     ClaroEmergencyButton(
-                        label = "Emergency call",
+                        label = stringResource(R.string.app_emergency_call),
                         onClick = { viewModel.openEmergencyDialer() },
                     )
                 }
                 is SosState.Unset -> {
                     ClaroSecondaryButton(
-                        label = "Settings",
+                        label = stringResource(R.string.app_settings),
                         onClick = onOpenProtectedSosSettings,
                     )
                     ClaroPrimaryButton(
-                        label = "Call in 5 seconds",
+                        label = stringResource(R.string.app_call_in_5_seconds),
                         onClick = {},
                         containerColor = ClaroColors.Red,
                         enabled = false,
                     )
                     ClaroEmergencyButton(
-                        label = "Emergency call",
+                        label = stringResource(R.string.app_emergency_call),
                         onClick = { viewModel.openEmergencyDialer() },
                     )
                 }
                 is SosState.CountingDown -> {
                     ClaroPrimaryButton(
-                        label = "STOP",
+                        label = stringResource(R.string.app_sos_stop),
                         onClick = { viewModel.cancelSos() },
                         containerColor = ClaroColors.Red,
                     )
                 }
                 is SosState.Canceled -> {
                     ClaroPrimaryButton(
-                        label = "Try again",
+                        label = stringResource(R.string.app_try_again),
                         onClick = {
                             viewModel.startSos(state.testMode, SystemClock.elapsedRealtime())
                         },
@@ -242,13 +248,13 @@ private fun SosScreen(
                         enabled = state.contact.recipientConsented,
                     )
                     ClaroEmergencyButton(
-                        label = "Emergency call",
+                        label = stringResource(R.string.app_emergency_call),
                         onClick = { viewModel.openEmergencyDialer() },
                     )
                 }
                 is SosState.Interrupted -> {
                     ClaroPrimaryButton(
-                        label = "Try again",
+                        label = stringResource(R.string.app_try_again),
                         onClick = {
                             viewModel.startSos(state.testMode, SystemClock.elapsedRealtime())
                         },
@@ -256,13 +262,13 @@ private fun SosScreen(
                         enabled = state.contact.recipientConsented,
                     )
                     ClaroEmergencyButton(
-                        label = "Emergency call",
+                        label = stringResource(R.string.app_emergency_call),
                         onClick = { viewModel.openEmergencyDialer() },
                     )
                 }
                 is SosState.Calling -> {
                     ClaroPrimaryButton(
-                        label = "Try again",
+                        label = stringResource(R.string.app_try_again),
                         onClick = {
                             viewModel.configureSos(
                                 state.contact.displayName,
@@ -275,13 +281,13 @@ private fun SosScreen(
                         enabled = state.contact.recipientConsented,
                     )
                     ClaroEmergencyButton(
-                        label = "Emergency call",
+                        label = stringResource(R.string.app_emergency_call),
                         onClick = { viewModel.openEmergencyDialer() },
                     )
                 }
                 is SosState.Failed -> {
                     ClaroPrimaryButton(
-                        label = "Try again",
+                        label = stringResource(R.string.app_try_again),
                         onClick = {
                             viewModel.startSos(state.testMode, SystemClock.elapsedRealtime())
                         },
@@ -289,7 +295,7 @@ private fun SosScreen(
                         enabled = state.contact.recipientConsented,
                     )
                     ClaroEmergencyButton(
-                        label = "Emergency call",
+                        label = stringResource(R.string.app_emergency_call),
                         onClick = { viewModel.openEmergencyDialer() },
                     )
                 }
@@ -304,12 +310,12 @@ private fun SosScreen(
                     destination = state.contact.destination,
                 )
                 ClaroInfoCard(
-                    text = NON_DISPATCH_SOS_WARNING,
+                    text = nonDispatchWarning,
                     tone = ClaroBannerTone.WARNING,
                 )
                 if (!state.contact.recipientConsented) {
                     ClaroInfoCard(
-                        text = "Choose a contact who has agreed in Settings.",
+                        text = stringResource(R.string.app_sos_choose_agreed_contact),
                         tone = ClaroBannerTone.ERROR,
                     )
                 }
@@ -317,16 +323,16 @@ private fun SosScreen(
             is SosState.Unset -> {
                 SosWordmark()
                 ClaroInfoCard(
-                    text = "Choose a help contact in Settings.",
+                    text = stringResource(R.string.app_sos_choose_help_contact),
                     tone = ClaroBannerTone.WARNING,
                 )
                 ClaroInfoCard(
-                    text = NON_DISPATCH_SOS_WARNING,
+                    text = nonDispatchWarning,
                     tone = ClaroBannerTone.WARNING,
                 )
                 if (state.message != "SOS is not configured.") {
                     ClaroInfoCard(
-                        text = state.message,
+                        text = localizeSosUnsetMessage(state.message, resources),
                         tone = ClaroBannerTone.ERROR,
                     )
                 }
@@ -365,12 +371,12 @@ private fun SosScreen(
                 )
                 if (state.testMode) {
                     ClaroInfoCard(
-                        text = "Test call mode.",
+                        text = stringResource(R.string.app_sos_test_call_mode),
                         tone = ClaroBannerTone.INFO,
                     )
                 }
                 Text(
-                    text = "Back or Home cancels the call.",
+                    text = stringResource(R.string.app_sos_back_or_home_cancels),
                     color = ClaroColors.Muted,
                     fontSize = 19.sp,
                     lineHeight = 24.sp,
@@ -383,7 +389,7 @@ private fun SosScreen(
             is SosState.Canceled -> {
                 SosWordmark()
                 ClaroInfoCard(
-                    text = "Canceled. No call started.",
+                    text = stringResource(R.string.app_sos_canceled_no_call),
                     tone = ClaroBannerTone.SUCCESS,
                 )
                 SosRecipientCard(
@@ -394,7 +400,7 @@ private fun SosScreen(
             is SosState.Interrupted -> {
                 SosWordmark()
                 ClaroInfoCard(
-                    text = "Canceled. No call started.",
+                    text = stringResource(R.string.app_sos_canceled_no_call),
                     tone = ClaroBannerTone.INFO,
                 )
                 SosRecipientCard(
@@ -408,11 +414,14 @@ private fun SosScreen(
                     destination = state.contact.destination,
                 )
                 ClaroInfoCard(
-                    text = "${state.outcome.friendlyName()}. Help is not confirmed.",
+                    text = stringResource(
+                        R.string.app_sos_calling_unconfirmed,
+                        state.outcome.friendlyName(),
+                    ),
                     tone = ClaroBannerTone.INFO,
                 )
                 ClaroInfoCard(
-                    text = NON_DISPATCH_SOS_WARNING,
+                    text = nonDispatchWarning,
                     tone = ClaroBannerTone.WARNING,
                 )
             }
@@ -422,11 +431,14 @@ private fun SosScreen(
                     destination = state.contact.destination,
                 )
                 ClaroInfoCard(
-                    text = "${state.outcome.friendlyName()}. No one reached. No alert or location delivered.",
+                    text = stringResource(
+                        R.string.app_sos_failed_no_one_reached,
+                        state.outcome.friendlyName(),
+                    ),
                     tone = ClaroBannerTone.ERROR,
                 )
                 ClaroInfoCard(
-                    text = NON_DISPATCH_SOS_WARNING,
+                    text = nonDispatchWarning,
                     tone = ClaroBannerTone.WARNING,
                 )
             }
@@ -437,7 +449,7 @@ private fun SosScreen(
 @Composable
 private fun SosWordmark() {
     Text(
-        text = "SOS",
+        text = stringResource(R.string.app_sos),
         color = ClaroColors.Red,
         fontSize = 60.sp,
         lineHeight = 64.sp,
@@ -504,6 +516,7 @@ private fun SosSettingsScreen(
     onTestStarted: () -> Unit,
     onBack: () -> Unit,
 ) {
+    val resources = LocalResources.current
     val existing = state.trustedContactOrNull()
     var name by rememberSaveable { mutableStateOf(existing?.displayName.orEmpty()) }
     var number by rememberSaveable { mutableStateOf(existing?.destination.orEmpty()) }
@@ -512,15 +525,15 @@ private fun SosSettingsScreen(
     var feedback by remember { mutableStateOf<Pair<String, ClaroBannerTone>?>(null) }
 
     ClaroScreenScaffold(
-        title = "SOS contact",
+        title = stringResource(R.string.app_sos_contact_title),
         dock = {
             ClaroPrimaryButton(
-                label = "Save",
+                label = stringResource(R.string.app_save),
                 onClick = {
                     viewModel.configureSos(name, number, consented)
                     val updated = viewModel.sosState.value
-                    if (name.isNotBlank() && number.isNotBlank() && updated is SosState.Unset) {
-                        feedback = updated.message to ClaroBannerTone.ERROR
+                    if (name.isNotBlank() && number.isBlank().not() && updated is SosState.Unset) {
+                        feedback = localizeSosUnsetMessage(updated.message, resources) to ClaroBannerTone.ERROR
                     } else {
                         onBack()
                     }
@@ -528,7 +541,7 @@ private fun SosSettingsScreen(
                 containerColor = ClaroColors.Blue,
             )
             ClaroSecondaryButton(
-                label = "Cancel",
+                label = stringResource(R.string.app_cancel),
                 onClick = onBack,
             )
         },
@@ -539,13 +552,13 @@ private fun SosSettingsScreen(
 
         if (contacts.isEmpty()) {
             ClaroSecondaryButton(
-                label = "Load contacts",
+                label = stringResource(R.string.app_load_contacts),
                 onClick = onLoadContacts,
                 icon = ClaroIconKind.CONTACT,
             )
         } else {
             Text(
-                text = "Choose from contacts",
+                text = stringResource(R.string.app_choose_from_contacts),
                 color = ClaroColors.Ink,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -560,7 +573,10 @@ private fun SosSettingsScreen(
                         onClick = {
                             name = contact.displayName
                             number = contactNumber.value
-                            feedback = "Selected ${contact.displayName}." to ClaroBannerTone.INFO
+                            feedback = resources.getString(
+                                R.string.app_selected_contact,
+                                contact.displayName,
+                            ) to ClaroBannerTone.INFO
                         },
                     )
                 }
@@ -570,14 +586,14 @@ private fun SosSettingsScreen(
         OutlinedTextField(
             value = name,
             onValueChange = { name = it },
-            label = { Text("Trusted person") },
+            label = { Text(stringResource(R.string.app_trusted_person)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
             value = number,
             onValueChange = { number = it },
-            label = { Text("Phone number") },
+            label = { Text(stringResource(R.string.app_phone_number)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             textStyle = TextStyle(
@@ -600,35 +616,35 @@ private fun SosSettingsScreen(
                 onCheckedChange = null,
             )
             Text(
-                text = "They agreed to receive help calls.",
+                text = stringResource(R.string.app_sos_recipient_agreed),
                 color = ClaroColors.Ink,
                 fontSize = 20.sp,
                 lineHeight = 26.sp,
             )
         }
         ClaroInfoCard(
-            text = "Not an emergency service. Needs mobile service and an answer. No message or location sent.",
+            text = stringResource(R.string.app_sos_settings_warning),
             tone = ClaroBannerTone.WARNING,
         )
         if (!confirmingTest) {
             ClaroSecondaryButton(
-                label = "Test call",
+                label = stringResource(R.string.app_sos_test_call),
                 onClick = { confirmingTest = true },
             )
         } else {
             ClaroInfoCard(
-                text = "Test mode: tell your contact before placing a real test call.",
+                text = stringResource(R.string.app_sos_test_mode_notice),
                 tone = ClaroBannerTone.INFO,
             )
             ClaroPrimaryButton(
-                label = "Start test",
+                label = stringResource(R.string.app_sos_start_test),
                 onClick = {
                     viewModel.configureSos(name, number, consented)
                     if (name.isBlank() || number.isBlank() || !consented || viewModel.sosState.value is SosState.Unset) {
                         val reason = (viewModel.sosState.value as? SosState.Unset)
                             ?.takeIf { it.message != "SOS is not configured." }
-                            ?.message
-                            ?: "Enter a non-emergency contact and confirm they agreed before testing."
+                            ?.let { localizeSosUnsetMessage(it.message, resources) }
+                            ?: resources.getString(R.string.app_sos_test_requires_agreed_contact)
                         feedback = reason to ClaroBannerTone.ERROR
                         confirmingTest = false
                     } else {
@@ -642,7 +658,7 @@ private fun SosSettingsScreen(
                 containerColor = ClaroColors.Red,
             )
             ClaroSecondaryButton(
-                label = "Cancel",
+                label = stringResource(R.string.app_cancel),
                 onClick = { confirmingTest = false },
             )
         }
@@ -658,6 +674,7 @@ private fun CameraGalleryScreen(
     onShowGallery: () -> Unit,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     var status by remember(showCameraFirst) {
         mutableStateOf<Pair<String, ClaroBannerTone>?>(null)
     }
@@ -684,9 +701,9 @@ private fun CameraGalleryScreen(
         val removed = photoId != null && library.confirmOwnedDeletion(photoId, authorized)
         syncPhotos(if (removed) photoId else null)
         status = if (removed) {
-            "Photo deleted." to ClaroBannerTone.SUCCESS
+            resources.getString(R.string.app_photo_deleted) to ClaroBannerTone.SUCCESS
         } else {
-            "Delete canceled or denied. Photo kept." to ClaroBannerTone.WARNING
+            resources.getString(R.string.app_photo_delete_canceled) to ClaroBannerTone.WARNING
         }
         pendingOwnedDeleteId = null
     }
@@ -698,16 +715,16 @@ private fun CameraGalleryScreen(
         if (saved && uri != null) {
             val photo = ClaroPhoto(
                 id = uri.toString(),
-                title = "Camera photo ${photos.size + 1}",
+                title = resources.getString(R.string.app_camera_photo_title, photos.size + 1),
                 contentUri = uri.toString(),
                 ownership = PhotoOwnership.CLARO_OWNED,
             )
             library.addOwned(photo)
             syncPhotos(null)
-            status = "Picture saved. Tap Gallery to view it." to ClaroBannerTone.SUCCESS
+            status = resources.getString(R.string.app_picture_saved) to ClaroBannerTone.SUCCESS
         } else {
             uri?.let { context.contentResolver.delete(it, null, null) }
-            status = "Camera canceled. No picture saved." to ClaroBannerTone.WARNING
+            status = resources.getString(R.string.app_camera_canceled) to ClaroBannerTone.WARNING
         }
         pendingCaptureUri = null
     }
@@ -716,7 +733,7 @@ private fun CameraGalleryScreen(
         ActivityResultContracts.PickVisualMedia(),
     ) { uri ->
         if (uri == null) {
-            status = "Photo selection canceled." to ClaroBannerTone.INFO
+            status = resources.getString(R.string.app_photo_selection_canceled) to ClaroBannerTone.INFO
         } else {
             val persistable = runCatching {
                 context.contentResolver.takePersistableUriPermission(
@@ -726,7 +743,7 @@ private fun CameraGalleryScreen(
             }.isSuccess
             val photo = ClaroPhoto(
                 id = uri.toString(),
-                title = "Selected photo ${photos.size + 1}",
+                title = resources.getString(R.string.app_selected_photo_title, photos.size + 1),
                 contentUri = uri.toString(),
                 ownership = PhotoOwnership.REFERENCED,
                 availability = PhotoAvailability.AVAILABLE,
@@ -737,30 +754,30 @@ private fun CameraGalleryScreen(
             )
             syncPhotos(null)
             status = if (persistable) {
-                "Picture added to Claro." to ClaroBannerTone.SUCCESS
+                resources.getString(R.string.app_picture_added) to ClaroBannerTone.SUCCESS
             } else {
-                "Picture added. Android may ask you to select it again later." to ClaroBannerTone.INFO
+                resources.getString(R.string.app_picture_added_temporary) to ClaroBannerTone.INFO
             }
         }
     }
 
     if (showCameraFirst) {
         ClaroScreenScaffold(
-            title = "Camera",
+            title = stringResource(R.string.app_camera),
             dock = {
                 ClaroPrimaryButton(
-                    label = "Open camera",
+                    label = stringResource(R.string.app_open_camera),
                     onClick = {
                         val uri = createCaptureUri(context)
                         if (uri == null) {
-                            status = "Camera or storage is unavailable." to ClaroBannerTone.ERROR
+                            status = resources.getString(R.string.app_camera_storage_unavailable) to ClaroBannerTone.ERROR
                         } else {
                             pendingCaptureUri = uri
                             runCatching { captureLauncher.launch(uri) }
                                 .onFailure {
                                     context.contentResolver.delete(uri, null, null)
                                     pendingCaptureUri = null
-                                    status = "No system camera is available." to ClaroBannerTone.ERROR
+                                    status = resources.getString(R.string.app_no_system_camera) to ClaroBannerTone.ERROR
                                 }
                         }
                     },
@@ -768,13 +785,13 @@ private fun CameraGalleryScreen(
                     icon = ClaroIconKind.CAMERA,
                 )
                 ClaroSecondaryButton(
-                    label = "Gallery",
+                    label = stringResource(R.string.app_gallery),
                     onClick = onShowGallery,
                 )
             },
         ) {
             ClaroInfoCard(
-                text = "Opens the Android camera outside Claro. Camera controls are not enlarged by Claro.",
+                text = stringResource(R.string.app_camera_external_notice),
                 tone = ClaroBannerTone.INFO,
             )
             status?.let { (message, tone) ->
@@ -794,7 +811,7 @@ private fun CameraGalleryScreen(
                     size = 72.dp,
                 )
                 Text(
-                    text = "Take a picture in your phone's camera app, then return here.",
+                    text = stringResource(R.string.app_camera_take_picture_prompt),
                     color = ClaroColors.Ink,
                     fontSize = 21.sp,
                     lineHeight = 27.sp,
@@ -814,10 +831,10 @@ private fun CameraGalleryScreen(
     }
 
     ClaroScreenScaffold(
-        title = selectedPhoto?.title ?: "Gallery",
+        title = selectedPhoto?.title ?: stringResource(R.string.app_gallery),
         dock = {
             ClaroPrimaryButton(
-                label = "Add picture",
+                label = stringResource(R.string.app_add_picture),
                 onClick = {
                     pickerLauncher.launch(
                         PickVisualMediaRequest(
@@ -828,7 +845,7 @@ private fun CameraGalleryScreen(
                 containerColor = ClaroColors.Blue,
             )
             ClaroSecondaryButton(
-                label = "Camera",
+                label = stringResource(R.string.app_camera),
                 onClick = {
                     selectedPhotoId = null
                     confirmingRemoval = false
@@ -892,13 +909,13 @@ private fun CameraGalleryScreen(
                         confirmingRemoval = false
                         syncPhotos(if (removed) selectedPhoto.id else null)
                         status = if (removed) {
-                            "Picture removed." to ClaroBannerTone.SUCCESS
+                            resources.getString(R.string.app_picture_removed) to ClaroBannerTone.SUCCESS
                         } else {
-                            "Could not delete. Picture kept." to ClaroBannerTone.ERROR
+                            resources.getString(R.string.app_picture_delete_failed) to ClaroBannerTone.ERROR
                         }
                     } else {
                         confirmingRemoval = false
-                        status = "Waiting for Android delete confirmation." to ClaroBannerTone.INFO
+                        status = resources.getString(R.string.app_waiting_delete_confirmation) to ClaroBannerTone.INFO
                     }
                 },
                 onBackToGrid = {
@@ -908,7 +925,7 @@ private fun CameraGalleryScreen(
             )
         } else if (photos.isEmpty()) {
             ClaroInfoCard(
-                text = "No pictures yet.",
+                text = stringResource(R.string.app_no_pictures_yet),
                 tone = ClaroBannerTone.INFO,
             )
         } else {
@@ -994,14 +1011,14 @@ private fun PhotoDetailContent(
     onBackToGrid: () -> Unit,
 ) {
     val actionLabel = if (photo.ownership == PhotoOwnership.CLARO_OWNED) {
-        "Delete photo"
+        stringResource(R.string.app_delete_photo)
     } else {
-        "Remove from Claro"
+        stringResource(R.string.app_remove_from_claro)
     }
     val ownershipBadge = if (photo.ownership == PhotoOwnership.CLARO_OWNED) {
-        "Saved by Claro"
+        stringResource(R.string.app_saved_by_claro)
     } else {
-        "Device photo reference"
+        stringResource(R.string.app_device_photo_reference)
     }
 
     Column(
@@ -1047,15 +1064,15 @@ private fun PhotoDetailContent(
 
     when (photo.availability) {
         PhotoAvailability.PERMISSION_LOST -> ClaroInfoCard(
-            text = "Access was removed. Select this photo again.",
+            text = stringResource(R.string.app_photo_access_removed),
             tone = ClaroBannerTone.WARNING,
         )
         PhotoAvailability.CLOUD_UNAVAILABLE -> ClaroInfoCard(
-            text = "Connect to view cloud photos.",
+            text = stringResource(R.string.app_photo_cloud_unavailable),
             tone = ClaroBannerTone.WARNING,
         )
         PhotoAvailability.MISSING -> ClaroInfoCard(
-            text = "This photo is missing.",
+            text = stringResource(R.string.app_photo_missing),
             tone = ClaroBannerTone.ERROR,
         )
         PhotoAvailability.AVAILABLE -> Unit
@@ -1066,13 +1083,13 @@ private fun PhotoDetailContent(
         horizontalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
     ) {
         ClaroSecondaryButton(
-            label = "← Previous",
+            label = stringResource(R.string.app_photo_previous),
             onClick = onPrevious,
             enabled = hasMultiple,
             modifier = Modifier.weight(1f),
         )
         ClaroSecondaryButton(
-            label = "Next →",
+            label = stringResource(R.string.app_photo_next),
             onClick = onNext,
             enabled = hasMultiple,
             modifier = Modifier.weight(1f),
@@ -1087,9 +1104,9 @@ private fun PhotoDetailContent(
     } else {
         ClaroInfoCard(
             text = if (photo.ownership == PhotoOwnership.CLARO_OWNED) {
-                "Delete this photo from your device? Android may ask you to confirm."
+                stringResource(R.string.app_confirm_delete_device_photo)
             } else {
-                "Remove from Claro? The original stays on your device."
+                stringResource(R.string.app_confirm_remove_from_claro)
             },
             tone = ClaroBannerTone.WARNING,
         )
@@ -1099,13 +1116,13 @@ private fun PhotoDetailContent(
             containerColor = ClaroColors.Red,
         )
         ClaroSecondaryButton(
-            label = "Cancel",
+            label = stringResource(R.string.app_cancel),
             onClick = onCancelRemove,
         )
     }
 
     ClaroSecondaryButton(
-        label = "All pictures",
+        label = stringResource(R.string.app_all_pictures),
         onClick = onBackToGrid,
     )
 }
@@ -1134,15 +1151,22 @@ private fun SosState.trustedContactOrNull(): TrustedContact? = when (this) {
     is SosState.Failed -> contact
 }
 
+private fun localizeSosUnsetMessage(message: String, resources: Resources): String = when (message) {
+    "Emergency numbers cannot be saved as trusted contacts." ->
+        resources.getString(R.string.app_sos_emergency_number_not_allowed)
+    else -> message
+}
+
+@Composable
 private fun SosCallOutcome.friendlyName(): String = when (this) {
-    SosCallOutcome.DIALING -> "Calling"
-    SosCallOutcome.RINGING -> "Ringing"
-    SosCallOutcome.CONNECTED -> "Connected"
-    SosCallOutcome.ENDED -> "Call ended"
-    SosCallOutcome.BUSY -> "Line busy"
-    SosCallOutcome.NO_ANSWER -> "No answer"
-    SosCallOutcome.DECLINED -> "Call declined"
-    SosCallOutcome.NO_SERVICE -> "No mobile service"
-    SosCallOutcome.ROLE_OR_PERMISSION_LOST -> "Phone access needs repair"
-    SosCallOutcome.UNKNOWN_FAILURE -> "Call did not connect"
+    SosCallOutcome.DIALING -> stringResource(R.string.app_sos_outcome_dialing)
+    SosCallOutcome.RINGING -> stringResource(R.string.app_sos_outcome_ringing)
+    SosCallOutcome.CONNECTED -> stringResource(R.string.app_sos_outcome_connected)
+    SosCallOutcome.ENDED -> stringResource(R.string.app_sos_outcome_ended)
+    SosCallOutcome.BUSY -> stringResource(R.string.app_sos_outcome_busy)
+    SosCallOutcome.NO_ANSWER -> stringResource(R.string.app_sos_outcome_no_answer)
+    SosCallOutcome.DECLINED -> stringResource(R.string.app_sos_outcome_declined)
+    SosCallOutcome.NO_SERVICE -> stringResource(R.string.app_sos_outcome_no_service)
+    SosCallOutcome.ROLE_OR_PERMISSION_LOST -> stringResource(R.string.app_sos_outcome_permission_lost)
+    SosCallOutcome.UNKNOWN_FAILURE -> stringResource(R.string.app_sos_outcome_unknown_failure)
 }

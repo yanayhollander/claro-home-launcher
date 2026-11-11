@@ -23,6 +23,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -72,11 +73,11 @@ fun PeopleSettingsScreen(
     BackHandler(onBack = onBack)
 
     ClaroScreenScaffold(
-        title = "People & speed dial",
+        title = stringResource(R.string.app_people_and_speed_dial),
         scrollable = false,
         dock = {
             ClaroPrimaryButton(
-                label = "Done",
+                label = stringResource(R.string.app_done),
                 onClick = onBack,
                 containerColor = ClaroColors.Blue,
             )
@@ -118,7 +119,11 @@ fun PeopleSettingsScreen(
                             isUnassigned = unassigned,
                         )
                         Text(
-                            text = if (unassigned) "Slot ${index + 1}" else favorite?.displayName.orEmpty(),
+                            text = if (unassigned) {
+                                stringResource(R.string.app_favorite_slot, index + 1)
+                            } else {
+                                favorite?.displayName.orEmpty()
+                            },
                             fontSize = 15.sp,
                             lineHeight = 18.sp,
                             fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
@@ -138,6 +143,8 @@ fun PeopleSettingsScreen(
             listOf("1", "2").forEach { slot ->
                 val assignment = assignments.firstOrNull { it.slot == slot }
                 val selected = target == "key:$slot"
+                val assignedName = assignment?.displayNameSnapshot
+                    ?: stringResource(R.string.app_not_set)
                 OutlinedButton(
                     onClick = { target = "key:$slot" },
                     modifier = Modifier
@@ -155,7 +162,7 @@ fun PeopleSettingsScreen(
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
                 ) {
                     Text(
-                        text = "Hold $slot · ${assignment?.displayNameSnapshot ?: "Not set"}",
+                        text = stringResource(R.string.app_speed_dial_hold_slot, slot, assignedName),
                         fontSize = 18.sp,
                         lineHeight = 22.sp,
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
@@ -166,7 +173,7 @@ fun PeopleSettingsScreen(
         }
 
         Text(
-            text = "Holding 1 or 2 calls immediately, without confirmation.",
+            text = stringResource(R.string.app_speed_dial_immediate_notice),
             color = ClaroColors.Muted,
             fontSize = 16.sp,
             lineHeight = 20.sp,
@@ -174,7 +181,7 @@ fun PeopleSettingsScreen(
         )
 
         ClaroSecondaryButton(
-            label = "Clear selected slot",
+            label = stringResource(R.string.app_clear_selected_slot),
             onClick = {
                 val (kind, slot) = target.split(':')
                 if (kind == "home") onClearFavorite(slot.toInt()) else onClearKey(slot)
@@ -185,23 +192,23 @@ fun PeopleSettingsScreen(
             value = query,
             onValueChange = { query = it },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Search") },
+            label = { Text(stringResource(R.string.app_search)) },
             singleLine = true,
         )
 
         if (contacts.isEmpty()) {
             ClaroInfoCard(
-                text = "No contacts are available. Allow Contacts access or add a contact in Android.",
+                text = stringResource(R.string.app_no_contacts_available),
                 tone = ClaroBannerTone.INFO,
             )
             ClaroSecondaryButton(
-                label = "Load contacts",
+                label = stringResource(R.string.app_load_contacts),
                 onClick = onLoadContacts,
                 icon = ClaroIconKind.CONTACT,
             )
         } else if (choices.isEmpty()) {
             ClaroInfoCard(
-                text = "No contacts match your search.",
+                text = stringResource(R.string.app_no_contacts_match_search),
                 tone = ClaroBannerTone.INFO,
             )
         } else {
