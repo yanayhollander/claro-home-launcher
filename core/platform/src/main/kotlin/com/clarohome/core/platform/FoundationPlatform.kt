@@ -4,12 +4,14 @@ import android.util.Log
 import com.clarohome.core.domain.AnalyticsEvent
 import com.clarohome.core.domain.BillingGateway
 import com.clarohome.core.domain.CrashReporter
+import com.clarohome.core.domain.CriticalActivityRepository
 import com.clarohome.core.domain.PlatformReadinessRepository
 import com.clarohome.core.domain.ProductAnalytics
 import com.clarohome.core.domain.StartupRecoveryCoordinator
 import com.clarohome.core.domain.StartupRecoveryState
 import com.clarohome.core.domain.VisualModeRepository
 import com.clarohome.core.model.CapabilityStatus
+import com.clarohome.core.model.CriticalActivity
 import com.clarohome.core.model.EntitlementState
 import com.clarohome.core.model.PlatformReadiness
 import dagger.Binds
@@ -29,7 +31,15 @@ class FakePlatformReadinessRepository @Inject constructor() : PlatformReadinessR
         home = CapabilityStatus.NEEDS_ATTENTION,
         phone = CapabilityStatus.NEEDS_ATTENTION,
         messages = CapabilityStatus.NEEDS_ATTENTION,
+        contacts = CapabilityStatus.NEEDS_ATTENTION,
+        notifications = CapabilityStatus.NEEDS_ATTENTION,
+        media = CapabilityStatus.READY,
     )
+}
+
+@Singleton
+class FakeCriticalActivityRepository @Inject constructor() : CriticalActivityRepository {
+    override val activeActivities: Flow<Set<CriticalActivity>> = flowOf(emptySet())
 }
 
 @Singleton
@@ -104,6 +114,11 @@ abstract class PlatformBindingsModule {
     abstract fun bindStartupRecovery(
         coordinator: DefaultStartupRecoveryCoordinator,
     ): StartupRecoveryCoordinator
+
+    @Binds
+    abstract fun bindCriticalActivityRepository(
+        repository: FakeCriticalActivityRepository,
+    ): CriticalActivityRepository
 
     @Binds
     abstract fun bindAnalytics(analytics: DisabledProductAnalytics): ProductAnalytics

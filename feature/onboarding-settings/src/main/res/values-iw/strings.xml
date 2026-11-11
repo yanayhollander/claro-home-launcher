@@ -1,0 +1,8 @@
+<resources>
+    <string name="onboarding_welcome">ברוכים הבאים ל-Claro</string>
+    <string name="touch_home">מסך בית במגע</string>
+    <string name="classic_phone">טלפון קלאסי</string>
+    <string name="settings">הגדרות</string>
+    <string name="phone_style">סגנון הטלפון</string>
+    <string name="unlock">פתיחה</string>
+</resources>

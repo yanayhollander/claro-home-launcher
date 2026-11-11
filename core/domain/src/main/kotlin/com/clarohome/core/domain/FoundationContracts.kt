@@ -1,6 +1,8 @@
 package com.clarohome.core.domain
 
 import com.clarohome.core.model.EntitlementState
+import com.clarohome.core.model.ClaroPreferences
+import com.clarohome.core.model.CriticalActivity
 import com.clarohome.core.model.HomeSnapshot
 import com.clarohome.core.model.PlatformReadiness
 import com.clarohome.core.model.VisualMode
@@ -9,6 +11,15 @@ import kotlinx.coroutines.flow.Flow
 interface VisualModeRepository {
     val visualMode: Flow<VisualMode>
     suspend fun setVisualMode(mode: VisualMode)
+}
+
+interface ClaroPreferencesRepository {
+    val preferences: Flow<ClaroPreferences>
+    suspend fun save(preferences: ClaroPreferences)
+}
+
+interface CriticalActivityRepository {
+    val activeActivities: Flow<Set<CriticalActivity>>
 }
 
 interface HomeRepository {
@@ -34,6 +45,11 @@ interface StartupRecoveryCoordinator {
 
 enum class ProtectedRoute {
     SETTINGS,
+    PHONE_STYLE,
+    DISPLAY,
+    LANGUAGE,
+    READINESS,
+    PEOPLE_AND_SAFETY,
     MEMBERSHIP,
     PRIVACY,
     RESET,

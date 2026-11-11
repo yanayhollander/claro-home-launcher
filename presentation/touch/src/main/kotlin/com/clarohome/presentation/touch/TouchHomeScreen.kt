@@ -35,7 +35,7 @@ import com.clarohome.core.model.TileAccent
 @Composable
 fun TouchHomeScreen(
     home: HomeSnapshot,
-    onUseClassicMode: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -53,10 +53,10 @@ fun TouchHomeScreen(
                 Text("Wednesday · 20:06", color = Color.White)
             }
             Button(
-                onClick = onUseClassicMode,
+                onClick = onOpenSettings,
                 contentPadding = PaddingValues(horizontal = 12.dp),
             ) {
-                Text("Classic")
+                Text("Settings")
             }
         }
         Row(

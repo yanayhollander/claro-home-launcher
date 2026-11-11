@@ -10,6 +10,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.clarohome.core.model.TextSize
 
 object ClaroColors {
     val Charcoal = Color(0xFF202734)
@@ -28,26 +29,41 @@ object ClaroDimensions {
     val ScreenPadding = 12.dp
 }
 
-private val ClaroTypography = Typography(
-    bodyLarge = TextStyle(fontSize = 24.sp, lineHeight = 30.sp),
-    titleLarge = TextStyle(fontSize = 32.sp, lineHeight = 38.sp, fontWeight = FontWeight.Bold),
-    labelLarge = TextStyle(fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold),
-)
-
-private val ClaroColorScheme = darkColorScheme(
-    primary = ClaroColors.Green,
-    background = ClaroColors.Charcoal,
-    surface = ClaroColors.Surface,
-    onSurface = ClaroColors.Charcoal,
-    onBackground = Color.White,
-    error = ClaroColors.Red,
-)
-
 @Composable
-fun ClaroTheme(content: @Composable () -> Unit) {
+fun ClaroTheme(
+    textSize: TextSize = TextSize.STANDARD,
+    highContrast: Boolean = false,
+    content: @Composable () -> Unit,
+) {
+    val scale = when (textSize) {
+        TextSize.STANDARD -> 1f
+        TextSize.LARGE -> 1.2f
+        TextSize.HUGE -> 1.45f
+    }
+    val typography = Typography(
+        bodyLarge = TextStyle(fontSize = (24 * scale).sp, lineHeight = (30 * scale).sp),
+        titleLarge = TextStyle(
+            fontSize = (32 * scale).sp,
+            lineHeight = (38 * scale).sp,
+            fontWeight = FontWeight.Bold,
+        ),
+        labelLarge = TextStyle(
+            fontSize = (24 * scale).sp,
+            lineHeight = (30 * scale).sp,
+            fontWeight = FontWeight.Bold,
+        ),
+    )
+    val colorScheme = darkColorScheme(
+        primary = if (highContrast) Color(0xFF00A85A) else ClaroColors.Green,
+        background = if (highContrast) Color.Black else ClaroColors.Charcoal,
+        surface = if (highContrast) Color.White else ClaroColors.Surface,
+        onSurface = Color.Black,
+        onBackground = Color.White,
+        error = if (highContrast) Color(0xFFFF334D) else ClaroColors.Red,
+    )
     MaterialTheme(
-        colorScheme = ClaroColorScheme,
-        typography = ClaroTypography,
+        colorScheme = colorScheme,
+        typography = typography,
         shapes = MaterialTheme.shapes.copy(
             medium = RoundedCornerShape(8.dp),
             large = RoundedCornerShape(12.dp),

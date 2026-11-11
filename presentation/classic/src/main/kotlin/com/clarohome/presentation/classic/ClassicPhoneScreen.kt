@@ -27,7 +27,7 @@ import com.clarohome.core.model.HomeSnapshot
 @Composable
 fun ClassicPhoneScreen(
     home: HomeSnapshot,
-    onUseTouchMode: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -44,7 +44,7 @@ fun ClassicPhoneScreen(
                 Text("20:06", color = Color.White)
                 Text("Wednesday", color = Color.White)
             }
-            Button(onClick = onUseTouchMode) { Text("Touch") }
+            Button(onClick = onOpenSettings) { Text("Menu") }
         }
         Text("People", color = Color.White)
         Row(

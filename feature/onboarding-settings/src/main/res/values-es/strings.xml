@@ -1,0 +1,8 @@
+<resources>
+    <string name="onboarding_welcome">Te damos la bienvenida a Claro</string>
+    <string name="touch_home">Inicio táctil</string>
+    <string name="classic_phone">Teléfono clásico</string>
+    <string name="settings">Configuración</string>
+    <string name="phone_style">Estilo del teléfono</string>
+    <string name="unlock">Desbloquear</string>
+</resources>
