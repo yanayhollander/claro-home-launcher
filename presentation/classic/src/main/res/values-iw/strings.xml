@@ -64,8 +64,9 @@
     <string name="classic_phone_number_value">מספר טלפון %1$s</string>
     <string name="classic_calling_unavailable">שיחות אינן זמינות במכשיר זה.</string>
     <string name="classic_phone_access_attention">הגישה לטלפון דורשת טיפול.</string>
-    <string name="classic_history_missed">לא נענתה · %1$s</string>
-    <string name="classic_history_recent">אחרונה · %1$s</string>
+    <string name="classic_call_missed">שיחה שלא נענתה</string>
+    <string name="classic_call_incoming">שיחה נכנסת</string>
+    <string name="classic_call_outgoing">שיחה יוצאת</string>
     <string name="classic_no_contacts_yet">אין עדיין אנשי קשר.</string>
     <string name="classic_no_matches">אין תוצאות מתאימות.</string>
     <string name="classic_more_contacts">עוד אנשי קשר</string>
@@ -114,7 +115,6 @@
     <string name="classic_sending_ellipsis">שולח…</string>
     <string name="classic_new_message">הודעה חדשה</string>
     <string name="classic_repair_messages_access">תיקון גישה להודעות</string>
-    <string name="classic_cancel">ביטול</string>
     <string name="classic_edit">עריכה</string>
     <string name="classic_messages_unavailable">הודעות אינן זמינות במכשיר זה.</string>
     <string name="classic_messages_access_repair">הגישה להודעות דורשת תיקון.</string>

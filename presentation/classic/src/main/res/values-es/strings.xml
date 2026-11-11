@@ -64,8 +64,9 @@
     <string name="classic_phone_number_value">Número de teléfono %1$s</string>
     <string name="classic_calling_unavailable">Las llamadas no están disponibles en este dispositivo.</string>
     <string name="classic_phone_access_attention">El acceso al teléfono requiere atención.</string>
-    <string name="classic_history_missed">Perdida · %1$s</string>
-    <string name="classic_history_recent">Reciente · %1$s</string>
+    <string name="classic_call_missed">Llamada perdida</string>
+    <string name="classic_call_incoming">Llamada entrante</string>
+    <string name="classic_call_outgoing">Llamada saliente</string>
     <string name="classic_no_contacts_yet">Aún no hay contactos.</string>
     <string name="classic_no_matches">Sin coincidencias.</string>
     <string name="classic_more_contacts">Más contactos</string>
@@ -114,7 +115,6 @@
     <string name="classic_sending_ellipsis">Enviando…</string>
     <string name="classic_new_message">Nuevo mensaje</string>
     <string name="classic_repair_messages_access">Reparar acceso a Mensajes</string>
-    <string name="classic_cancel">Cancelar</string>
     <string name="classic_edit">Editar</string>
     <string name="classic_messages_unavailable">Los mensajes no están disponibles en este dispositivo.</string>
     <string name="classic_messages_access_repair">El acceso a Mensajes necesita reparación.</string>

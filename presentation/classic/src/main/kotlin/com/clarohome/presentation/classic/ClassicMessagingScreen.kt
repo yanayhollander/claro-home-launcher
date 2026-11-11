@@ -123,7 +123,6 @@ fun ClassicMessagingScreen(
         recipientFieldValue = recipientFieldValue,
         onNewMessage = onNewMessage,
         onOpenRecipients = onOpenRecipients,
-        onCancelRecipients = onCancelRecipients,
         onSearchInbox = {
             multiTapState = null
             onSearchInbox(it)
@@ -141,14 +140,32 @@ fun ClassicMessagingScreen(
             onBodyChange(it)
         },
         onEdit = onEdit,
-        onCancelKeepDraft = onCancelFailure,
         onRepair = onRepair,
         onHome = onHome,
     )
 
     val backAction: () -> Unit = {
+        val editingRecipientPhone = state.route == MessagingRoute.COMPOSE &&
+            composeTarget == ClassicComposeTarget.RECIPIENT
         when {
             optionsOpen -> optionsOpen = false
+            state.route == MessagingRoute.INBOX && state.searchQuery.isNotEmpty() -> {
+                multiTapState = null
+                onSearchInbox(state.searchQuery.dropLast(1))
+            }
+            state.route == MessagingRoute.RECIPIENTS && state.recipientQuery.isNotEmpty() -> {
+                multiTapState = null
+                onSearchRecipients(state.recipientQuery.dropLast(1))
+            }
+            editingRecipientPhone && recipientFieldValue.isNotEmpty() -> {
+                multiTapState = null
+                onRecipientInputChange(recipientFieldValue.dropLast(1))
+            }
+            (state.route == MessagingRoute.COMPOSE || state.route == MessagingRoute.CONVERSATION) &&
+                !editingRecipientPhone && state.draft.body.isNotEmpty() -> {
+                multiTapState = null
+                onBodyChange(state.draft.body.dropLast(1))
+            }
             state.route == MessagingRoute.CONFIRMATION -> onEdit()
             state.route == MessagingRoute.RECIPIENTS -> onCancelRecipients()
             state.route == MessagingRoute.COMPOSE -> onCancelFailure()
@@ -380,22 +397,18 @@ private fun buildClassicMessagingOptions(
     recipientFieldValue: String,
     onNewMessage: () -> Unit,
     onOpenRecipients: () -> Unit,
-    onCancelRecipients: () -> Unit,
     onSearchInbox: (String) -> Unit,
     onSearchRecipients: (String) -> Unit,
     onRecipientInputChange: (String) -> Unit,
     onBodyChange: (String) -> Unit,
     onEdit: () -> Unit,
-    onCancelKeepDraft: () -> Unit,
     onRepair: () -> Unit,
     onHome: () -> Unit,
 ): List<ClassicOptionAction> {
     val newMessageLabel = stringResource(R.string.classic_new_message)
     val contactsLabel = stringResource(R.string.classic_contacts)
-    val deleteCharacterLabel = stringResource(R.string.classic_delete_character)
     val clearTextLabel = stringResource(R.string.classic_clear_text)
     val repairMessagesLabel = stringResource(R.string.classic_repair_messages_access)
-    val cancelLabel = stringResource(R.string.classic_cancel)
     val editLabel = stringResource(R.string.classic_edit)
 
     return buildList {
@@ -403,13 +416,6 @@ private fun buildClassicMessagingOptions(
             MessagingRoute.INBOX -> {
                 add(ClassicOptionAction(label = newMessageLabel, onSelect = onNewMessage))
                 add(ClassicOptionAction(label = contactsLabel, onSelect = onOpenRecipients))
-                add(
-                    ClassicOptionAction(
-                        label = deleteCharacterLabel,
-                        enabled = state.searchQuery.isNotEmpty(),
-                        onSelect = { onSearchInbox(state.searchQuery.dropLast(1)) },
-                    ),
-                )
                 add(
                     ClassicOptionAction(
                         label = clearTextLabel,
@@ -420,17 +426,9 @@ private fun buildClassicMessagingOptions(
                 if (!state.qualification.canRead && state.qualification.telephonySupported) {
                     add(ClassicOptionAction(label = repairMessagesLabel, onSelect = onRepair))
                 }
-                add(ClassicOptionAction(label = cancelLabel, onSelect = onHome))
             }
 
             MessagingRoute.CONVERSATION -> {
-                add(
-                    ClassicOptionAction(
-                        label = deleteCharacterLabel,
-                        enabled = state.draft.body.isNotEmpty(),
-                        onSelect = { onBodyChange(state.draft.body.dropLast(1)) },
-                    ),
-                )
                 add(
                     ClassicOptionAction(
                         label = clearTextLabel,
@@ -440,17 +438,9 @@ private fun buildClassicMessagingOptions(
                 )
                 add(ClassicOptionAction(label = newMessageLabel, onSelect = onNewMessage))
                 add(ClassicOptionAction(label = contactsLabel, onSelect = onOpenRecipients))
-                add(ClassicOptionAction(label = cancelLabel, onSelect = onHome))
             }
 
             MessagingRoute.RECIPIENTS -> {
-                add(
-                    ClassicOptionAction(
-                        label = deleteCharacterLabel,
-                        enabled = state.recipientQuery.isNotEmpty(),
-                        onSelect = { onSearchRecipients(state.recipientQuery.dropLast(1)) },
-                    ),
-                )
                 add(
                     ClassicOptionAction(
                         label = clearTextLabel,
@@ -459,26 +449,12 @@ private fun buildClassicMessagingOptions(
                     ),
                 )
                 add(ClassicOptionAction(label = newMessageLabel, onSelect = onNewMessage))
-                add(ClassicOptionAction(label = cancelLabel, onSelect = onCancelRecipients))
             }
 
             MessagingRoute.COMPOSE -> {
                 val editingRecipient = composeTarget == ClassicComposeTarget.RECIPIENT
                 val activeText = if (editingRecipient) recipientFieldValue else state.draft.body
                 add(ClassicOptionAction(label = contactsLabel, onSelect = onOpenRecipients))
-                add(
-                    ClassicOptionAction(
-                        label = deleteCharacterLabel,
-                        enabled = activeText.isNotEmpty(),
-                        onSelect = {
-                            if (editingRecipient) {
-                                onRecipientInputChange(recipientFieldValue.dropLast(1))
-                            } else {
-                                onBodyChange(state.draft.body.dropLast(1))
-                            }
-                        },
-                    ),
-                )
                 add(
                     ClassicOptionAction(
                         label = clearTextLabel,
@@ -493,25 +469,21 @@ private fun buildClassicMessagingOptions(
                     ),
                 )
                 add(ClassicOptionAction(label = newMessageLabel, onSelect = onNewMessage))
-                add(ClassicOptionAction(label = cancelLabel, onSelect = onCancelKeepDraft))
             }
 
             MessagingRoute.CONFIRMATION -> {
                 add(ClassicOptionAction(label = editLabel, onSelect = onEdit))
                 add(ClassicOptionAction(label = contactsLabel, onSelect = onOpenRecipients))
                 add(ClassicOptionAction(label = newMessageLabel, onSelect = onNewMessage))
-                add(ClassicOptionAction(label = cancelLabel, onSelect = onCancelKeepDraft))
             }
 
             MessagingRoute.FAILED -> {
                 add(ClassicOptionAction(label = editLabel, onSelect = onEdit))
                 add(ClassicOptionAction(label = newMessageLabel, onSelect = onNewMessage))
                 add(ClassicOptionAction(label = contactsLabel, onSelect = onOpenRecipients))
-                add(ClassicOptionAction(label = cancelLabel, onSelect = onCancelKeepDraft))
             }
 
             MessagingRoute.SENDING -> {
-                add(ClassicOptionAction(label = cancelLabel, onSelect = onCancelKeepDraft))
             }
         }
     }
@@ -895,10 +867,6 @@ private fun ClassicMessageDisplay(
                     textColor = Color.White,
                     borderColor = ClaroColors.Blue,
                 )
-                ClassicLightButton(
-                    label = stringResource(R.string.classic_cancel_keep_draft),
-                    onClick = onCancelFailure,
-                )
             }
 
             MessagingRoute.CONFIRMATION -> {
@@ -924,10 +892,6 @@ private fun ClassicMessageDisplay(
                 ClassicLightButton(
                     label = stringResource(R.string.classic_edit),
                     onClick = onEdit,
-                )
-                ClassicLightButton(
-                    label = stringResource(R.string.classic_cancel_keep_draft),
-                    onClick = onCancelFailure,
                 )
             }
 

@@ -121,33 +121,18 @@
 
     <string name="app_photo_deleted">Foto eliminada.</string>
     <string name="app_photo_delete_canceled">Eliminación cancelada o denegada. Se conservó la foto.</string>
-    <string name="app_camera_photo_title">Foto de cámara %1$d</string>
-    <string name="app_picture_saved">Foto guardada. Toque Galería para verla.</string>
-    <string name="app_camera_canceled">Cámara cancelada. No se guardó ninguna foto.</string>
-    <string name="app_photo_selection_canceled">Selección de foto cancelada.</string>
-    <string name="app_selected_photo_title">Foto seleccionada %1$d</string>
-    <string name="app_picture_added">Foto añadida a Claro.</string>
-    <string name="app_picture_added_temporary">Foto añadida. Es posible que Android pida seleccionarla de nuevo más adelante.</string>
     <string name="app_open_camera">Abrir cámara</string>
     <string name="app_camera_storage_unavailable">La cámara o el almacenamiento no están disponibles.</string>
     <string name="app_no_system_camera">No hay ninguna cámara del sistema disponible.</string>
-    <string name="app_camera_external_notice">Abre la cámara de Android fuera de Claro. Claro no amplía los controles de la cámara.</string>
-    <string name="app_camera_take_picture_prompt">Tome una foto en la aplicación de cámara de su teléfono y luego regrese aquí.</string>
-    <string name="app_add_picture">Añadir foto</string>
-    <string name="app_picture_removed">Foto quitada.</string>
     <string name="app_picture_delete_failed">No se pudo eliminar. Se conservó la foto.</string>
-    <string name="app_waiting_delete_confirmation">Esperando la confirmación de eliminación de Android.</string>
     <string name="app_no_pictures_yet">Aún no hay fotos.</string>
     <string name="app_delete_photo">Eliminar foto</string>
-    <string name="app_remove_from_claro">Quitar de Claro</string>
-    <string name="app_saved_by_claro">Guardada por Claro</string>
-    <string name="app_device_photo_reference">Foto guardada en el dispositivo</string>
-    <string name="app_photo_access_removed">Se quitó el permiso. Vuelva a seleccionar esta foto.</string>
-    <string name="app_photo_cloud_unavailable">Conéctese a internet para ver fotos en la nube.</string>
-    <string name="app_photo_missing">Falta esta foto.</string>
     <string name="app_photo_previous">← Anterior</string>
     <string name="app_photo_next">Siguiente →</string>
     <string name="app_confirm_delete_device_photo">¿Eliminar esta foto del dispositivo? Android podría pedir confirmación.</string>
-    <string name="app_confirm_remove_from_claro">¿Quitar de Claro? La foto original permanece en su dispositivo.</string>
     <string name="app_all_pictures">Todas las fotos</string>
+    <string name="app_gallery_allow_pictures">Permitir fotos</string>
+    <string name="app_gallery_access_needed">Permite que Claro muestre tus fotos. Si Android ya no lo pregunta, abre los ajustes y permite Fotos.</string>
+    <string name="app_gallery_partial_access">Android comparte solo algunas fotos. Permite todas las fotos para verlas todas.</string>
+    <string name="app_picture_position">Foto %1$d de %2$d</string>
 </resources>

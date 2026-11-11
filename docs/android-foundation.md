@@ -90,12 +90,26 @@ is absent, the request fails into a repair state instead of simulating success.
 Emergency access is a separate native dialer handoff and is never gated by Claro
 configuration or entitlement.
 
-Camera capture is an external system handoff backed by scoped `MediaStore`
-content. Imported photos use the system Photo Picker, references are removable
-without deleting the original, and owned-photo deletion uses Android's delete
-authorization flow where required. The Apps screen launches only caregiver-
-allowlisted launcher activities and does not claim to resize, lock, or control
-third-party apps.
+Camera opens the system camera immediately (no intermediate Claro screen) and,
+after a capture, lands in the Gallery. The Gallery lists every image on the
+device from `MediaStore` (newest first, `READ_MEDIA_IMAGES`, with
+`READ_MEDIA_VISUAL_USER_SELECTED` for partial access on Android 14+ and
+`READ_EXTERNAL_STORAGE` up to API 32); there is no "add picture" import step.
+This deliberately overrides the original Claro-only gallery wording of
+REQ-MEDIA-01/02 at the product owner's request. Deleting a photo still uses
+Android's delete authorization flow. The Apps screen and Home/menu tiles show
+each app's real launcher icon (`ClaroAppIcon`, falling back to a generic glyph),
+launch only caregiver-allowlisted launcher activities and do not claim to
+resize, lock, or control third-party apps.
+
+Messaging UX rules: drafts persist automatically, so Compose and Confirmation
+have no Cancel/Keep-draft buttons (system/product Back is the exit and Classic
+Back deletes the last typed character first); Classic Options no longer repeat
+Delete-character/Cancel; the failed-send screen keeps its PRD Cancel. A
+successful send clears the draft and recipient query, and leaving Messages
+resets the inbox search. Call history rows show only the time plus a trailing
+incoming/outgoing/missed direction icon and read the system `CallLog`.
+Onboarding offers Classic first (left) and preselected, and Favorites persist.
 
 Protected settings are the only route to phone-style changes, allowed-app/Home
 customization, contact creation/editing/deletion, SOS recipient configuration

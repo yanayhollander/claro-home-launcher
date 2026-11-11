@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.clarohome.core.design.ClaroAvatar
+import com.clarohome.core.design.ClaroAppIcon
 import com.clarohome.core.design.ClaroBannerTone
 import com.clarohome.core.design.ClaroBatteryMeter
 import com.clarohome.core.design.ClaroCellularBars
@@ -437,11 +438,19 @@ private fun HomeTileCard(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
             ) {
-                ClaroIcon(
-                    kind = tile.kind.iconKind(),
-                    tint = tile.kind.tileIconTint(),
-                    size = if (tile.kind == HomeTileKind.INSTALLED_APP) 54.dp else 68.dp,
-                )
+                if (tile.kind == HomeTileKind.INSTALLED_APP) {
+                    ClaroAppIcon(
+                        packageName = tile.packageName,
+                        size = 60.dp,
+                        fallbackTint = tile.kind.tileIconTint(),
+                    )
+                } else {
+                    ClaroIcon(
+                        kind = tile.kind.iconKind(),
+                        tint = tile.kind.tileIconTint(),
+                        size = 68.dp,
+                    )
+                }
                 Text(
                     text = displayLabel,
                     color = ClaroColors.Ink,

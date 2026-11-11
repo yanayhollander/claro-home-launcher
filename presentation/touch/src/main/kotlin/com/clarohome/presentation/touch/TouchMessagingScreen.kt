@@ -1,5 +1,6 @@
 package com.clarohome.presentation.touch
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -80,6 +81,21 @@ fun TouchMessagingScreen(
 ) {
     val rootModifier = Modifier.testTag("touch-messaging")
 
+    BackHandler(
+        enabled = state.route in setOf(
+            MessagingRoute.COMPOSE,
+            MessagingRoute.RECIPIENTS,
+            MessagingRoute.CONFIRMATION,
+            MessagingRoute.FAILED,
+        ),
+    ) {
+        when (state.route) {
+            MessagingRoute.RECIPIENTS -> onCancelRecipients()
+            MessagingRoute.CONFIRMATION -> onEdit()
+            else -> onCancelFailure()
+        }
+    }
+
     when (state.route) {
         MessagingRoute.INBOX -> InboxRoute(
             state = state,
@@ -97,7 +113,6 @@ fun TouchMessagingScreen(
             onOpenRecipients = onOpenRecipients,
             onBodyChange = onBodyChange,
             onReview = onReview,
-            onCancelKeepDraft = onCancelFailure,
             onRepair = onRepair,
         )
 
@@ -108,7 +123,6 @@ fun TouchMessagingScreen(
             onLoadMoreRecipients = onLoadMoreRecipients,
             onChooseContactNumber = onChooseContactNumber,
             onManualRecipient = onManualRecipient,
-            onCancelRecipients = onCancelRecipients,
         )
 
         MessagingRoute.CONVERSATION -> ConversationRoute(
@@ -124,7 +138,6 @@ fun TouchMessagingScreen(
             modifier = rootModifier,
             onSend = onSend,
             onEdit = onEdit,
-            onCancelKeepDraft = onCancelFailure,
         )
 
         MessagingRoute.SENDING -> SendingRoute(
@@ -253,7 +266,6 @@ private fun ComposeRoute(
     onOpenRecipients: () -> Unit,
     onBodyChange: (String) -> Unit,
     onReview: () -> Unit,
-    onCancelKeepDraft: () -> Unit,
     onRepair: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -266,10 +278,6 @@ private fun ComposeRoute(
                 label = stringResource(R.string.touch_action_review),
                 onClick = onReview,
                 containerColor = ClaroColors.Blue,
-            )
-            ClaroSecondaryButton(
-                label = stringResource(R.string.touch_cancel_keep_draft),
-                onClick = onCancelKeepDraft,
             )
         },
     ) {
@@ -360,19 +368,12 @@ private fun RecipientsRoute(
     onLoadMoreRecipients: () -> Unit,
     onChooseContactNumber: (ClaroContact, ContactNumber) -> Unit,
     onManualRecipient: (String) -> Unit,
-    onCancelRecipients: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     ClaroScreenScaffold(
         title = stringResource(R.string.touch_choose_recipient_title),
         modifier = modifier,
         scrollable = false,
-        dock = {
-            ClaroSecondaryButton(
-                label = stringResource(R.string.touch_action_cancel),
-                onClick = onCancelRecipients,
-            )
-        },
     ) {
         MessageFieldLabel(stringResource(R.string.touch_search_name_or_number))
         OutlinedTextField(
@@ -636,7 +637,6 @@ private fun ConfirmationRoute(
     state: MessagingUiState,
     onSend: () -> Unit,
     onEdit: () -> Unit,
-    onCancelKeepDraft: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     ClaroScreenScaffold(
@@ -653,10 +653,6 @@ private fun ConfirmationRoute(
             ClaroSecondaryButton(
                 label = stringResource(R.string.touch_action_edit),
                 onClick = onEdit,
-            )
-            ClaroSecondaryButton(
-                label = stringResource(R.string.touch_cancel_keep_draft),
-                onClick = onCancelKeepDraft,
             )
         },
     ) {

@@ -143,7 +143,6 @@
 
     <string name="touch_write_message">Escribir un mensaje</string>
     <string name="touch_action_review">Revisar</string>
-    <string name="touch_cancel_keep_draft">Cancelar · guardar borrador</string>
     <string name="touch_messages_unavailable_device">Los mensajes no están disponibles en este dispositivo.</string>
     <string name="touch_message_access_repair">El acceso a los mensajes requiere reparación.</string>
     <string name="touch_repair_message_access">Reparar acceso a mensajes</string>

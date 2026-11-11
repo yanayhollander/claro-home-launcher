@@ -722,6 +722,7 @@ internal fun ClassicRowItem(
     unreadDot: Boolean = false,
     enabled: Boolean = true,
     leading: (@Composable () -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     var isFocused by remember { mutableStateOf(false) }
     val haptics = LocalClaroHaptics.current
@@ -780,13 +781,17 @@ internal fun ClassicRowItem(
                         )
                     }
                 }
-                val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-                Text(
-                    text = if (isRtl) "←" else "→",
-                    color = Color(0xFF5A687C),
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                )
+                if (trailing != null) {
+                    trailing()
+                } else {
+                    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+                    Text(
+                        text = if (isRtl) "←" else "→",
+                        color = Color(0xFF5A687C),
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
             }
         }
         HorizontalDivider(thickness = 2.dp, color = ClassicFrame)

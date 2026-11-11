@@ -179,6 +179,21 @@ class MessagingCoordinatorTest {
     }
 
     @Test
+    fun successfulSendClearsDraftBodyAndRecipientQuery() = runTest {
+        val fixture = fixture()
+        prepareSend(fixture)
+        val draftId = fixture.coordinator.state.value.draft.id
+
+        fixture.coordinator.send()
+        runCurrent()
+        fixture.transport.mutableEvents.value = SmsTransportEvent.Sent(draftId, 10)
+        runCurrent()
+
+        assertThat(fixture.coordinator.state.value.draft.body).isEmpty()
+        assertThat(fixture.coordinator.state.value.recipientQuery).isEmpty()
+    }
+
+    @Test
     fun touchAndClassicExposeEquivalentMessagingActions() = runTest {
         val fixture = fixture()
         fixture.coordinator.startNewMessage()

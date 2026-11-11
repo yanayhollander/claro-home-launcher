@@ -125,6 +125,18 @@ enum class ClaroIconKind(
         "M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M5 19l2-2M17 7l2-2M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z",
         filled = false,
     ),
+    CALL_INCOMING(
+        "M17 7 7 17m10 0H7V7",
+        filled = false,
+    ),
+    CALL_OUTGOING(
+        "M7 17 17 7M7 7h10v10",
+        filled = false,
+    ),
+    CALL_MISSED(
+        "M17 17 7 7m0 10V7h10",
+        filled = false,
+    ),
     HOME(
         "M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5Z",
         filled = false,

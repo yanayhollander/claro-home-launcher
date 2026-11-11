@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.clarohome.core.design.ClaroAppIcon
 import com.clarohome.core.design.ClaroBannerTone
 import com.clarohome.core.design.ClaroColors
 import com.clarohome.core.design.ClaroDimensions
@@ -269,11 +270,7 @@ private fun SeniorAppRow(
                 stringResource(R.string.app_subtitle_opens_external)
             },
             leading = {
-                ClaroIcon(
-                    kind = ClaroIconKind.APPS,
-                    tint = ClaroColors.Blue,
-                    size = 32.dp,
-                )
+                ClaroAppIcon(packageName = app.packageName, size = 44.dp)
             },
             onClick = onLaunch,
         )
@@ -292,10 +289,10 @@ private fun SeniorAppRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                ClaroIcon(
-                    kind = ClaroIconKind.APPS,
-                    tint = ClaroColors.Muted,
-                    size = 32.dp,
+                ClaroAppIcon(
+                    packageName = app.packageName,
+                    size = 44.dp,
+                    fallbackTint = ClaroColors.Muted,
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -348,10 +345,10 @@ private fun CaregiverAppRow(
                 onCheckedChange = null,
                 enabled = app.isAvailable,
             )
-            ClaroIcon(
-                kind = ClaroIconKind.APPS,
-                tint = if (app.isAvailable) ClaroColors.Blue else ClaroColors.Muted,
-                size = 28.dp,
+            ClaroAppIcon(
+                packageName = app.packageName,
+                size = 40.dp,
+                fallbackTint = if (app.isAvailable) ClaroColors.Blue else ClaroColors.Muted,
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(

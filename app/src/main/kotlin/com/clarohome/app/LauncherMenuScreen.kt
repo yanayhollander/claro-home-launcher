@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.clarohome.core.design.ClaroColors
+import com.clarohome.core.design.ClaroAppIcon
 import com.clarohome.core.design.ClaroIcon
 import com.clarohome.core.design.ClaroIconKind
 import com.clarohome.core.design.ClaroRowButton
@@ -60,11 +61,19 @@ fun LauncherMenuScreen(
                     subtitle = subtitle,
                     unreadDot = unread,
                     leading = {
-                        ClaroIcon(
-                            kind = tile.kind.toClaroIconKind(),
-                            tint = tile.kind.toClaroIconTint(),
-                            size = 32.dp,
-                        )
+                        if (tile.kind == HomeTileKind.INSTALLED_APP) {
+                            ClaroAppIcon(
+                                packageName = tile.packageName,
+                                size = 40.dp,
+                                fallbackTint = tile.kind.toClaroIconTint(),
+                            )
+                        } else {
+                            ClaroIcon(
+                                kind = tile.kind.toClaroIconKind(),
+                                tint = tile.kind.toClaroIconTint(),
+                                size = 32.dp,
+                            )
+                        }
                     },
                     onClick = {
                         if (tile.label == "Settings") {

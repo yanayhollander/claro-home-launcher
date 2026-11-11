@@ -12,6 +12,7 @@ import android.provider.Settings
 import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -38,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -180,6 +182,11 @@ class MainActivity : ComponentActivity() {
         communicationViewModel.refreshQualification()
         communicationViewModel.openContacts()
     }
+    private val mediaPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) {
+        markPermissionRequested(MEDIA_REQUESTED)
+    }
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) {
@@ -279,6 +286,15 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun requestMediaAccess() {
+        val permissions = deviceMediaPermissions()
+        if (shouldOpenAppSettings(permissions, MEDIA_REQUESTED)) {
+            openAppSettings()
+        } else {
+            mediaPermissionLauncher.launch(permissions)
+        }
+    }
+
     private fun requestNotificationAccess() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
         if (shouldOpenAppSettings(arrayOf(Manifest.permission.POST_NOTIFICATIONS), NOTIFICATIONS_REQUESTED)) {
@@ -300,7 +316,7 @@ class MainActivity : ComponentActivity() {
             ReadinessCapability.MESSAGES -> repairMessagesAccess()
             ReadinessCapability.CONTACTS -> requestContactsAccess()
             ReadinessCapability.NOTIFICATIONS -> requestNotificationAccess()
-            ReadinessCapability.MEDIA -> Unit
+            ReadinessCapability.MEDIA -> requestMediaAccess()
         }
     }
 
@@ -357,6 +373,7 @@ class MainActivity : ComponentActivity() {
         private const val MESSAGE_PERMISSIONS_REQUESTED = "messages"
         private const val CONTACTS_REQUESTED = "contacts"
         private const val NOTIFICATIONS_REQUESTED = "notifications"
+        private const val MEDIA_REQUESTED = "media"
         private val PHONE_PERMISSIONS = arrayOf(
             Manifest.permission.CALL_PHONE,
             Manifest.permission.ANSWER_PHONE_CALLS,
@@ -456,9 +473,11 @@ private fun ClaroApp(
         navController.navigate(PhoneRoute)
     }
 
+    var resumeTick by remember { mutableIntStateOf(0) }
     DisposableEffect(lifecycleOwner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
+                resumeTick++
                 Locale.setDefault(viewModel.uiState.value.preferences.language.toLocale())
                 viewModel.refreshLauncherState()
             }
@@ -507,6 +526,7 @@ private fun ClaroApp(
         projectedHome?.homeRole,
         communication.qualification,
         messaging.qualification,
+        resumeTick,
     ) {
         viewModel.setReadiness(
             ReadinessCapability.HOME,
@@ -563,7 +583,14 @@ private fun ClaroApp(
                 CapabilityStatus.NEEDS_ATTENTION
             },
         )
-        viewModel.setReadiness(ReadinessCapability.MEDIA, CapabilityStatus.READY)
+        viewModel.setReadiness(
+            ReadinessCapability.MEDIA,
+            if (deviceMediaAccess(context) == DeviceMediaAccess.FULL) {
+                CapabilityStatus.READY
+            } else {
+                CapabilityStatus.NEEDS_ATTENTION
+            },
+        )
     }
 
     ClaroLocaleContainer(language = state.preferences.language) {
@@ -839,6 +866,13 @@ private fun ClaroApp(
                         )
                     }
                     composable<MessagesRoute> {
+                        DisposableEffect(messagingViewModel) {
+                            onDispose {
+                                if (messagingViewModel.state.value.searchQuery.isNotEmpty()) {
+                                    messagingViewModel.searchInbox("")
+                                }
+                            }
+                        }
                         IntegratedMessagingScreen(
                             state = messaging,
                             visualMode = state.preferences.visualMode,
@@ -864,6 +898,9 @@ private fun ClaroApp(
                             },
                             onOpenProtectedSosSettings = {
                                 navController.openProtected(viewModel, TARGET_SOS_SETTINGS)
+                            },
+                            onRequestMediaAccess = {
+                                onRequestCapability(ReadinessCapability.MEDIA)
                             },
                         )
                     }
@@ -1124,9 +1161,12 @@ private fun ClaroApp(
                     }
                 }
                 if (!isRecoveryOrOnboarding && state.preferences.visualMode == VisualMode.TOUCH) {
+                    val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
                     ProductNavigationBar(
                         onBack = {
-                            if (!navController.popBackStack()) {
+                            if (navController.previousBackStackEntry != null && backDispatcher != null) {
+                                backDispatcher.onBackPressed()
+                            } else {
                                 navController.goHome(state.preferences.visualMode)
                             }
                         },

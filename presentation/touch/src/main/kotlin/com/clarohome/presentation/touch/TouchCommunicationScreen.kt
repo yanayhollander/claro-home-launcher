@@ -505,6 +505,15 @@ private fun ColumnScope.TouchDialerRoute(
                                     entry.identity.displayName.isNullOrBlank(),
                             )
                         },
+                        trailing = {
+                            val (kind, tint, label) = entry.historyIcon()
+                            ClaroIcon(
+                                kind = kind,
+                                tint = tint,
+                                size = 34.dp,
+                                contentDescription = label,
+                            )
+                        },
                         onClick = { onOpenHistoryEntry(entry.id) },
                     )
                 }
@@ -2058,22 +2067,36 @@ private fun localizedPhoneMessage(message: String, failure: CallFailure?): Strin
 }
 
 @Composable
+private fun CallHistoryEntry.historyIcon(): Triple<ClaroIconKind, Color, String> = when {
+    outcome == CallOutcome.MISSED_INCOMING -> Triple(
+        ClaroIconKind.CALL_MISSED,
+        ClaroColors.Red,
+        stringResource(R.string.touch_history_status_missed),
+    )
+    direction == CallDirection.INCOMING -> Triple(
+        ClaroIconKind.CALL_INCOMING,
+        ClaroColors.Green,
+        stringResource(R.string.touch_history_status_incoming),
+    )
+    else -> Triple(
+        ClaroIconKind.CALL_OUTGOING,
+        ClaroColors.Blue,
+        stringResource(R.string.touch_history_status_outgoing),
+    )
+}
+
+@Composable
 private fun CallHistoryEntry.historySubtitle(): String {
     val status = when (outcome) {
-        CallOutcome.MISSED_INCOMING -> stringResource(R.string.touch_history_status_missed)
         CallOutcome.UNANSWERED_OUTGOING -> stringResource(R.string.touch_history_status_no_answer)
         CallOutcome.DECLINED_INCOMING -> stringResource(R.string.touch_history_status_declined)
         CallOutcome.CANCELED_OUTGOING -> stringResource(R.string.touch_history_status_canceled)
         CallOutcome.FAILED -> stringResource(R.string.touch_history_status_not_connected)
-        CallOutcome.ENDED -> if (direction == CallDirection.INCOMING) {
-            stringResource(R.string.touch_history_status_incoming)
-        } else {
-            stringResource(R.string.touch_history_status_outgoing)
-        }
+        CallOutcome.MISSED_INCOMING, CallOutcome.ENDED -> null
     }
     val locale = LocalConfiguration.current.locales.get(0) ?: Locale.ENGLISH
     val timeText = DateFormat.getTimeInstance(DateFormat.SHORT, locale).format(Date(timestampMillis))
-    return stringResource(R.string.touch_history_subtitle, status, timeText)
+    return if (status == null) timeText else stringResource(R.string.touch_history_subtitle, status, timeText)
 }
 
 private fun keypadLetters(digit: Char): String? = when (digit) {

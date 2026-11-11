@@ -292,6 +292,7 @@ fun ClaroRowButton(
     subtitle: String? = null,
     leading: (@Composable () -> Unit)? = null,
     unreadDot: Boolean = false,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     val haptics = LocalClaroHaptics.current
     Column(modifier = modifier.fillMaxWidth()) {
@@ -335,13 +336,17 @@ fun ClaroRowButton(
                         )
                     }
                 }
-                val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-                Text(
-                    text = if (isRtl) "←" else "→",
-                    color = Color(0xFF5A687C),
-                    fontSize = 23.sp,
-                    fontWeight = FontWeight.Bold,
-                )
+                if (trailing != null) {
+                    trailing()
+                } else {
+                    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+                    Text(
+                        text = if (isRtl) "←" else "→",
+                        color = Color(0xFF5A687C),
+                        fontSize = 23.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
             }
         }
         HorizontalDivider(thickness = 2.dp, color = ClaroColors.Charcoal)

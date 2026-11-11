@@ -624,7 +624,7 @@ class MessagingCoordinator(
             statusMessage = "Sending message",
             duplicateRiskConfirmationRequired = false,
         )
-        val clientMessageId = current.draft.id
+        val clientMessageId = "${current.draft.id}:${clock.nowMillis()}"
         scope.launch {
             when (
                 val result = transport.send(
@@ -716,8 +716,8 @@ class MessagingCoordinator(
                     MessageDeliveryState.SENT,
                 )
                 sendInFlight.set(false)
-                draftStore.delete(event.clientMessageId)
                 val draft = mutableState.value.draft
+                draftStore.delete(draft.id)
                 val recipient = draft.recipient
                 val conversation = mutableState.value.selectedConversation
                     ?: recipient?.let {
@@ -742,9 +742,17 @@ class MessagingCoordinator(
                         deliveryState = MessageDeliveryState.SENT,
                     )
                 }
+                val clearedDraft = MessageDraft(
+                    id = conversation?.let { "conversation-${it.id}" } ?: newDraftId(),
+                    conversationId = conversation?.id,
+                    recipient = draft.recipient,
+                    updatedAtMillis = clock.nowMillis(),
+                )
                 mutableState.value = mutableState.value.copy(
                     route = MessagingRoute.CONVERSATION,
                     selectedConversation = conversation,
+                    draft = clearedDraft,
+                    recipientQuery = "",
                     messages = if (sentMessage == null) {
                         mutableState.value.messages
                     } else {

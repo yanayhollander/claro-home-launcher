@@ -48,6 +48,7 @@ import com.clarohome.core.design.ClaroInfoCard
 import com.clarohome.core.model.BatteryStatus
 import com.clarohome.core.model.CellularStatus
 import com.clarohome.feature.communication.AudioRoute
+import com.clarohome.feature.communication.CallDirection
 import com.clarohome.feature.communication.CallFailure
 import com.clarohome.feature.communication.CallOutcome
 import com.clarohome.feature.communication.CallPhase
@@ -540,11 +541,7 @@ private fun ClassicCommunicationDisplay(
                     val timeLabel = formatCallHistoryTimestamp(entry.timestampMillis)
                     ClassicRowItem(
                         title = entry.identity.classicAccessibleName(),
-                        subtitle = if (isMissed) {
-                            stringResource(R.string.classic_history_missed, timeLabel)
-                        } else {
-                            stringResource(R.string.classic_history_recent, timeLabel)
-                        },
+                        subtitle = timeLabel,
                         unreadDot = isMissed && !entry.isOpened,
                         onClick = { onOpenHistoryEntry(entry.id) },
                         leading = {
@@ -554,6 +551,31 @@ private fun ClassicCommunicationDisplay(
                                 paletteSeed = index,
                                 isUnassigned = entry.identity.isPrivate ||
                                     entry.identity.displayName.isNullOrBlank(),
+                            )
+                        },
+                        trailing = {
+                            val (kind, tint, label) = when {
+                                isMissed -> Triple(
+                                    ClaroIconKind.CALL_MISSED,
+                                    ClaroColors.Red,
+                                    stringResource(R.string.classic_call_missed),
+                                )
+                                entry.direction == CallDirection.INCOMING -> Triple(
+                                    ClaroIconKind.CALL_INCOMING,
+                                    ClaroColors.Green,
+                                    stringResource(R.string.classic_call_incoming),
+                                )
+                                else -> Triple(
+                                    ClaroIconKind.CALL_OUTGOING,
+                                    ClaroColors.Blue,
+                                    stringResource(R.string.classic_call_outgoing),
+                                )
+                            }
+                            ClaroIcon(
+                                kind = kind,
+                                tint = tint,
+                                size = 30.dp,
+                                contentDescription = label,
                             )
                         },
                     )

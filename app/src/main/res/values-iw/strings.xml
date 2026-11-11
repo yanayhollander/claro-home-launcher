@@ -121,33 +121,18 @@
 
     <string name="app_photo_deleted">התמונה נמחקה.</string>
     <string name="app_photo_delete_canceled">המחיקה בוטלה או נדחתה. התמונה נשמרה.</string>
-    <string name="app_camera_photo_title">תמונת מצלמה %1$d</string>
-    <string name="app_picture_saved">התמונה נשמרה. הקישו על גלריה כדי לצפות בה.</string>
-    <string name="app_camera_canceled">המצלמה נסגרה. לא נשמרה תמונה.</string>
-    <string name="app_photo_selection_canceled">בחירת התמונה בוטלה.</string>
-    <string name="app_selected_photo_title">תמונה שנבחרה %1$d</string>
-    <string name="app_picture_added">התמונה נוספה ל-Claro.</string>
-    <string name="app_picture_added_temporary">התמונה נוספה. ייתכן ש-Android יבקש לבחור אותה שוב בהמשך.</string>
     <string name="app_open_camera">פתיחת מצלמה</string>
     <string name="app_camera_storage_unavailable">המצלמה או האחסון אינם זמינים.</string>
     <string name="app_no_system_camera">אין מצלמת מערכת זמינה.</string>
-    <string name="app_camera_external_notice">פותח את מצלמת Android מחוץ ל-Claro. כפתורי המצלמה אינם מוגדלים על ידי Claro.</string>
-    <string name="app_camera_take_picture_prompt">צלמו תמונה באפליקציית המצלמה של הטלפון ואז חזרו לכאן.</string>
-    <string name="app_add_picture">הוספת תמונה</string>
-    <string name="app_picture_removed">התמונה הוסרה.</string>
     <string name="app_picture_delete_failed">לא ניתן למחוק. התמונה נשמרה.</string>
-    <string name="app_waiting_delete_confirmation">ממתין לאישור מחיקה מ-Android.</string>
     <string name="app_no_pictures_yet">עדיין אין תמונות.</string>
     <string name="app_delete_photo">מחיקת תמונה</string>
-    <string name="app_remove_from_claro">הסרה מ-Claro</string>
-    <string name="app_saved_by_claro">נשמרה על ידי Claro</string>
-    <string name="app_device_photo_reference">קישור לתמונה במכשיר</string>
-    <string name="app_photo_access_removed">ההרשאה הוסרה. בחרו את התמונה הזו מחדש.</string>
-    <string name="app_photo_cloud_unavailable">התחברו לאינטרנט כדי לצפות בתמונות מהענן.</string>
-    <string name="app_photo_missing">התמונה הזו חסרה.</string>
     <string name="app_photo_previous">→ הקודמת</string>
     <string name="app_photo_next">הבאה ←</string>
     <string name="app_confirm_delete_device_photo">למחוק את התמונה הזו מהמכשיר? ייתכן ש-Android יבקש לאשר.</string>
-    <string name="app_confirm_remove_from_claro">להסיר מ-Claro? התמונה המקורית נשארת במכשיר.</string>
     <string name="app_all_pictures">כל התמונות</string>
+    <string name="app_gallery_allow_pictures">לאפשר תמונות</string>
+    <string name="app_gallery_access_needed">אשרו ל-Claro להציג את התמונות שלכם. אם Android כבר לא שואל, פתחו הגדרות ואשרו תמונות.</string>
+    <string name="app_gallery_partial_access">Android משתף רק חלק מהתמונות. אשרו את כל התמונות כדי לראות את כולן.</string>
+    <string name="app_picture_position">תמונה %1$d מתוך %2$d</string>
 </resources>

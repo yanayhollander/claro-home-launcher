@@ -79,8 +79,9 @@
     <string name="classic_phone_number_value">Phone number %1$s</string>
     <string name="classic_calling_unavailable">Calling is not available on this device.</string>
     <string name="classic_phone_access_attention">Phone access needs attention.</string>
-    <string name="classic_history_missed">Missed · %1$s</string>
-    <string name="classic_history_recent">Recent · %1$s</string>
+    <string name="classic_call_missed">Missed call</string>
+    <string name="classic_call_incoming">Incoming call</string>
+    <string name="classic_call_outgoing">Outgoing call</string>
     <string name="classic_no_contacts_yet">No contacts yet.</string>
     <string name="classic_no_matches">No matches.</string>
     <string name="classic_more_contacts">More contacts</string>
@@ -129,7 +130,6 @@
     <string name="classic_sending_ellipsis">Sending…</string>
     <string name="classic_new_message">New message</string>
     <string name="classic_repair_messages_access">Repair Messages access</string>
-    <string name="classic_cancel">Cancel</string>
     <string name="classic_edit">Edit</string>
     <string name="classic_messages_unavailable">Messages are not available on this device.</string>
     <string name="classic_messages_access_repair">Messages access needs repair.</string>
