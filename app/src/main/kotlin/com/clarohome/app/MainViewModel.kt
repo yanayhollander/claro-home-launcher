@@ -136,8 +136,14 @@ class MainViewModel @Inject constructor(
 
     fun chooseVisualMode(mode: VisualMode) = launch { settingsManager.chooseVisualMode(mode) }
 
-    fun saveLanguageDisplay(language: AppLanguage, size: TextSize, highContrast: Boolean) =
-        launch { settingsManager.setLanguageAndDisplay(language, size, highContrast) }
+    fun saveLanguageDisplay(
+        language: AppLanguage,
+        size: TextSize,
+        highContrast: Boolean,
+        hapticFeedback: Boolean? = null,
+    ) = launch {
+        settingsManager.setLanguageAndDisplay(language, size, highContrast, hapticFeedback)
+    }
 
     fun useDateQuestion() = launch { settingsManager.useDateQuestion() }
 

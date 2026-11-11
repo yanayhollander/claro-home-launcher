@@ -40,11 +40,13 @@ class ProtoSettingsSerializerTest {
             recoveryVerifier = PersistedSecretVerifier("recovery-salt", "recovery-hash", 120_000),
             failedUnlockAttempts = 5,
             unlockCooldown = PersistedCooldown(2_000, 1_000, "boot"),
+            hapticFeedback = false,
         )
 
         ProtoSettingsSerializer.writeTo(settings, output)
 
         val restored = ProtoSettingsSerializer.readFrom(ByteArrayInputStream(output.toByteArray()))
         assertThat(restored).isEqualTo(settings)
+        assertThat(ClaroSettings().toPreferences().hapticFeedback).isTrue()
     }
 }

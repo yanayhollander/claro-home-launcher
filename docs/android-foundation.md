@@ -26,7 +26,10 @@ app
   migration/schema ownership.
 - `core:design`: accessible typography, color, spacing, target-size tokens,
   storyboard SVG vector icons (`ClaroIcons`), illustrated portraits
-  (`ClaroAvatar`), battery/signal meters, headers, info cards, rows, and docked
+  (`ClaroAvatar`), 2G tactile keypad/softkey/D-pad haptics (`ClaroHaptics`
+  using Android 10+ predefined `EFFECT_CLICK`, `EFFECT_TICK`,
+  `EFFECT_HEAVY_CLICK`, and `EFFECT_DOUBLE_CLICK` with `USAGE_TOUCH` plus view
+  fallback), battery/signal meters, headers, info cards, rows, and docked
   screen scaffolds (`ClaroComponents`).
 - `core:platform`: replaceable Android platform adapters and Hilt bindings.
 - `core:testing`: shared unit-test dependencies and future deterministic fixtures.

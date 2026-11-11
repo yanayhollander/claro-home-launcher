@@ -149,8 +149,14 @@ class OnboardingSettingsManager @Inject constructor(
         language: AppLanguage,
         textSize: TextSize,
         highContrast: Boolean,
+        hapticFeedback: Boolean? = null,
     ) = update {
-        it.copy(language = language, textSize = textSize, highContrast = highContrast)
+        it.copy(
+            language = language,
+            textSize = textSize,
+            highContrast = highContrast,
+            hapticFeedback = hapticFeedback ?: it.hapticFeedback,
+        )
     }
 
     suspend fun useDateQuestion() = update {

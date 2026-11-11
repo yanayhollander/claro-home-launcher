@@ -73,6 +73,7 @@ import com.clarohome.core.design.ClaroPrimaryButton
 import com.clarohome.core.design.ClaroRowButton
 import com.clarohome.core.design.ClaroScreenScaffold
 import com.clarohome.core.design.ClaroSecondaryButton
+import com.clarohome.core.design.LocalClaroHaptics
 import com.clarohome.core.model.AppLanguage
 import com.clarohome.core.model.CapabilityStatus
 import com.clarohome.core.model.ClaroPreferences
@@ -95,6 +96,7 @@ data class OnboardingCallbacks(
     val onHandover: (HandoverCheck, Boolean) -> Unit,
     val onOpenAppsSetup: () -> Unit = {},
     val onOpenPlans: () -> Unit = {},
+    val onHapticFeedbackChange: (Boolean) -> Unit = {},
 )
 
 @Composable
@@ -117,8 +119,9 @@ fun OnboardingFlow(
         OnboardingStep.LANGUAGE_AND_DISPLAY -> LanguageDisplayOnboardingStep(
             preferences = preferences,
             message = message,
-            onSave = { language, size, contrast ->
+            onSave = { language, size, contrast, haptics ->
                 callbacks.onLanguageDisplay(language, size, contrast)
+                callbacks.onHapticFeedbackChange(haptics)
                 callbacks.onContinue(OnboardingStep.SETTINGS_ACCESS)
             },
         )
@@ -581,10 +584,12 @@ fun DisplayLanguageSettingsScreen(
     preferences: ClaroPreferences,
     onApply: (AppLanguage, TextSize, Boolean) -> Unit,
     onCancel: () -> Unit,
+    onApplyWithHaptics: ((AppLanguage, TextSize, Boolean, Boolean) -> Unit)? = null,
 ) {
     var language by rememberSaveable { mutableStateOf(preferences.language) }
     var textSize by rememberSaveable { mutableStateOf(preferences.textSize) }
     var highContrast by rememberSaveable { mutableStateOf(preferences.highContrast) }
+    var hapticFeedback by rememberSaveable { mutableStateOf(preferences.hapticFeedback) }
 
     ClaroScreenScaffold(
         title = "Language and display",
@@ -592,7 +597,13 @@ fun DisplayLanguageSettingsScreen(
         dock = {
             ClaroPrimaryButton(
                 label = "Save",
-                onClick = { onApply(language, textSize, highContrast) },
+                onClick = {
+                    if (onApplyWithHaptics != null) {
+                        onApplyWithHaptics(language, textSize, highContrast, hapticFeedback)
+                    } else {
+                        onApply(language, textSize, highContrast)
+                    }
+                },
             )
             ClaroSecondaryButton(
                 label = "Cancel",
@@ -607,6 +618,8 @@ fun DisplayLanguageSettingsScreen(
             onTextSizeChange = { textSize = it },
             highContrast = highContrast,
             onHighContrastChange = { highContrast = it },
+            hapticFeedback = hapticFeedback,
+            onHapticFeedbackChange = { hapticFeedback = it },
         )
     }
 }
@@ -853,11 +866,12 @@ private fun PhoneStyleChoice(
 private fun LanguageDisplayOnboardingStep(
     preferences: ClaroPreferences,
     message: String?,
-    onSave: (AppLanguage, TextSize, Boolean) -> Unit,
+    onSave: (AppLanguage, TextSize, Boolean, Boolean) -> Unit,
 ) {
     var language by rememberSaveable { mutableStateOf(preferences.language) }
     var textSize by rememberSaveable { mutableStateOf(preferences.textSize) }
     var highContrast by rememberSaveable { mutableStateOf(preferences.highContrast) }
+    var hapticFeedback by rememberSaveable { mutableStateOf(preferences.hapticFeedback) }
 
     OnboardingStepScaffold(
         title = OnboardingStep.LANGUAGE_AND_DISPLAY.title(),
@@ -866,7 +880,7 @@ private fun LanguageDisplayOnboardingStep(
         dock = {
             ClaroPrimaryButton(
                 label = "Save and continue",
-                onClick = { onSave(language, textSize, highContrast) },
+                onClick = { onSave(language, textSize, highContrast, hapticFeedback) },
             )
         },
     ) {
@@ -877,6 +891,8 @@ private fun LanguageDisplayOnboardingStep(
             onTextSizeChange = { textSize = it },
             highContrast = highContrast,
             onHighContrastChange = { highContrast = it },
+            hapticFeedback = hapticFeedback,
+            onHapticFeedbackChange = { hapticFeedback = it },
         )
     }
 }
@@ -1771,6 +1787,8 @@ private fun LanguageDisplayFields(
     onTextSizeChange: (TextSize) -> Unit,
     highContrast: Boolean,
     onHighContrastChange: (Boolean) -> Unit,
+    hapticFeedback: Boolean = true,
+    onHapticFeedbackChange: (Boolean) -> Unit = {},
 ) {
     SectionLabel("Language")
     AppLanguage.entries.forEach { option ->
@@ -1794,6 +1812,11 @@ private fun LanguageDisplayFields(
         label = "High contrast",
         checked = highContrast,
         onChecked = onHighContrastChange,
+    )
+    ToggleRow(
+        label = "Keypad & touch vibration",
+        checked = hapticFeedback,
+        onChecked = onHapticFeedbackChange,
     )
     Spacer(Modifier.height(4.dp))
     LanguageLivePreviewCard(
@@ -2050,6 +2073,7 @@ private fun ChoiceRow(
     onClick: () -> Unit,
     subtitle: String? = null,
 ) {
+    val haptics = LocalClaroHaptics.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2064,7 +2088,10 @@ private fun ChoiceRow(
             .selectable(
                 selected = selected,
                 role = Role.RadioButton,
-                onClick = onClick,
+                onClick = {
+                    haptics.keyClick()
+                    onClick()
+                },
             )
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -2097,6 +2124,7 @@ private fun ToggleRow(
     checked: Boolean,
     onChecked: (Boolean) -> Unit,
 ) {
+    val haptics = LocalClaroHaptics.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2107,7 +2135,10 @@ private fun ToggleRow(
             .toggleable(
                 value = checked,
                 role = Role.Switch,
-                onValueChange = onChecked,
+                onValueChange = {
+                    haptics.keyClick()
+                    onChecked(it)
+                },
             )
             .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,

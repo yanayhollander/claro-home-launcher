@@ -104,6 +104,7 @@ data class ClaroPreferences(
     val highContrast: Boolean = false,
     val onboarding: OnboardingProgress = OnboardingProgress(),
     val accessProtection: AccessProtection = AccessProtection(),
+    val hapticFeedback: Boolean = true,
 )
 
 data class FavoritePerson(

@@ -72,6 +72,7 @@ import com.clarohome.core.design.ClaroInfoCard
 import com.clarohome.core.design.ClaroPrimaryButton
 import com.clarohome.core.design.ClaroRowButton
 import com.clarohome.core.design.ClaroSecondaryButton
+import com.clarohome.core.design.LocalClaroHaptics
 import com.clarohome.feature.communication.AssignmentStatus
 import com.clarohome.feature.communication.AudioRoute
 import com.clarohome.feature.communication.CallDirection
@@ -547,8 +548,12 @@ private fun DialNumberDisplayRow(
                 )
             }
         }
+        val haptics = LocalClaroHaptics.current
         OutlinedButton(
-            onClick = onBackspace,
+            onClick = {
+                haptics.keyClick()
+                onBackspace()
+            },
             enabled = !isEmpty,
             modifier = Modifier
                 .size(64.dp)
@@ -579,6 +584,7 @@ private fun SpeedDialShortcutBar(
     onDigit: (Char) -> Unit,
     onDirectCall: (String) -> Unit,
 ) {
+    val haptics = LocalClaroHaptics.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
@@ -601,8 +607,15 @@ private fun SpeedDialShortcutBar(
                     .border(1.dp, ClaroColors.Border, RoundedCornerShape(3.dp))
                     .combinedClickable(
                         role = Role.Button,
-                        onClick = { onDigit(slot.single()) },
-                        onLongClick = { onDirectCall(slot) },
+                        hapticFeedbackEnabled = false,
+                        onClick = {
+                            haptics.keyClick()
+                            onDigit(slot.single())
+                        },
+                        onLongClick = {
+                            haptics.confirmHeavy()
+                            onDirectCall(slot)
+                        },
                     )
                     .semantics {
                         contentDescription = statusHint
@@ -633,6 +646,7 @@ private fun DialKeypadGrid(
     onDigit: (Char) -> Unit,
     onDirectCall: (String) -> Unit,
 ) {
+    val haptics = LocalClaroHaptics.current
     val rows = listOf(
         listOf('1', '2', '3'),
         listOf('4', '5', '6'),
@@ -665,9 +679,16 @@ private fun DialKeypadGrid(
                                 .background(ClaroColors.Surface)
                                 .combinedClickable(
                                     role = Role.Button,
-                                    onClick = { onDigit(digit) },
+                                    hapticFeedbackEnabled = false,
+                                    onClick = {
+                                        haptics.keyClick()
+                                        onDigit(digit)
+                                    },
                                     onLongClick = speedDialSlot?.let { slot ->
-                                        { onDirectCall(slot) }
+                                        {
+                                            haptics.confirmHeavy()
+                                            onDirectCall(slot)
+                                        }
                                     },
                                 )
                                 .semantics {

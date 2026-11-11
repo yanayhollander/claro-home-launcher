@@ -162,8 +162,16 @@ fun ClaroPrimaryButton(
     containerColor: Color = ClaroColors.Blue,
     icon: ClaroIconKind? = null,
 ) {
+    val haptics = LocalClaroHaptics.current
     Button(
-        onClick = onClick,
+        onClick = {
+            if (containerColor == ClaroColors.Red) {
+                haptics.alertDouble()
+            } else {
+                haptics.confirmHeavy()
+            }
+            onClick()
+        },
         enabled = enabled,
         modifier = modifier
             .fillMaxWidth()
@@ -203,8 +211,12 @@ fun ClaroSecondaryButton(
     enabled: Boolean = true,
     icon: ClaroIconKind? = null,
 ) {
+    val haptics = LocalClaroHaptics.current
     OutlinedButton(
-        onClick = onClick,
+        onClick = {
+            haptics.softkey()
+            onClick()
+        },
         enabled = enabled,
         modifier = modifier
             .fillMaxWidth()
@@ -243,8 +255,12 @@ fun ClaroEmergencyButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val haptics = LocalClaroHaptics.current
     OutlinedButton(
-        onClick = onClick,
+        onClick = {
+            haptics.alertDouble()
+            onClick()
+        },
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = ClaroDimensions.PrimaryTarget),
@@ -275,9 +291,13 @@ fun ClaroRowButton(
     leading: (@Composable () -> Unit)? = null,
     unreadDot: Boolean = false,
 ) {
+    val haptics = LocalClaroHaptics.current
     Column(modifier = modifier.fillMaxWidth()) {
         Button(
-            onClick = onClick,
+            onClick = {
+                haptics.softkey()
+                onClick()
+            },
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 68.dp),

@@ -68,6 +68,7 @@ import com.clarohome.core.design.ClaroColors
 import com.clarohome.core.design.ClaroIcon
 import com.clarohome.core.design.ClaroIconKind
 import com.clarohome.core.design.ClaroTheme
+import com.clarohome.core.design.LocalClaroHaptics
 import com.clarohome.core.domain.StartupRecoveryState
 import com.clarohome.core.model.AppLanguage
 import com.clarohome.core.model.BatteryStatus
@@ -552,6 +553,7 @@ private fun ClaroApp(
         ClaroTheme(
             textSize = state.preferences.textSize,
             highContrast = state.preferences.highContrast,
+            hapticFeedback = state.preferences.hapticFeedback,
         ) {
             Column(
                 Modifier
@@ -609,6 +611,14 @@ private fun ClaroApp(
                                 },
                                 onOpenPlans = {
                                     navController.navigate(MembershipRoute)
+                                },
+                                onHapticFeedbackChange = { enabled ->
+                                    viewModel.saveLanguageDisplay(
+                                        state.preferences.language,
+                                        state.preferences.textSize,
+                                        state.preferences.highContrast,
+                                        enabled,
+                                    )
                                 },
                             ),
                         )
@@ -1002,6 +1012,11 @@ private fun ClaroApp(
                                 navController.popBackStack()
                             },
                             onCancel = navController::popBackStack,
+                            onApplyWithHaptics = { language, size, contrast, haptics ->
+                                viewModel.recordSettingsActivity()
+                                viewModel.saveLanguageDisplay(language, size, contrast, haptics)
+                                navController.popBackStack()
+                            },
                         )
                     }
                     composable<AccessMethodRoute> {
@@ -1118,6 +1133,7 @@ private fun ProductNavigationBar(
     onBack: () -> Unit,
     onHome: () -> Unit,
 ) {
+    val haptics = LocalClaroHaptics.current
     Column {
         HorizontalDivider(thickness = 3.dp, color = ClaroColors.Charcoal)
         Row(
@@ -1127,7 +1143,10 @@ private fun ProductNavigationBar(
                 .background(Color.White),
         ) {
             Button(
-                onClick = onBack,
+                onClick = {
+                    haptics.softkey()
+                    onBack()
+                },
                 modifier = Modifier
                     .weight(1f)
                     .heightIn(min = 64.dp),
@@ -1153,7 +1172,10 @@ private fun ProductNavigationBar(
                     .padding(horizontal = 1.dp),
             )
             Button(
-                onClick = onHome,
+                onClick = {
+                    haptics.softkey()
+                    onHome()
+                },
                 modifier = Modifier
                     .weight(1f)
                     .heightIn(min = 64.dp),

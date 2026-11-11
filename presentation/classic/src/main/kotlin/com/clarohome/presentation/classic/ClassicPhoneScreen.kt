@@ -69,6 +69,7 @@ import com.clarohome.core.design.ClaroCellularBars
 import com.clarohome.core.design.ClaroColors
 import com.clarohome.core.design.ClaroIcon
 import com.clarohome.core.design.ClaroIconKind
+import com.clarohome.core.design.LocalClaroHaptics
 import com.clarohome.core.model.BadgeValue
 import com.clarohome.core.model.BatteryStatus
 import com.clarohome.core.model.CellularStatus
@@ -377,6 +378,7 @@ private fun ClassicShortcut(
     onClick: () -> Unit,
 ) {
     var isFocused by remember { mutableStateOf(false) }
+    val haptics = LocalClaroHaptics.current
     val hasVisibleBadge = when (val badge = tile.badge) {
         is BadgeValue.Known -> badge.count > 0
         BadgeValue.Unknown -> true
@@ -393,7 +395,13 @@ private fun ClassicShortcut(
                 shape = RoundedCornerShape(3.dp),
             )
             .onFocusChanged { isFocused = it.isFocused }
-            .clickable(role = Role.Button, onClick = onClick)
+            .clickable(
+                role = Role.Button,
+                onClick = {
+                    haptics.softkey()
+                    onClick()
+                },
+            )
             .semantics {
                 contentDescription = HomeCustomizationPolicy.badgeLabel(tile.label, tile.badge)
                 role = Role.Button
@@ -446,6 +454,7 @@ private fun FavoriteRow(
     favorites: List<FavoritePerson>,
     onFavoriteSelected: (FavoritePerson) -> Unit,
 ) {
+    val haptics = LocalClaroHaptics.current
     val slots = remember(favorites) {
         List(4) { index ->
             favorites.getOrNull(index) ?: FavoritePerson(
@@ -485,7 +494,10 @@ private fun FavoriteRow(
                         },
                     )
                     .onFocusChanged { isFocused = it.isFocused }
-                    .clickable(role = Role.Button) { onFavoriteSelected(person) }
+                    .clickable(role = Role.Button) {
+                        haptics.softkey()
+                        onFavoriteSelected(person)
+                    }
                     .semantics {
                         contentDescription = if (isUnassigned) {
                             "Add person, favorite slot ${index + 1}"
@@ -616,8 +628,16 @@ internal fun ClassicLightButton(
     leadingIcon: ClaroIconKind? = null,
 ) {
     var isFocused by remember { mutableStateOf(false) }
+    val haptics = LocalClaroHaptics.current
     Button(
-        onClick = onClick,
+        onClick = {
+            if (color == ClaroColors.Red) {
+                haptics.alertDouble()
+            } else {
+                haptics.softkey()
+            }
+            onClick()
+        },
         enabled = enabled,
         modifier = modifier
             .fillMaxWidth()
@@ -665,6 +685,7 @@ internal fun ClassicRowItem(
     leading: (@Composable () -> Unit)? = null,
 ) {
     var isFocused by remember { mutableStateOf(false) }
+    val haptics = LocalClaroHaptics.current
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -677,7 +698,10 @@ internal fun ClassicRowItem(
             ),
     ) {
         Button(
-            onClick = onClick,
+            onClick = {
+                haptics.softkey()
+                onClick()
+            },
             enabled = enabled,
             modifier = Modifier
                 .fillMaxWidth()
@@ -974,6 +998,8 @@ private fun ClassicDeckButton(
     onClick: (() -> Unit)?,
 ) {
     val cleanLabel = label.replace(Regex("^[☎⌂✉↻＋✓…\\s]+"), "").trim().ifBlank { label }
+    val haptics = LocalClaroHaptics.current
+    val isHeavyAction = color == ClaroColors.Green || color == ClaroColors.Red
     val iconKind = when {
         cleanLabel.equals("Decline", ignoreCase = true) ||
             cleanLabel.equals("End", ignoreCase = true) -> ClaroIconKind.END_CALL
@@ -985,7 +1011,14 @@ private fun ClassicDeckButton(
     }
     val tint = if (onClick != null) Color.White else Color.White.copy(alpha = 0.55f)
     Button(
-        onClick = { onClick?.invoke() },
+        onClick = {
+            if (isHeavyAction) {
+                haptics.confirmHeavy()
+            } else {
+                haptics.softkey()
+            }
+            onClick?.invoke()
+        },
         enabled = onClick != null,
         modifier = modifier.fillMaxWidth(),
         border = BorderStroke(1.dp, if (onClick != null) borderColor else borderColor.copy(alpha = 0.45f)),
@@ -1031,6 +1064,7 @@ private fun ClassicDirectionButton(
     accessibilityLabel: String? = null,
     onClick: () -> Unit,
 ) {
+    val haptics = LocalClaroHaptics.current
     Box(
         modifier = modifier
             .height(if (center) 48.dp else 44.dp)
@@ -1044,7 +1078,13 @@ private fun ClassicDirectionButton(
                     Modifier
                 },
             )
-            .clickable(role = Role.Button, onClick = onClick)
+            .clickable(
+                role = Role.Button,
+                onClick = {
+                    if (center) haptics.keyClick() else haptics.dpadStep()
+                    onClick()
+                },
+            )
             .then(
                 if (accessibilityLabel != null) {
                     Modifier.semantics {
@@ -1075,6 +1115,7 @@ fun ClassicNumericKeypad(
     assignments: Map<Char, String> = emptyMap(),
     onLongDigitSelected: ((Char) -> Unit)? = null,
 ) {
+    val haptics = LocalClaroHaptics.current
     val legends = mapOf(
         '1' to ".,?!",
         '2' to "ABC",
@@ -1129,11 +1170,17 @@ fun ClassicNumericKeypad(
                                     if (enabled) {
                                         Modifier.combinedClickable(
                                             role = Role.Button,
-                                            onClick = { digitAction(key) },
+                                            hapticFeedbackEnabled = false,
+                                            onClick = {
+                                                haptics.keyClick()
+                                                digitAction(key)
+                                            },
                                             onLongClick = {
                                                 if ((key == '1' || key == '2') && onLongDigitSelected != null) {
+                                                    haptics.confirmHeavy()
                                                     onLongDigitSelected(key)
                                                 } else {
+                                                    haptics.keyClick()
                                                     digitAction(key)
                                                 }
                                             },

@@ -48,6 +48,7 @@ import com.clarohome.core.design.ClaroIcon
 import com.clarohome.core.design.ClaroIconKind
 import com.clarohome.core.design.ClaroInfoCard
 import com.clarohome.core.design.ClaroPrimaryButton
+import com.clarohome.core.design.LocalClaroHaptics
 import com.clarohome.core.model.BadgeValue
 import com.clarohome.core.model.CellularAvailability
 import com.clarohome.core.model.FavoritePerson
@@ -212,6 +213,7 @@ private fun TouchStatusHeader(
                     fontWeight = FontWeight.Bold,
                 )
             }
+            val haptics = LocalClaroHaptics.current
             Box(
                 modifier = Modifier
                     .size(48.dp)
@@ -220,7 +222,10 @@ private fun TouchStatusHeader(
                     .clickable(
                         role = Role.Button,
                         onClickLabel = "Settings",
-                        onClick = onUseClassicMode,
+                        onClick = {
+                            haptics.softkey()
+                            onUseClassicMode()
+                        },
                     )
                     .semantics {
                         contentDescription = "Settings"
@@ -275,6 +280,7 @@ private fun FavoriteStrip(
     favorites: List<FavoritePerson>,
     onFavoriteSelected: (FavoritePerson) -> Unit,
 ) {
+    val haptics = LocalClaroHaptics.current
     val visibleFavorites = List(4) { index ->
         favorites.getOrNull(index) ?: FavoritePerson(
             id = "favorite-$index",
@@ -304,7 +310,10 @@ private fun FavoriteStrip(
                     .clickable(
                         role = Role.Button,
                         onClickLabel = person.favoriteActionLabel(),
-                    ) { onFavoriteSelected(person) }
+                    ) {
+                        haptics.softkey()
+                        onFavoriteSelected(person)
+                    }
                     .semantics {
                         contentDescription = person.favoriteDescription()
                         role = Role.Button
@@ -364,13 +373,24 @@ private fun HomeTileCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val haptics = LocalClaroHaptics.current
     val description = HomeCustomizationPolicy.badgeLabel(tile.label, tile.badge)
     Box(
         modifier = modifier
             .heightIn(min = 160.dp)
             .clip(RoundedCornerShape(1.dp))
             .background(tile.kind.tileBackgroundColor())
-            .clickable(role = Role.Button, onClick = onClick)
+            .clickable(
+                role = Role.Button,
+                onClick = {
+                    if (tile.kind == HomeTileKind.SOS) {
+                        haptics.confirmHeavy()
+                    } else {
+                        haptics.softkey()
+                    }
+                    onClick()
+                },
+            )
             .semantics {
                 contentDescription = description
                 role = Role.Button

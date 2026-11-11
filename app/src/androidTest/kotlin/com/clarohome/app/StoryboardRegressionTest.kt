@@ -13,6 +13,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -21,6 +22,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.clarohome.core.design.ClaroColors
 import com.clarohome.core.design.ClaroTheme
+import com.clarohome.core.design.HapticCue
+import com.clarohome.core.design.RecordingClaroHaptics
 import com.clarohome.core.model.BadgeValue
 import com.clarohome.core.model.BatteryStatus
 import com.clarohome.core.model.CapabilityStatus
@@ -441,6 +444,75 @@ class StoryboardRegressionTest {
             "Store products are not configured. Purchases are unavailable; core features remain free.",
         ).assertIsDisplayed()
         capture("membership-privacy", "billing-screen")
+    }
+
+    @Test
+    fun twoGKeypadAndControlsTriggerCrispHapticCuesAndRespectToggle() {
+        var enabled by mutableStateOf(true)
+        var mode by mutableStateOf(VisualMode.CLASSIC)
+        val recorded = mutableListOf<HapticCue>()
+        compose.setContent {
+            val haptics = RecordingClaroHaptics(enabled = enabled) { recorded += it }
+            ClaroTheme(hapticsOverride = haptics) {
+                if (mode == VisualMode.CLASSIC) {
+                    ClassicPhoneScreen(
+                        home = storyboardHome(),
+                        onOpenMenu = {},
+                        onTileSelected = {},
+                        onFavoriteSelected = {},
+                        onRepairHomeRole = {},
+                        onReturnToCall = {},
+                        onDigitSelected = {},
+                        onBack = {},
+                        onHome = {},
+                    )
+                } else {
+                    TouchHomeScreen(
+                        home = storyboardHome(),
+                        onUseClassicMode = {},
+                        onTileSelected = {},
+                        onFavoriteSelected = {},
+                        onRepairHomeRole = {},
+                        onReturnToCall = {},
+                    )
+                }
+            }
+        }
+
+        compose.onNodeWithContentDescription("5, JKL").performClick()
+        compose.onNodeWithContentDescription("Navigate up").performClick()
+        compose.onNodeWithText("OK").performClick()
+        compose.onNodeWithText("Call").performClick()
+
+        compose.runOnIdle {
+            assertEquals(
+                listOf(
+                    HapticCue.KEYPAD_DIGIT,
+                    HapticCue.DPAD_STEP,
+                    HapticCue.KEYPAD_DIGIT,
+                    HapticCue.CONFIRM_HEAVY,
+                ),
+                recorded,
+            )
+            recorded.clear()
+            mode = VisualMode.TOUCH
+        }
+
+        compose.onNodeWithText("Phone").performClick()
+        compose.onNodeWithText("SOS").performClick()
+        compose.runOnIdle {
+            assertEquals(
+                listOf(HapticCue.SOFTKEY, HapticCue.CONFIRM_HEAVY),
+                recorded,
+            )
+            recorded.clear()
+            enabled = false
+        }
+
+        compose.onNodeWithText("Messages").performClick()
+        compose.runOnIdle {
+            assertTrue(recorded.isEmpty())
+        }
     }
 
     private fun capture(name: String, tag: String): Bitmap {

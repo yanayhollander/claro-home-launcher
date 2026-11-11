@@ -58,6 +58,7 @@ data class ClaroSettings(
     val failedRecoveryAttempts: Int = 0,
     val unlockCooldown: PersistedCooldown = PersistedCooldown(),
     val recoveryCooldown: PersistedCooldown = PersistedCooldown(),
+    val hapticFeedback: Boolean = true,
 )
 
 @Serializable
@@ -99,6 +100,7 @@ fun ClaroSettings.toPreferences() = ClaroPreferences(
         unlockCooldown = unlockCooldown.toModel(),
         recoveryCooldown = recoveryCooldown.toModel(),
     ),
+    hapticFeedback = hapticFeedback,
 )
 
 fun ClaroPreferences.toSettings() = ClaroSettings(
@@ -122,6 +124,7 @@ fun ClaroPreferences.toSettings() = ClaroSettings(
     failedRecoveryAttempts = accessProtection.failedRecoveryAttempts,
     unlockCooldown = accessProtection.unlockCooldown.toPersisted(),
     recoveryCooldown = accessProtection.recoveryCooldown.toPersisted(),
+    hapticFeedback = hapticFeedback,
 )
 
 private fun PersistedSecretVerifier.toModel() = SecretVerifier(saltBase64, hashBase64, iterations)

@@ -5,6 +5,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -58,8 +59,11 @@ object ClaroDimensions {
 fun ClaroTheme(
     textSize: TextSize = TextSize.STANDARD,
     highContrast: Boolean = false,
+    hapticFeedback: Boolean = true,
+    hapticsOverride: ClaroHaptics? = null,
     content: @Composable () -> Unit,
 ) {
+    val haptics = hapticsOverride ?: rememberClaroHaptics(enabled = hapticFeedback)
     val scale = when (textSize) {
         TextSize.STANDARD -> 1f
         TextSize.LARGE -> 1.2f
@@ -87,13 +91,15 @@ fun ClaroTheme(
         onBackground = ClaroColors.Ink,
         error = if (highContrast) Color(0xFFFF334D) else ClaroColors.Red,
     )
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = typography,
-        shapes = MaterialTheme.shapes.copy(
-            medium = RoundedCornerShape(8.dp),
-            large = RoundedCornerShape(12.dp),
-        ),
-        content = content,
-    )
+    CompositionLocalProvider(LocalClaroHaptics provides haptics) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = typography,
+            shapes = MaterialTheme.shapes.copy(
+                medium = RoundedCornerShape(8.dp),
+                large = RoundedCornerShape(12.dp),
+            ),
+            content = content,
+        )
+    }
 }
