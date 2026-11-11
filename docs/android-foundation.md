@@ -72,6 +72,19 @@ causes, no-service and dual-SIM account selection, Bluetooth and proximity
 behavior, call waiting/conference capability reporting, ringtone/DND behavior,
 locked-screen incoming calls, emergency handoff, and OEM dialer-role repair.
 
+The safety feature routes a configured trusted-contact
+SOS through the shared Telecom call gateway. If the required role or permission
+is absent, the request fails into a repair state instead of simulating success.
+Emergency access is a separate native dialer handoff and is never gated by Claro
+configuration or entitlement.
+
+Camera capture is an external system handoff backed by scoped `MediaStore`
+content. Imported photos use the system Photo Picker, references are removable
+without deleting the original, and owned-photo deletion uses Android's delete
+authorization flow where required. The Apps screen launches only caregiver-
+allowlisted launcher activities and does not claim to resize, lock, or control
+third-party apps.
+
 ## Toolchain and dependency policy
 
 Versions are pinned in `gradle/libs.versions.toml`; dynamic and preview versions

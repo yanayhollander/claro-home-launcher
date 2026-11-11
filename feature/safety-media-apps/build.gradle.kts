@@ -10,4 +10,7 @@ android {
     }
 }
 
-dependencies { api(project(":core:domain")) }
+dependencies {
+    api(project(":core:domain"))
+    testImplementation(project(":core:testing"))
+}
