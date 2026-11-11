@@ -1047,7 +1047,7 @@ private fun CallerIdentity?.classicAccessibleName(): String = when {
     this == null -> stringResource(R.string.classic_unknown_caller)
     isPrivate -> stringResource(R.string.classic_private_number)
     !displayName.isNullOrBlank() -> displayName.orEmpty()
-    !number.isNullOrBlank() -> number.orEmpty()
+    !number.isNullOrBlank() -> "\u2066${number.orEmpty()}\u2069"
     else -> stringResource(R.string.classic_unknown_caller)
 }
 

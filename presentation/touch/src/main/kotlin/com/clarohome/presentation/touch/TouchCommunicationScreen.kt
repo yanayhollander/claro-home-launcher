@@ -2004,7 +2004,7 @@ private fun CallerIdentity.localizedCallerName(
 ): String = when {
     isPrivate -> stringResource(R.string.touch_caller_private)
     !displayName.isNullOrBlank() -> displayName.orEmpty()
-    !number.isNullOrBlank() -> number.orEmpty()
+    !number.isNullOrBlank() -> "\u2066${number.orEmpty()}\u2069"
     else -> fallback
 }
 

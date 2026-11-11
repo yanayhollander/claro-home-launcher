@@ -66,7 +66,8 @@ data class MessageRecipient(
     val contactLookupKey: String? = null,
     val label: String? = null,
 ) {
-    val accessibleName: String get() = displayName?.ifBlank { null } ?: number
+    val accessibleName: String
+        get() = displayName?.ifBlank { null } ?: "\u2066$number\u2069"
 }
 
 data class MessageAttachment(

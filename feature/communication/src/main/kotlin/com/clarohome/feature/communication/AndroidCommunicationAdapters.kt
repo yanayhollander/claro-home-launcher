@@ -14,9 +14,13 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.database.Cursor
+import android.database.ContentObserver
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
+import android.provider.CallLog
 import android.provider.ContactsContract
 import android.telecom.Call
 import android.telecom.CallAudioState
@@ -25,6 +29,7 @@ import android.telecom.InCallService
 import android.telecom.TelecomManager
 import android.telephony.TelephonyManager
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import androidx.core.app.NotificationCompat
 import dagger.Binds
 import dagger.Module
@@ -40,6 +45,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 @Singleton
@@ -625,7 +631,7 @@ class AndroidContactsGateway @Inject constructor(
             val lookupKey = cursor.string(ContactsContract.CommonDataKinds.Phone.LOOKUP_KEY)
             val number = cursor.string(ContactsContract.CommonDataKinds.Phone.NUMBER)
             val type = cursor.int(ContactsContract.CommonDataKinds.Phone.TYPE)
-            val customLabel = cursor.string(ContactsContract.CommonDataKinds.Phone.LABEL)
+            val customLabel = cursor.nullableString(ContactsContract.CommonDataKinds.Phone.LABEL)
             val label = ContactsContract.CommonDataKinds.Phone.getTypeLabel(
                 context.resources,
                 type,
@@ -747,18 +753,20 @@ class SharedPreferencesPhoneAssignmentStore @Inject constructor(
     }
 
     private fun write(assignments: List<PhoneAssignment>) {
-        preferences.edit().putStringSet(
-            KEY_ASSIGNMENTS,
-            assignments.mapTo(mutableSetOf()) { assignment ->
-                listOf(
-                    assignment.slot,
-                    assignment.contactLookupKey,
-                    assignment.selectedNumberSnapshot,
-                    assignment.displayNameSnapshot,
-                    assignment.status.name,
-                ).joinToString(SEPARATOR) { Uri.encode(it) }
-            },
-        ).apply()
+        preferences.edit {
+            putStringSet(
+                KEY_ASSIGNMENTS,
+                assignments.mapTo(mutableSetOf()) { assignment ->
+                    listOf(
+                        assignment.slot,
+                        assignment.contactLookupKey,
+                        assignment.selectedNumberSnapshot,
+                        assignment.displayNameSnapshot,
+                        assignment.status.name,
+                    ).joinToString(SEPARATOR) { Uri.encode(it) }
+                },
+            )
+        }
         mutableAssignments.value = assignments
     }
 
@@ -785,42 +793,141 @@ class SharedPreferencesPhoneAssignmentStore @Inject constructor(
 
 @Singleton
 class SharedPreferencesCallHistoryStore @Inject constructor(
-    @ApplicationContext context: Context,
+    @ApplicationContext private val context: Context,
 ) : CallHistoryStore {
     private val preferences: SharedPreferences =
         context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-    private val mutableHistory = MutableStateFlow(read())
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var localEntries: List<CallHistoryEntry> = readLocal()
+    private val mutableHistory = MutableStateFlow(localEntries)
     override val history: StateFlow<List<CallHistoryEntry>> = mutableHistory.asStateFlow()
 
+    init {
+        runCatching {
+            context.contentResolver.registerContentObserver(
+                CallLog.Calls.CONTENT_URI,
+                true,
+                object : ContentObserver(Handler(Looper.getMainLooper())) {
+                    override fun onChange(selfChange: Boolean) {
+                        scope.launch { refresh() }
+                    }
+                },
+            )
+        }
+        scope.launch { refresh() }
+    }
+
     override suspend fun record(entry: CallHistoryEntry) {
-        write((listOf(entry) + mutableHistory.value.filterNot { it.id == entry.id }).take(200))
+        localEntries = (listOf(entry) + localEntries.filterNot { it.id == entry.id }).take(MAX_ENTRIES)
+        writeLocal(localEntries)
+        refresh()
     }
 
     override suspend fun markOpened(id: String) {
-        write(mutableHistory.value.map { if (it.id == id) it.copy(isOpened = true) else it })
+        val opened = openedIds() + id
+        preferences.edit { putStringSet(KEY_OPENED, opened) }
+        localEntries = localEntries.map { if (it.id == id) it.copy(isOpened = true) else it }
+        writeLocal(localEntries)
+        refresh()
     }
 
-    private fun write(entries: List<CallHistoryEntry>) {
-        preferences.edit().putStringSet(
-            KEY_HISTORY,
-            entries.mapTo(mutableSetOf()) { entry ->
-                listOf(
-                    entry.id,
-                    entry.identity.displayName.orEmpty(),
-                    entry.identity.number.orEmpty(),
-                    entry.identity.isPrivate.toString(),
-                    entry.direction.name,
-                    entry.outcome.name,
-                    entry.timestampMillis.toString(),
-                    entry.connectedDurationMillis?.toString().orEmpty(),
-                    entry.isOpened.toString(),
-                ).joinToString(SEPARATOR) { Uri.encode(it) }
-            },
-        ).apply()
-        mutableHistory.value = entries.sortedByDescending { it.timestampMillis }
+    // The system call log is authoritative when readable; Claro's own record is only a fallback.
+    override suspend fun refresh() {
+        val system = readSystemLog()
+        mutableHistory.value = (system ?: localEntries).sortedByDescending { it.timestampMillis }
     }
 
-    private fun read(): List<CallHistoryEntry> =
+    private fun readSystemLog(): List<CallHistoryEntry>? {
+        if (
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALL_LOG) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            return null
+        }
+        val opened = openedIds()
+        val resolver = PhoneNumberNameResolver(context)
+        val entries = mutableListOf<CallHistoryEntry>()
+        runCatching {
+            context.contentResolver.query(
+                CallLog.Calls.CONTENT_URI,
+                arrayOf(
+                    CallLog.Calls._ID,
+                    CallLog.Calls.NUMBER,
+                    CallLog.Calls.CACHED_NAME,
+                    CallLog.Calls.TYPE,
+                    CallLog.Calls.DATE,
+                    CallLog.Calls.DURATION,
+                    CallLog.Calls.IS_READ,
+                    CallLog.Calls.NUMBER_PRESENTATION,
+                ),
+                null,
+                null,
+                "${CallLog.Calls.DATE} DESC",
+            )?.use { cursor ->
+                while (cursor.moveToNext() && entries.size < MAX_ENTRIES) {
+                    val type = cursor.getInt(3)
+                    val durationMillis = cursor.getLong(5) * 1_000
+                    val (direction, outcome) = when (type) {
+                        CallLog.Calls.INCOMING_TYPE,
+                        CallLog.Calls.ANSWERED_EXTERNALLY_TYPE,
+                        CallLog.Calls.VOICEMAIL_TYPE,
+                        -> CallDirection.INCOMING to CallOutcome.ENDED
+                        CallLog.Calls.MISSED_TYPE -> CallDirection.INCOMING to CallOutcome.MISSED_INCOMING
+                        CallLog.Calls.REJECTED_TYPE,
+                        CallLog.Calls.BLOCKED_TYPE,
+                        -> CallDirection.INCOMING to CallOutcome.DECLINED_INCOMING
+                        CallLog.Calls.OUTGOING_TYPE -> CallDirection.OUTGOING to
+                            if (durationMillis > 0) CallOutcome.ENDED else CallOutcome.UNANSWERED_OUTGOING
+                        else -> continue
+                    }
+                    val number = cursor.getString(1)?.ifBlank { null }
+                    val isPrivate = number == null &&
+                        cursor.getInt(7) != CallLog.Calls.PRESENTATION_ALLOWED
+                    val id = "log:${cursor.getLong(0)}"
+                    entries += CallHistoryEntry(
+                        id = id,
+                        identity = CallerIdentity(
+                            displayName = resolver.resolve(number) ?: cursor.getString(2)?.ifBlank { null },
+                            number = number,
+                            isPrivate = isPrivate,
+                        ),
+                        direction = direction,
+                        outcome = outcome,
+                        timestampMillis = cursor.getLong(4),
+                        connectedDurationMillis = durationMillis.takeIf { it > 0 },
+                        isOpened = id in opened || cursor.getInt(6) != 0,
+                    )
+                }
+            }
+        }.onFailure { return null }
+        return entries
+    }
+
+    private fun openedIds(): Set<String> =
+        preferences.getStringSet(KEY_OPENED, emptySet()).orEmpty().toSet()
+
+    private fun writeLocal(entries: List<CallHistoryEntry>) {
+        preferences.edit {
+            putStringSet(
+                KEY_HISTORY,
+                entries.mapTo(mutableSetOf()) { entry ->
+                    listOf(
+                        entry.id,
+                        entry.identity.displayName.orEmpty(),
+                        entry.identity.number.orEmpty(),
+                        entry.identity.isPrivate.toString(),
+                        entry.direction.name,
+                        entry.outcome.name,
+                        entry.timestampMillis.toString(),
+                        entry.connectedDurationMillis?.toString().orEmpty(),
+                        entry.isOpened.toString(),
+                    ).joinToString(SEPARATOR) { Uri.encode(it) }
+                },
+            )
+        }
+    }
+
+    private fun readLocal(): List<CallHistoryEntry> =
         preferences.getStringSet(KEY_HISTORY, emptySet()).orEmpty().mapNotNull { encoded ->
             val values = encoded.split(SEPARATOR).map(Uri::decode)
             if (values.size != 9) return@mapNotNull null
@@ -844,7 +951,9 @@ class SharedPreferencesCallHistoryStore @Inject constructor(
     companion object {
         private const val PREFERENCES = "call_history"
         private const val KEY_HISTORY = "history"
+        private const val KEY_OPENED = "opened_ids"
         private const val SEPARATOR = "|"
+        private const val MAX_ENTRIES = 200
     }
 }
 

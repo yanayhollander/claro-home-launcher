@@ -104,6 +104,7 @@ class AndroidMessageRepository @Inject constructor(
             return
         }
         val rows = linkedMapOf<Long, MutableConversation>()
+        val nameResolver = PhoneNumberNameResolver(context)
         context.contentResolver.query(
             Telephony.Sms.CONTENT_URI,
             SMS_PROJECTION,
@@ -124,7 +125,8 @@ class AndroidMessageRepository @Inject constructor(
                 if (
                     query.isNotBlank() &&
                     !address.contains(query, ignoreCase = true) &&
-                    !body.contains(query, ignoreCase = true)
+                    !body.contains(query, ignoreCase = true) &&
+                    nameResolver.resolve(address)?.contains(query, ignoreCase = true) != true
                 ) {
                     continue
                 }
@@ -132,6 +134,7 @@ class AndroidMessageRepository @Inject constructor(
                     MutableConversation(
                         id = threadId,
                         address = address,
+                        displayName = nameResolver.resolve(address),
                         snippet = body,
                         timestampMillis = cursor.getLong(dateIndex),
                     )
@@ -348,6 +351,7 @@ class AndroidMessageRepository @Inject constructor(
         val id: Long,
         val address: String,
         val snippet: String,
+        val displayName: String? = null,
         val timestampMillis: Long,
         var unreadCount: Int = 0,
         var kind: MessageKind = MessageKind.SMS,
@@ -355,7 +359,7 @@ class AndroidMessageRepository @Inject constructor(
     ) {
         fun toConversation(): MessageConversation = MessageConversation(
             id = id,
-            recipient = MessageRecipient(address),
+            recipient = MessageRecipient(address, displayName = displayName),
             snippet = snippet,
             timestampMillis = timestampMillis,
             unreadCount = unreadCount,

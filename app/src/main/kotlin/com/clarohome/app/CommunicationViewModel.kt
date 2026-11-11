@@ -54,6 +54,7 @@ class CommunicationViewModel @Inject constructor(
         }
         viewModelScope.launch {
             roleGateway.refresh()
+            coordinator.refreshHistory()
             coordinator.reconcileAssignments()
         }
     }
@@ -61,7 +62,10 @@ class CommunicationViewModel @Inject constructor(
     fun roleRequestIntent(): Intent? = roleGateway.createRoleRequest()
 
     fun refreshQualification() {
-        viewModelScope.launch { roleGateway.refresh() }
+        viewModelScope.launch {
+            roleGateway.refresh()
+            coordinator.refreshHistory()
+        }
     }
 
     fun openDialer() = coordinator.openDialer()

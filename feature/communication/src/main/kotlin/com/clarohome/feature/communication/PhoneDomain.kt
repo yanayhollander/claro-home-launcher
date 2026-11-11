@@ -264,6 +264,7 @@ interface CallHistoryStore {
     val history: StateFlow<List<CallHistoryEntry>>
     suspend fun record(entry: CallHistoryEntry)
     suspend fun markOpened(id: String)
+    suspend fun refresh() = Unit
 }
 
 interface ElapsedRealtimeClock {
@@ -451,6 +452,8 @@ class PhoneContactsCoordinator(
         contactQuery = state.value.contactQuery,
         selectedContactLookupKey = state.value.selectedContact?.lookupKey,
     )
+
+    suspend fun refreshHistory() = historyStore.refresh()
 
     fun openDialer() = update {
         copy(route = CommunicationRoute.DIALER, failure = null, message = null)
