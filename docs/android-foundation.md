@@ -31,12 +31,19 @@ app
   remain pinned in the catalog but are intentionally not placed on the runtime
   classpath until configured, preventing automatic SDK startup.
 - `core:testing`: shared unit-test dependencies and future deterministic fixtures.
-- `presentation:*`: Touch Home and Classic Phone shells.
-- `feature:*`: ownership contracts for independently stacked feature work.
+- `presentation:*`: Touch Home and Classic Phone shells consuming the same
+  launcher snapshot.
+- `feature:launcher-home`: HOME-role eligibility/request/repair, scoped
+  launchable-app discovery, device status reads, app allowlisting and home-tile
+  policy.
+- Other `feature:*` modules remain ownership contracts for independently stacked
+  feature work.
 
-The current app deliberately does not request launcher, dialer, SMS, contacts, or
-notification roles; place calls; send messages; purchase products; or upload
-telemetry.
+The app now declares HOME intent handling and can request or repair the HOME role.
+It still deliberately does not request dialer, SMS, contacts, or notification
+roles; place calls; send messages; purchase products; or upload telemetry.
+Unavailable phone/message authority is represented as unknown rather than a
+fabricated zero, and launch failures remain visible.
 
 ## Toolchain and dependency policy
 

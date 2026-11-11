@@ -13,6 +13,7 @@ android {
 }
 
 dependencies {
+    api(project(":core:model"))
     api(libs.junit)
     api(libs.truth)
     api(libs.turbine)

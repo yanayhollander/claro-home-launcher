@@ -109,13 +109,37 @@ data class ClaroPreferences(
 data class FavoritePerson(
     val id: String,
     val displayName: String,
+    val phoneNumber: String? = null,
+    val photoUri: String? = null,
+    val state: FavoriteState = FavoriteState.READY,
 )
+
+enum class FavoriteState {
+    READY,
+    UNASSIGNED,
+    CONTACT_MISSING,
+    PHOTO_UNAVAILABLE,
+}
 
 data class HomeTile(
     val id: String,
     val label: String,
     val accent: TileAccent,
+    val kind: HomeTileKind,
+    val badge: BadgeValue? = null,
+    val packageName: String? = null,
+    val isCore: Boolean = true,
 )
+
+enum class HomeTileKind {
+    PHONE,
+    MESSAGES,
+    CAMERA,
+    GALLERY,
+    SOS,
+    APPS,
+    INSTALLED_APP,
+}
 
 enum class TileAccent {
     GREEN,
@@ -125,10 +149,74 @@ enum class TileAccent {
     VIOLET,
 }
 
+sealed interface BadgeValue {
+    data class Known(val count: Int) : BadgeValue {
+        init {
+            require(count >= 0)
+        }
+    }
+
+    data object Unknown : BadgeValue
+}
+
+data class BatteryStatus(
+    val percentage: Int,
+    val isCharging: Boolean,
+) {
+    init {
+        require(percentage in 0..100)
+    }
+}
+
+enum class CellularAvailability {
+    AVAILABLE,
+    NO_SIM,
+    NO_SERVICE,
+    AIRPLANE_MODE,
+    UNKNOWN,
+}
+
+data class CellularStatus(
+    val availability: CellularAvailability,
+    val signalLevel: Int? = null,
+) {
+    init {
+        require(signalLevel == null || signalLevel in 0..4)
+    }
+}
+
+enum class HomeRoleState {
+    GRANTED,
+    AVAILABLE,
+    UNAVAILABLE,
+    UNKNOWN,
+}
+
+data class InstalledApp(
+    val packageName: String,
+    val label: String,
+    val isAllowed: Boolean,
+    val isFavorite: Boolean = false,
+    val isOnHome: Boolean = false,
+    val isAvailable: Boolean = true,
+)
+
+data class ActiveCall(
+    val displayName: String,
+    val stateLabel: String,
+)
+
 data class HomeSnapshot(
     val greeting: String,
+    val dayAndDate: String,
+    val time: String,
+    val battery: BatteryStatus,
+    val cellular: CellularStatus,
     val favorites: List<FavoritePerson>,
     val tiles: List<HomeTile>,
+    val installedApps: List<InstalledApp>,
+    val homeRole: HomeRoleState,
+    val activeCall: ActiveCall? = null,
 )
 
 enum class CapabilityStatus {

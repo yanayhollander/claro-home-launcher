@@ -3,7 +3,11 @@ package com.clarohome.core.domain
 import com.clarohome.core.model.EntitlementState
 import com.clarohome.core.model.ClaroPreferences
 import com.clarohome.core.model.CriticalActivity
+import com.clarohome.core.model.BatteryStatus
+import com.clarohome.core.model.CellularStatus
+import com.clarohome.core.model.HomeRoleState
 import com.clarohome.core.model.HomeSnapshot
+import com.clarohome.core.model.InstalledApp
 import com.clarohome.core.model.PlatformReadiness
 import com.clarohome.core.model.VisualMode
 import kotlinx.coroutines.flow.Flow
@@ -24,6 +28,16 @@ interface CriticalActivityRepository {
 
 interface HomeRepository {
     val home: Flow<HomeSnapshot>
+    suspend fun setInstalledApps(apps: List<InstalledApp>)
+    suspend fun setAppAllowed(packageName: String, allowed: Boolean)
+    suspend fun setAppOnHome(packageName: String, onHome: Boolean)
+    suspend fun setHomeRoleState(state: HomeRoleState)
+    suspend fun setStatus(
+        dayAndDate: String,
+        time: String,
+        battery: BatteryStatus,
+        cellular: CellularStatus,
+    )
 }
 
 interface PlatformReadinessRepository {

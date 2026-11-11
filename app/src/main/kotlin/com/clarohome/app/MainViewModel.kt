@@ -1,5 +1,6 @@
 package com.clarohome.app
 
+import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clarohome.core.domain.HomeRepository
@@ -20,6 +21,9 @@ import com.clarohome.core.model.VisualMode
 import com.clarohome.feature.onboarding.settings.AccessResult
 import com.clarohome.feature.onboarding.settings.ModeSwitchResult
 import com.clarohome.feature.onboarding.settings.OnboardingSettingsManager
+import com.clarohome.feature.launcher.home.HomeRoleController
+import com.clarohome.feature.launcher.home.InstalledAppCatalog
+import com.clarohome.feature.launcher.home.LauncherStatusReader
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,7 +47,10 @@ class MainViewModel @Inject constructor(
     private val criticalActivityRepository: CriticalActivityRepository,
     private val recoveryCoordinator: StartupRecoveryCoordinator,
     private val settingsManager: OnboardingSettingsManager,
-    homeRepository: HomeRepository,
+    private val homeRepository: HomeRepository,
+    private val homeRoleController: HomeRoleController,
+    private val installedAppCatalog: InstalledAppCatalog,
+    private val launcherStatusReader: LauncherStatusReader,
 ) : ViewModel() {
     private val startup = MutableStateFlow<StartupRecoveryState>(StartupRecoveryState.Recovering)
     private val message = MutableStateFlow<String?>(null)
@@ -65,6 +72,7 @@ class MainViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             startup.value = recoveryCoordinator.recover()
+            refreshLauncherState()
         }
     }
 
@@ -198,6 +206,39 @@ class MainViewModel @Inject constructor(
 
     private fun launch(block: suspend () -> Unit) {
         viewModelScope.launch { block() }
+    }
+
+    fun refreshLauncherState() {
+        viewModelScope.launch {
+            homeRepository.setHomeRoleState(homeRoleController.currentState())
+            homeRepository.setInstalledApps(installedAppCatalog.discoverEligibleApps())
+            launcherStatusReader.read().let { status ->
+                homeRepository.setStatus(
+                    dayAndDate = status.dayAndDate,
+                    time = status.time,
+                    battery = status.battery,
+                    cellular = status.cellular,
+                )
+            }
+        }
+    }
+
+    fun homeRoleActionIntent(): Intent =
+        homeRoleController.requestIntent() ?: homeRoleController.repairIntent()
+
+    fun appLaunchIntent(packageName: String): Intent? =
+        installedAppCatalog.launchIntent(packageName)
+
+    fun setAppAllowed(packageName: String, allowed: Boolean) {
+        viewModelScope.launch {
+            homeRepository.setAppAllowed(packageName, allowed)
+        }
+    }
+
+    fun setAppOnHome(packageName: String, onHome: Boolean) {
+        viewModelScope.launch {
+            homeRepository.setAppOnHome(packageName, onHome)
+        }
     }
 }
 

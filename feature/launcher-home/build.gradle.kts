@@ -1,4 +1,8 @@
-plugins { alias(libs.plugins.android.library) }
+plugins {
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt)
+}
 
 android {
     namespace = "com.clarohome.feature.launcher.home"
@@ -10,4 +14,12 @@ android {
     }
 }
 
-dependencies { api(project(":core:domain")) }
+dependencies {
+    api(project(":core:domain"))
+    implementation(project(":core:model"))
+    implementation(libs.hilt.android)
+    implementation(libs.kotlinx.coroutines.android)
+    ksp(libs.hilt.compiler)
+
+    testImplementation(project(":core:testing"))
+}
