@@ -135,7 +135,8 @@ the list. Focus is made visible by `ClaroFocusIndication` (amber ring, set in
 `ClaroTheme`) plus `Modifier.claroFocusRing()` for Material buttons; the Classic
 deck keeps Compose in keyboard input mode (a touch-mode listener flips it back) so
 taps on the arrows move a visible focus without resetting it, and the first arrow on
-a screen focuses the first item whatever its direction.
+a screen focuses the first item whatever its direction. The ring stays hidden
+(`ClaroFocusVisibility`) until the first arrow/D-pad press and hides again on the next screen.
 
 Settings unlock is session-long: once the Date/PIN gate is answered, protected
 settings stay unlocked until the user taps "Lock settings" or the process is

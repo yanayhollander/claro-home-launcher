@@ -70,6 +70,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import com.clarohome.core.design.ClaroFocusVisibility
 import com.clarohome.core.design.claroFocusRing
 import com.clarohome.core.design.ClaroColors
 import com.clarohome.core.design.ClaroIcon
@@ -149,6 +150,13 @@ import kotlinx.serialization.Serializable
 @Serializable private data class PeopleSettingsRoute(val requiresAuth: Boolean)
 @Serializable private data object MenuOrderRoute
 
+private val FOCUS_KEYS = setOf(
+    KeyEvent.KEYCODE_DPAD_UP,
+    KeyEvent.KEYCODE_DPAD_DOWN,
+    KeyEvent.KEYCODE_DPAD_LEFT,
+    KeyEvent.KEYCODE_DPAD_RIGHT,
+    KeyEvent.KEYCODE_TAB,
+)
 private const val TARGET_SETTINGS = "settings"
 private const val TARGET_SOS_SETTINGS = "sos_settings"
 private const val TARGET_APPS_CUSTOMIZE = "apps_customize"
@@ -156,6 +164,11 @@ private const val TARGET_CONTACTS = "contacts"
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode in FOCUS_KEYS) ClaroFocusVisibility.visible = true
+        return super.dispatchKeyEvent(event)
+    }
+
     private val communicationViewModel by viewModels<CommunicationViewModel>()
     private val messagingViewModel by viewModels<MessagingViewModel>()
     private val phonePermissionLauncher = registerForActivityResult(

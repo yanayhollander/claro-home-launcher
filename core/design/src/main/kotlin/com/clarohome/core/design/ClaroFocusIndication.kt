@@ -31,6 +31,14 @@ import kotlinx.coroutines.launch
  * a thick amber ring with a dark inner edge and a light tint, so the focused
  * item is obvious on light and dark backgrounds. Touch ripples are preserved.
  */
+/**
+ * Whether the focus marker is shown. It stays hidden on arrival at a screen (touch users never
+ * see it) and turns on with the first arrow/D-pad press, then off again when the screen changes.
+ */
+object ClaroFocusVisibility {
+    var visible by mutableStateOf(false)
+}
+
 internal object ClaroFocusIndication : IndicationNodeFactory {
     override fun create(interactionSource: InteractionSource): DelegatableNode =
         ClaroFocusIndicationNode(interactionSource)
@@ -71,7 +79,7 @@ private class ClaroFocusIndicationNode(
 
     override fun ContentDrawScope.draw() {
         drawContent()
-        if (focused) drawClaroFocusRing()
+        if (focused && ClaroFocusVisibility.visible) drawClaroFocusRing()
     }
 }
 
@@ -103,6 +111,6 @@ fun Modifier.claroFocusRing(): Modifier = composed {
         .onFocusChanged { focused = it.hasFocus }
         .drawWithContent {
             drawContent()
-            if (focused) drawClaroFocusRing()
+            if (focused && ClaroFocusVisibility.visible) drawClaroFocusRing()
         }
 }

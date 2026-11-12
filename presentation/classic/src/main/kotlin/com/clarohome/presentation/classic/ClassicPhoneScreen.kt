@@ -72,6 +72,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.clarohome.core.design.ClaroAppIcon
+import com.clarohome.core.design.ClaroFocusVisibility
 import com.clarohome.core.design.ClaroAvatar
 import com.clarohome.core.design.ClaroBatteryMeter
 import com.clarohome.core.design.ClaroCellularBars
@@ -387,6 +388,7 @@ private fun ClassicHomeTile(
     onClick: () -> Unit,
 ) {
     var isFocused by remember { mutableStateOf(false) }
+    val showFocus = isFocused && ClaroFocusVisibility.visible
     val haptics = LocalClaroHaptics.current
     val tileLabel = when (tile.kind) {
         HomeTileKind.PHONE -> stringResource(R.string.classic_phone_title)
@@ -414,8 +416,8 @@ private fun ClassicHomeTile(
             .clip(RoundedCornerShape(3.dp))
             .background(if (isSos) ClaroColors.Red else Color(0xFFEEF3FB))
             .border(
-                width = if (isFocused) 2.5.dp else 1.dp,
-                color = if (isFocused) ClassicFocusOutline else Color(0xFFBAC8DC),
+                width = if (showFocus) 2.5.dp else 1.dp,
+                color = if (showFocus) ClassicFocusOutline else Color(0xFFBAC8DC),
                 shape = RoundedCornerShape(3.dp),
             )
             .onFocusChanged { isFocused = it.isFocused }
@@ -606,6 +608,7 @@ internal fun ClassicLightButton(
     leadingIcon: ClaroIconKind? = null,
 ) {
     var isFocused by remember { mutableStateOf(false) }
+    val showFocus = isFocused && ClaroFocusVisibility.visible
     val haptics = LocalClaroHaptics.current
     Button(
         onClick = {
@@ -622,8 +625,8 @@ internal fun ClassicLightButton(
             .heightIn(min = minHeight.dp)
             .onFocusChanged { isFocused = it.isFocused },
         border = BorderStroke(
-            width = if (isFocused) 2.5.dp else 1.dp,
-            color = if (isFocused) ClassicFocusOutline else borderColor,
+            width = if (showFocus) 2.5.dp else 1.dp,
+            color = if (showFocus) ClassicFocusOutline else borderColor,
         ),
         colors = ButtonDefaults.buttonColors(
             containerColor = color,
@@ -664,12 +667,13 @@ internal fun ClassicRowItem(
     trailing: (@Composable () -> Unit)? = null,
 ) {
     var isFocused by remember { mutableStateOf(false) }
+    val showFocus = isFocused && ClaroFocusVisibility.visible
     val haptics = LocalClaroHaptics.current
     Column(
         modifier = modifier
             .fillMaxWidth()
             .then(
-                if (isFocused) {
+                if (showFocus) {
                     Modifier.border(2.5.dp, ClassicFocusOutline)
                 } else {
                     Modifier
@@ -861,6 +865,7 @@ fun ClassicIntegratedPad(
     val inputModeManager = LocalInputModeManager.current
     var arrowsStarted by remember(screenKey) { mutableStateOf(false) }
     val view = LocalView.current
+    LaunchedEffect(screenKey) { ClaroFocusVisibility.visible = false }
     // A deck tap would otherwise flip Compose into touch mode and drop the focused item.
     DisposableEffect(view, inputModeManager) {
         view.isFocusableInTouchMode = true
@@ -895,6 +900,7 @@ fun ClassicIntegratedPad(
     val navigate: (FocusDirection, Int, Int) -> Unit = { direction, keyCode, scrollDelta ->
         // Compose only focuses clickable items in keyboard mode; deck taps arrive as touch.
         inputModeManager.requestInputMode(InputMode.Keyboard)
+        ClaroFocusVisibility.visible = true
         // The first arrow on a screen starts from the first item, whatever was implicitly focused.
         val moved = runCatching {
             if (!arrowsStarted) {
