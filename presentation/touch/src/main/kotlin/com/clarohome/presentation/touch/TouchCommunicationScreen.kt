@@ -61,6 +61,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.clarohome.core.design.claroFocusRing
 import com.clarohome.core.design.ClaroActionDock
 import com.clarohome.core.design.ClaroAvatar
 import com.clarohome.core.design.ClaroBannerTone
@@ -595,6 +596,7 @@ private fun DialNumberDisplayRow(
             enabled = !isEmpty,
             modifier = Modifier
                 .size(64.dp)
+                .claroFocusRing()
                 .semantics { contentDescription = backspaceDescription },
             shape = RoundedCornerShape(3.dp),
             border = BorderStroke(1.dp, ClaroColors.Border),
@@ -1488,7 +1490,7 @@ private fun CallControlTile(
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.heightIn(min = 88.dp),
+        modifier = modifier.heightIn(min = 88.dp).claroFocusRing(),
         shape = RoundedCornerShape(3.dp),
         border = BorderStroke(if (active) 2.dp else 1.dp, border),
         colors = ButtonDefaults.outlinedButtonColors(
@@ -1555,7 +1557,8 @@ private fun InCallDtmfPad(
                                 onClick = { onDigit(digit) },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .heightIn(min = 60.dp),
+                                    .heightIn(min = 60.dp)
+                                    .claroFocusRing(),
                                 shape = RoundedCornerShape(1.dp),
                                 border = BorderStroke(0.dp, Color.Transparent),
                                 colors = ButtonDefaults.outlinedButtonColors(

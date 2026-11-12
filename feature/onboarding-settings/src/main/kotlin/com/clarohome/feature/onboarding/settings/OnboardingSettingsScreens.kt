@@ -356,6 +356,7 @@ fun SettingsHubScreen(
     onDone: () -> Unit,
     onLockAndExit: () -> Unit,
     onResetClaro: () -> Unit = {},
+    onMenuOrder: (() -> Unit)? = null,
 ) {
     ClaroScreenScaffold(
         title = stringResource(R.string.settings),
@@ -398,6 +399,20 @@ fun SettingsHubScreen(
                 },
                 onClick = onHomeAndApps,
             )
+            if (onMenuOrder != null) {
+                ClaroRowButton(
+                    title = stringResource(R.string.onb_menu_order_title),
+                    subtitle = stringResource(R.string.onb_menu_order_subtitle),
+                    leading = {
+                        ClaroIcon(
+                            kind = ClaroIconKind.SETTINGS,
+                            tint = ClaroColors.Blue,
+                            size = 32.dp,
+                        )
+                    },
+                    onClick = onMenuOrder,
+                )
+            }
             ClaroRowButton(
                 title = stringResource(R.string.onb_people_and_speed_dial_amp_title),
                 subtitle = stringResource(

@@ -97,45 +97,50 @@ fun AppsMenuScreen(
         },
     ) {
         if (editing) {
-            ClaroInfoCard(
-                text = stringResource(R.string.app_apps_hiding_convenience_notice),
-                tone = ClaroBannerTone.INFO,
-            )
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.app_search)) },
-                singleLine = true,
-            )
-            if (visible.isEmpty()) {
-                ClaroInfoCard(
-                    text = if (query.isBlank()) {
-                        stringResource(R.string.app_no_eligible_apps)
-                    } else {
-                        stringResource(R.string.app_no_apps_match_search)
-                    },
-                    tone = ClaroBannerTone.INFO,
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
-                ) {
-                    items(visible, key = { it.packageName }) { app ->
-                        CaregiverAppRow(
-                            app = app,
-                            onSetAllowed = { allowed ->
-                                onSetAllowed(app, allowed)
-                                if (!allowed && app.isOnHome) {
-                                    onSetOnHome(app, false)
-                                }
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
+            ) {
+                item(key = "notice") {
+                    ClaroInfoCard(
+                        text = stringResource(R.string.app_apps_hiding_convenience_notice),
+                        tone = ClaroBannerTone.INFO,
+                    )
+                }
+                item(key = "search") {
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(stringResource(R.string.app_search)) },
+                        singleLine = true,
+                    )
+                }
+                if (visible.isEmpty()) {
+                    item(key = "empty") {
+                        ClaroInfoCard(
+                            text = if (query.isBlank()) {
+                                stringResource(R.string.app_no_eligible_apps)
+                            } else {
+                                stringResource(R.string.app_no_apps_match_search)
                             },
-                            onSetOnHome = { onHome -> onSetOnHome(app, onHome) },
+                            tone = ClaroBannerTone.INFO,
                         )
                     }
+                }
+                items(visible, key = { it.packageName }) { app ->
+                    CaregiverAppRow(
+                        app = app,
+                        onSetAllowed = { allowed ->
+                            onSetAllowed(app, allowed)
+                            if (!allowed && app.isOnHome) {
+                                onSetOnHome(app, false)
+                            }
+                        },
+                        onSetOnHome = { onHome -> onSetOnHome(app, onHome) },
+                    )
                 }
             }
         } else {

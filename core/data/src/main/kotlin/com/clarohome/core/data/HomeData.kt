@@ -28,6 +28,8 @@ import kotlinx.coroutines.flow.asStateFlow
 interface HomeSlotStore {
     fun load(): List<HomeTile?>
     fun save(slots: List<HomeTile?>)
+    fun loadMenuOrder(): List<String> = emptyList()
+    fun saveMenuOrder(order: List<String>) = Unit
 }
 
 class InMemoryHomeSlotStore(
@@ -36,6 +38,12 @@ class InMemoryHomeSlotStore(
     override fun load() = saved
     override fun save(slots: List<HomeTile?>) {
         saved = slots
+    }
+
+    private var savedOrder: List<String> = emptyList()
+    override fun loadMenuOrder() = savedOrder
+    override fun saveMenuOrder(order: List<String>) {
+        savedOrder = order
     }
 }
 
@@ -88,6 +96,16 @@ class SharedPreferencesHomeSlotStore @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : HomeSlotStore {
     private val prefs = context.getSharedPreferences("claro_home_slots", Context.MODE_PRIVATE)
+    private val orderPrefs = context.getSharedPreferences("claro_menu_order", Context.MODE_PRIVATE)
+
+    override fun loadMenuOrder(): List<String> =
+        orderPrefs.getString(MENU_ORDER, null)?.split('\n')?.filter { it.isNotBlank() }.orEmpty()
+
+    override fun saveMenuOrder(order: List<String>) {
+        orderPrefs.edit {
+            if (order.isEmpty()) remove(MENU_ORDER) else putString(MENU_ORDER, order.joinToString("\n"))
+        }
+    }
 
     override fun load(): List<HomeTile?> {
         if (!prefs.getBoolean(INITIALIZED, false)) {
@@ -143,6 +161,7 @@ class SharedPreferencesHomeSlotStore @Inject constructor(
 
     private companion object {
         const val INITIALIZED = "initialized"
+        const val MENU_ORDER = "order"
     }
 }
 
@@ -158,6 +177,7 @@ class LocalHomeRepository @Inject constructor(
             battery = BatteryStatus(0, isCharging = false),
             cellular = CellularStatus(CellularAvailability.UNKNOWN),
             homeSlots = slotStore.load(),
+            menuOrder = slotStore.loadMenuOrder(),
             tiles = listOf(
                 HomeTile(
                     "phone",
@@ -221,8 +241,15 @@ class LocalHomeRepository @Inject constructor(
             it.copy(isAllowed = false, isFavorite = false, isOnHome = false)
         }
         val defaults = defaultHomeSlots()
-        state.value = current.copy(homeSlots = defaults).withApps(clearedApps)
+        state.value = current.copy(homeSlots = defaults, menuOrder = emptyList()).withApps(clearedApps)
         slotStore.save(defaults)
+        slotStore.saveMenuOrder(emptyList())
+    }
+
+    override suspend fun setMenuOrder(order: List<String>) {
+        val cleaned = order.distinct()
+        state.value = state.value.copy(menuOrder = cleaned)
+        slotStore.saveMenuOrder(cleaned)
     }
 
     override suspend fun setInstalledApps(apps: List<InstalledApp>) {

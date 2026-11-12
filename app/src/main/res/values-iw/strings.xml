@@ -127,6 +127,12 @@
     <string name="app_section_shortcuts">קיצורים</string>
     <string name="app_section_apps">אפליקציות</string>
     <string name="app_section_contacts">אנשי קשר</string>
+    <string name="app_choose_for_tile">בחירה עבור אריח %1$d</string>
+    <string name="app_choose_for_key">בחירה עבור חיוג מהיר %1$s</string>
+    <string name="app_menu_order_title">סדר התפריט</string>
+    <string name="app_menu_order_hint">הזיזו פריטים למעלה או למטה. זה הסדר שבו הם מופיעים בתפריט.</string>
+    <string name="app_move_up">הזזת %1$s למעלה</string>
+    <string name="app_move_down">הזזת %1$s למטה</string>
     <string name="app_home_tiles_and_speed_dial">אריחי מסך בית וחיוג מהיר</string>
     <string name="app_show_in_menu">הצגה בתפריט</string>
     <string name="app_unavailable_review_in_settings">%1$s חסרה או מושבתת. בקשו ממלווה לבדוק אותה בהגדרות.</string>

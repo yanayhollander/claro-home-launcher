@@ -1,5 +1,6 @@
 package com.clarohome.core.design
 
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
@@ -99,7 +100,8 @@ fun ClaroTheme(
                 medium = RoundedCornerShape(8.dp),
                 large = RoundedCornerShape(12.dp),
             ),
-            content = content,
-        )
+        ) {
+            CompositionLocalProvider(LocalIndication provides ClaroFocusIndication, content = content)
+        }
     }
 }

@@ -41,11 +41,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalConfiguration
@@ -831,6 +834,7 @@ internal fun ClassicLtrText(
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun ClassicIntegratedPad(
     menuLabel: String = "",
@@ -851,6 +855,7 @@ fun ClassicIntegratedPad(
     greenColor: Color? = null,
 ) {
     val focusManager = LocalFocusManager.current
+    val inputModeManager = LocalInputModeManager.current
     val view = LocalView.current
     val scope = rememberCoroutineScope()
     val resolvedMenuLabel = if (menuLabel.isBlank() || menuLabel == "Menu") {
@@ -874,6 +879,8 @@ fun ClassicIntegratedPad(
         view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
     }
     val navigate: (FocusDirection, Int, Int) -> Unit = { direction, keyCode, scrollDelta ->
+        // Compose only focuses clickable items in keyboard mode; deck taps arrive as touch.
+        inputModeManager.requestInputMode(InputMode.Keyboard)
         val moved = runCatching { focusManager.moveFocus(direction) }.getOrDefault(false)
         if (!moved) {
             sendKey(keyCode)

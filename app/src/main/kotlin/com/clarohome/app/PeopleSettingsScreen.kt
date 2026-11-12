@@ -33,6 +33,7 @@ import com.clarohome.core.design.ClaroAppIcon
 import com.clarohome.core.design.ClaroAvatar
 import com.clarohome.core.design.ClaroBannerTone
 import com.clarohome.core.design.ClaroColors
+import com.clarohome.core.design.claroFocusRing
 import com.clarohome.core.design.ClaroDimensions
 import com.clarohome.core.design.ClaroIcon
 import com.clarohome.core.design.ClaroIconKind
@@ -41,6 +42,7 @@ import com.clarohome.core.design.ClaroPrimaryButton
 import com.clarohome.core.design.ClaroRowButton
 import com.clarohome.core.design.ClaroScreenScaffold
 import com.clarohome.core.design.ClaroSecondaryButton
+import com.clarohome.core.design.ClaroSoftkey
 import com.clarohome.core.data.homeSlotTile
 import com.clarohome.core.model.HOME_SLOT_COUNT
 import com.clarohome.core.model.HomeTile
@@ -75,26 +77,49 @@ fun PeopleSettingsScreen(
     onClearKey: (String) -> Unit,
     onBack: () -> Unit,
 ) {
-    var target by rememberSaveable { mutableStateOf("home:0") }
-    var query by rememberSaveable { mutableStateOf("") }
-    val (targetKind, targetId) = target.split(':')
-    val isHomeTarget = targetKind == "home"
-    val trimmed = query.trim()
-
-    val choices = contacts.flatMap { contact ->
-        contact.numbers.map { number -> contact to number }
-    }.filter { (contact, number) ->
-        trimmed.isEmpty() ||
-            contact.displayName.contains(trimmed, ignoreCase = true) ||
-            number.label.contains(trimmed, ignoreCase = true) ||
-            number.value.contains(trimmed, ignoreCase = true)
+    var target by rememberSaveable { mutableStateOf<String?>(null) }
+    val picking = target
+    if (picking == null) {
+        PeopleGridScreen(
+            homeSlots = homeSlots,
+            assignments = assignments,
+            onPick = { target = it },
+            onBack = onBack,
+        )
+    } else {
+        PeoplePickerScreen(
+            target = picking,
+            installedApps = installedApps,
+            contacts = contacts,
+            onLoadContacts = onLoadContacts,
+            onSetSlot = { slot, tile ->
+                onSetSlot(slot, tile)
+                target = null
+            },
+            onClearSlot = { slot ->
+                onClearSlot(slot)
+                target = null
+            },
+            onSetKey = { key, contact, number ->
+                onSetKey(key, contact, number)
+                target = null
+            },
+            onClearKey = { key ->
+                onClearKey(key)
+                target = null
+            },
+            onCancel = { target = null },
+        )
     }
-    val appChoices = installedApps
-        .filter { it.isAvailable && it.label.contains(trimmed, ignoreCase = true) }
-        .sortedBy { it.label.lowercase() }
-    val shortcuts = shortcutKinds.map { kind -> kind to stringResource(kind.shortcutLabelRes()) }
-        .filter { (_, label) -> label.contains(trimmed, ignoreCase = true) }
+}
 
+@Composable
+private fun PeopleGridScreen(
+    homeSlots: List<HomeTile?>,
+    assignments: List<PhoneAssignment>,
+    onPick: (String) -> Unit,
+    onBack: () -> Unit,
+) {
     BackHandler(onBack = onBack)
 
     ClaroScreenScaffold(
@@ -122,9 +147,9 @@ fun PeopleSettingsScreen(
                         SlotPickerCell(
                             slot = index,
                             tile = homeSlots.getOrNull(index),
-                            selected = target == "home:$index",
+                            selected = false,
                             modifier = Modifier.weight(1f),
-                            onClick = { target = "home:$index" },
+                            onClick = { onPick("home:$index") },
                         )
                     }
                 }
@@ -133,14 +158,15 @@ fun PeopleSettingsScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap)) {
                     listOf("1", "2").forEach { slot ->
                         val assignment = assignments.firstOrNull { it.slot == slot }
-                        val selected = target == "key:$slot"
+                        val selected = false
                         val assignedName = assignment?.displayNameSnapshot
                             ?: stringResource(R.string.app_not_set)
                         OutlinedButton(
-                            onClick = { target = "key:$slot" },
+                            onClick = { onPick("key:$slot") },
                             modifier = Modifier
                                 .weight(1f)
-                                .heightIn(min = ClaroDimensions.PrimaryTarget),
+                                .heightIn(min = ClaroDimensions.PrimaryTarget)
+                                .claroFocusRing(),
                             shape = RoundedCornerShape(3.dp),
                             border = BorderStroke(
                                 width = if (selected) 3.dp else 1.dp,
@@ -177,6 +203,65 @@ fun PeopleSettingsScreen(
                     modifier = Modifier.padding(horizontal = 4.dp),
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun PeoplePickerScreen(
+    target: String,
+    installedApps: List<InstalledApp>,
+    contacts: List<ClaroContact>,
+    onLoadContacts: () -> Unit,
+    onSetSlot: (Int, HomeTile) -> Unit,
+    onClearSlot: (Int) -> Unit,
+    onSetKey: (String, ClaroContact, ContactNumber) -> Unit,
+    onClearKey: (String) -> Unit,
+    onCancel: () -> Unit,
+) {
+    var query by rememberSaveable { mutableStateOf("") }
+    val (targetKind, targetId) = target.split(':')
+    val isHomeTarget = targetKind == "home"
+    val trimmed = query.trim()
+
+    val choices = contacts.flatMap { contact ->
+        contact.numbers.map { number -> contact to number }
+    }.filter { (contact, number) ->
+        trimmed.isEmpty() ||
+            contact.displayName.contains(trimmed, ignoreCase = true) ||
+            number.label.contains(trimmed, ignoreCase = true) ||
+            number.value.contains(trimmed, ignoreCase = true)
+    }
+    val appChoices = installedApps
+        .filter { it.isAvailable && it.label.contains(trimmed, ignoreCase = true) }
+        .sortedBy { it.label.lowercase() }
+    val shortcuts = shortcutKinds.map { kind -> kind to stringResource(kind.shortcutLabelRes()) }
+        .filter { (_, label) -> label.contains(trimmed, ignoreCase = true) }
+
+    BackHandler(onBack = onCancel)
+
+    ClaroScreenScaffold(
+        title = if (isHomeTarget) {
+            stringResource(R.string.app_choose_for_tile, targetId.toInt() + 1)
+        } else {
+            stringResource(R.string.app_choose_for_key, targetId)
+        },
+        scrollable = false,
+        dockInSoftkeys = true,
+        dock = {
+            ClaroSecondaryButton(
+                label = stringResource(R.string.app_cancel),
+                onClick = onCancel,
+                softkey = ClaroSoftkey.BACK,
+            )
+        },
+    ) {
+        LazyColumn(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
+        ) {
             item(key = "clear") {
                 ClaroSecondaryButton(
                     label = stringResource(R.string.app_clear_selected_slot),
@@ -313,7 +398,7 @@ private fun SlotPickerCell(
 ) {
     OutlinedButton(
         onClick = onClick,
-        modifier = modifier.heightIn(min = 92.dp),
+        modifier = modifier.heightIn(min = 92.dp).claroFocusRing(),
         shape = RoundedCornerShape(3.dp),
         border = BorderStroke(
             width = if (selected) 3.dp else 1.dp,

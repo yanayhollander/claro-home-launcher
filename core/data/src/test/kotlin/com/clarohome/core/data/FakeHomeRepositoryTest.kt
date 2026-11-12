@@ -6,10 +6,22 @@ import com.clarohome.core.model.HOME_SLOT_COUNT
 import com.clarohome.core.model.HomeRoleState
 import com.clarohome.core.model.HomeTileKind
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
 class LocalHomeRepositoryTest {
+    @Test
+    fun menuOrderPersistsAndResetClearsIt() = runTest {
+        val store = InMemoryHomeSlotStore()
+        val repository = LocalHomeRepository(store)
+        repository.setMenuOrder(listOf("camera", "phone"))
+        assertThat(LocalHomeRepository(store).home.first().menuOrder)
+            .containsExactly("camera", "phone").inOrder()
+        repository.reset()
+        assertThat(repository.home.first().menuOrder).isEmpty()
+    }
+
     @Test
     fun initialHomeHasEssentialsWithoutMessagesAndKeepsSixMenuTiles() = runTest {
         LocalHomeRepository(InMemoryHomeSlotStore()).home.test {

@@ -140,6 +140,8 @@
     <string name="onb_lock_settings">Lock settings</string>
     <string name="onb_home_and_apps_title">Apps &amp; Menu</string>
     <string name="onb_home_and_apps_subtitle">Choose which apps are allowed and shown in the Menu</string>
+    <string name="onb_menu_order_title">Menu order</string>
+    <string name="onb_menu_order_subtitle">Choose where each item appears in the Menu</string>
     <string name="onb_people_and_speed_dial_amp_title">Home tiles &amp; speed dial</string>
     <string name="onb_people_configured_short" tools:ignore="PluralsCandidate">%1$d/12 Home tiles configured</string>
     <string name="onb_language_and_display_amp_title">Language &amp; display</string>

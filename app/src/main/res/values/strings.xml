@@ -127,6 +127,12 @@
     <string name="app_section_shortcuts">Shortcuts</string>
     <string name="app_section_apps">Apps</string>
     <string name="app_section_contacts">Contacts</string>
+    <string name="app_choose_for_tile">Choose for tile %1$d</string>
+    <string name="app_choose_for_key">Choose for speed dial %1$s</string>
+    <string name="app_menu_order_title">Menu order</string>
+    <string name="app_menu_order_hint">Move items up or down. This is the order they appear in the Menu.</string>
+    <string name="app_move_up">Move %1$s up</string>
+    <string name="app_move_down">Move %1$s down</string>
     <string name="app_home_tiles_and_speed_dial">Home tiles &amp; speed dial</string>
     <string name="app_show_in_menu">Show in Menu</string>
     <string name="app_unavailable_review_in_settings">%1$s is missing or disabled. Ask a caregiver to review it in Settings.</string>

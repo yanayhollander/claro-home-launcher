@@ -219,7 +219,8 @@ fun ClaroPrimaryButton(
         enabled = enabled,
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = ClaroDimensions.DockButtonHeight),
+            .heightIn(min = ClaroDimensions.DockButtonHeight)
+            .claroFocusRing(),
         shape = RoundedCornerShape(3.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor,
@@ -279,7 +280,8 @@ fun ClaroSecondaryButton(
         enabled = enabled,
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = ClaroDimensions.PrimaryTarget),
+            .heightIn(min = ClaroDimensions.PrimaryTarget)
+            .claroFocusRing(),
         shape = RoundedCornerShape(3.dp),
         border = BorderStroke(1.dp, ClaroColors.Border),
         colors = ButtonDefaults.outlinedButtonColors(
@@ -322,7 +324,8 @@ fun ClaroEmergencyButton(
         },
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = ClaroDimensions.PrimaryTarget),
+            .heightIn(min = ClaroDimensions.PrimaryTarget)
+            .claroFocusRing(),
         shape = RoundedCornerShape(3.dp),
         border = BorderStroke(1.dp, ClaroColors.EmergencyBorder),
         colors = ButtonDefaults.outlinedButtonColors(
@@ -360,7 +363,8 @@ fun ClaroRowButton(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 68.dp),
+                .heightIn(min = 68.dp)
+                .claroFocusRing(),
             shape = RectangleShape,
             colors = ButtonDefaults.buttonColors(
                 containerColor = ClaroColors.RowSurface,

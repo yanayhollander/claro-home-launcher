@@ -127,6 +127,12 @@
     <string name="app_section_shortcuts">Accesos directos</string>
     <string name="app_section_apps">Aplicaciones</string>
     <string name="app_section_contacts">Contactos</string>
+    <string name="app_choose_for_tile">Elegir para el mosaico %1$d</string>
+    <string name="app_choose_for_key">Elegir para la marcación rápida %1$s</string>
+    <string name="app_menu_order_title">Orden del menú</string>
+    <string name="app_menu_order_hint">Mueve los elementos hacia arriba o abajo. Este es el orden en que aparecen en el menú.</string>
+    <string name="app_move_up">Subir %1$s</string>
+    <string name="app_move_down">Bajar %1$s</string>
     <string name="app_home_tiles_and_speed_dial">Mosaicos de inicio y marcación rápida</string>
     <string name="app_show_in_menu">Mostrar en el menú</string>
     <string name="app_unavailable_review_in_settings">%1$s falta o está desactivada. Pida a una persona de apoyo que la revise en Ajustes.</string>

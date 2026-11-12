@@ -350,6 +350,12 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    fun setMenuOrder(order: List<String>) {
+        viewModelScope.launch {
+            homeRepository.setMenuOrder(order)
+        }
+    }
+
     fun setSpeedDialConfigured(slot: String, configured: Boolean) {
         viewModelScope.launch {
             val onboarding = uiState.value.preferences.onboarding

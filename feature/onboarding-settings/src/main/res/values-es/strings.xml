@@ -127,6 +127,8 @@
     <string name="onb_lock_settings">Bloquear ajustes</string>
     <string name="onb_home_and_apps_title">Aplicaciones y Menú</string>
     <string name="onb_home_and_apps_subtitle">Elige qué aplicaciones se permiten y se muestran en el Menú</string>
+    <string name="onb_menu_order_title">Orden del menú</string>
+    <string name="onb_menu_order_subtitle">Elige dónde aparece cada elemento en el menú</string>
     <string name="onb_people_and_speed_dial_amp_title">Mosaicos de inicio y marcación rápida</string>
     <string name="onb_people_configured_short">%1$d/12 mosaicos de Inicio configurados</string>
     <string name="onb_language_and_display_amp_title">Idioma y pantalla</string>

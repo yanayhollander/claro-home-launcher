@@ -209,6 +209,7 @@ data class HomeSnapshot(
     val installedApps: List<InstalledApp>,
     val homeRole: HomeRoleState,
     val activeCall: ActiveCall? = null,
+    val menuOrder: List<String> = emptyList(),
 ) {
     val homeTiles: List<HomeTile> get() = homeSlots.filterNotNull()
 }

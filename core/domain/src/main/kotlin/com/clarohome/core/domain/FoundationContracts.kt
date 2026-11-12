@@ -32,6 +32,7 @@ interface HomeRepository {
     suspend fun setInstalledApps(apps: List<InstalledApp>)
     suspend fun setHomeSlot(slot: Int, tile: HomeTile)
     suspend fun clearHomeSlot(slot: Int)
+    suspend fun setMenuOrder(order: List<String>)
     suspend fun reset()
     suspend fun setAppAllowed(packageName: String, allowed: Boolean)
     suspend fun setAppOnHome(packageName: String, onHome: Boolean)

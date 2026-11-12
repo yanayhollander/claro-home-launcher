@@ -70,6 +70,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import com.clarohome.core.design.claroFocusRing
 import com.clarohome.core.design.ClaroColors
 import com.clarohome.core.design.ClaroIcon
 import com.clarohome.core.design.ClaroIconKind
@@ -146,6 +147,7 @@ import kotlinx.serialization.Serializable
 )
 @Serializable private data object MembershipRoute
 @Serializable private data class PeopleSettingsRoute(val requiresAuth: Boolean)
+@Serializable private data object MenuOrderRoute
 
 private const val TARGET_SETTINGS = "settings"
 private const val TARGET_SOS_SETTINGS = "sos_settings"
@@ -788,6 +790,7 @@ private fun ClaroApp(
                         state.home?.let { home ->
                             LauncherMenuScreen(
                                 tiles = home.tiles,
+                                menuOrder = home.menuOrder,
                                 onBack = navController::popBackStack,
                                 onContacts = {
                                     communicationViewModel.openContacts()
@@ -939,6 +942,17 @@ private fun ClaroApp(
                             onBack = navController::popBackStack,
                         )
                     }
+                    composable<MenuOrderRoute> {
+                        ProtectedSessionMonitor(viewModel, navController)
+                        state.home?.let { home ->
+                            MenuOrderScreen(
+                                tiles = home.tiles,
+                                savedOrder = home.menuOrder,
+                                onOrderChanged = viewModel::setMenuOrder,
+                                onBack = navController::popBackStack,
+                            )
+                        }
+                    }
                     composable<AccessGateRoute> { entry ->
                         val target = entry.toRoute<AccessGateRoute>().target
                         DisposableEffect(Unit) {
@@ -996,6 +1010,9 @@ private fun ClaroApp(
                             },
                             onHomeAndApps = {
                                 navController.navigate(AppsRoute(customize = true))
+                            },
+                            onMenuOrder = {
+                                navController.navigate(MenuOrderRoute)
                             },
                             onPeople = {
                                 communicationViewModel.openContacts()
@@ -1195,7 +1212,8 @@ private fun ProductNavigationBar(
                 },
                 modifier = Modifier
                     .weight(1f)
-                    .heightIn(min = 64.dp),
+                    .heightIn(min = 64.dp)
+                    .claroFocusRing(),
                 colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                     containerColor = Color.White,
                     contentColor = ClaroColors.Charcoal,
@@ -1227,7 +1245,8 @@ private fun ProductNavigationBar(
                 },
                 modifier = Modifier
                     .weight(1f)
-                    .heightIn(min = 64.dp),
+                    .heightIn(min = 64.dp)
+                    .claroFocusRing(),
                 colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                     containerColor = Color.White,
                     contentColor = ClaroColors.Charcoal,

@@ -27,8 +27,10 @@ fun LauncherMenuScreen(
     onContacts: () -> Unit,
     onSettings: () -> Unit,
     onUseTouchStyle: () -> Unit = {},
+    menuOrder: List<String> = emptyList(),
 ) {
-    val orderedTiles = tiles.filter { it.isCore } + tiles.filterNot { it.isCore }
+    val tilesByKey = tiles.associateBy { it.id }
+    val orderedKeys = orderedMenuKeys(tiles, menuOrder)
 
     BackHandler(onBack = onBack)
 
@@ -41,68 +43,68 @@ fun LauncherMenuScreen(
                 .weight(1f)
                 .fillMaxWidth(),
         ) {
-            item(key = "menu-contacts") {
-                ClaroRowButton(
-                    title = stringResource(R.string.app_contacts),
-                    leading = {
-                        ClaroIcon(
-                            kind = ClaroIconKind.CONTACT,
-                            tint = ClaroColors.Blue,
-                            size = 32.dp,
-                        )
-                    },
-                    onClick = onContacts,
-                )
-            }
-            items(orderedTiles, key = { it.id }) { tile ->
-                val (subtitle, unread) = tile.menuBadgePresentation()
-                ClaroRowButton(
-                    title = tile.localizedLabel(),
-                    subtitle = subtitle,
-                    unreadDot = unread,
-                    leading = {
-                        if (tile.kind == HomeTileKind.INSTALLED_APP) {
-                            ClaroAppIcon(
-                                packageName = tile.packageName,
-                                size = 40.dp,
-                                fallbackTint = tile.kind.toClaroIconTint(),
-                            )
-                        } else {
+            items(orderedKeys, key = { it }) { key ->
+                when (key) {
+                    MENU_KEY_CONTACTS -> ClaroRowButton(
+                        title = stringResource(R.string.app_contacts),
+                        leading = {
                             ClaroIcon(
-                                kind = tile.kind.toClaroIconKind(),
-                                tint = tile.kind.toClaroIconTint(),
+                                kind = ClaroIconKind.CONTACT,
+                                tint = ClaroColors.Blue,
                                 size = 32.dp,
                             )
-                        }
-                    },
-                    onClick = {
-                        if (tile.label == "Settings") {
-                            onUseTouchStyle()
-                        } else {
-                            onTileSelected(tile)
-                        }
-                    },
-                )
-            }
-            item(key = "menu-settings") {
-                ClaroRowButton(
-                    title = stringResource(R.string.app_settings),
-                    leading = {
-                        ClaroIcon(
-                            kind = ClaroIconKind.SETTINGS,
-                            tint = ClaroColors.Blue,
-                            size = 32.dp,
+                        },
+                        onClick = onContacts,
+                    )
+                    MENU_KEY_SETTINGS -> ClaroRowButton(
+                        title = stringResource(R.string.app_settings),
+                        leading = {
+                            ClaroIcon(
+                                kind = ClaroIconKind.SETTINGS,
+                                tint = ClaroColors.Blue,
+                                size = 32.dp,
+                            )
+                        },
+                        onClick = onSettings,
+                    )
+                    else -> tilesByKey[key]?.let { tile ->
+                        val (subtitle, unread) = tile.menuBadgePresentation()
+                        ClaroRowButton(
+                            title = tile.localizedLabel(),
+                            subtitle = subtitle,
+                            unreadDot = unread,
+                            leading = {
+                                if (tile.kind == HomeTileKind.INSTALLED_APP) {
+                                    ClaroAppIcon(
+                                        packageName = tile.packageName,
+                                        size = 40.dp,
+                                        fallbackTint = tile.kind.toClaroIconTint(),
+                                    )
+                                } else {
+                                    ClaroIcon(
+                                        kind = tile.kind.toClaroIconKind(),
+                                        tint = tile.kind.toClaroIconTint(),
+                                        size = 32.dp,
+                                    )
+                                }
+                            },
+                            onClick = {
+                                if (tile.label == "Settings") {
+                                    onUseTouchStyle()
+                                } else {
+                                    onTileSelected(tile)
+                                }
+                            },
                         )
-                    },
-                    onClick = onSettings,
-                )
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun HomeTile.localizedLabel(): String = when (kind) {
+internal fun HomeTile.localizedLabel(): String = when (kind) {
     HomeTileKind.PHONE -> stringResource(R.string.app_phone)
     HomeTileKind.MESSAGES -> stringResource(R.string.app_messages)
     HomeTileKind.CAMERA -> stringResource(R.string.app_camera)
@@ -117,7 +119,7 @@ private fun HomeTile.localizedLabel(): String = when (kind) {
     }
 }
 
-private fun HomeTileKind.toClaroIconKind(): ClaroIconKind = when (this) {
+internal fun HomeTileKind.toClaroIconKind(): ClaroIconKind = when (this) {
     HomeTileKind.PHONE -> ClaroIconKind.PHONE
     HomeTileKind.MESSAGES -> ClaroIconKind.MESSAGES
     HomeTileKind.CAMERA -> ClaroIconKind.CAMERA
@@ -129,7 +131,7 @@ private fun HomeTileKind.toClaroIconKind(): ClaroIconKind = when (this) {
     HomeTileKind.ALARM -> ClaroIconKind.CLOCK
 }
 
-private fun HomeTileKind.toClaroIconTint(): Color = when (this) {
+internal fun HomeTileKind.toClaroIconTint(): Color = when (this) {
     HomeTileKind.PHONE -> ClaroColors.Green
     HomeTileKind.MESSAGES -> ClaroColors.Blue
     HomeTileKind.CAMERA -> ClaroColors.Orange

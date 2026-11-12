@@ -126,6 +126,16 @@ lists allowed apps only (no search or edit entry); app allow-listing, Menu
 visibility and search live in protected settings. The setup counter
 `favoriteSlotsAssigned` follows the number of configured slots.
 
+The Menu order follows `HomeSnapshot.menuOrder` (protected Settings → "Menu
+order", stored separately from slots so slot clears keep it); unknown or missing
+keys fall back to the default order (Contacts, core tiles, apps, Settings).
+Choosing a contact/app/shortcut for a Home tile or speed-dial key opens a
+full-screen picker with search. The Apps editor's notice and search scroll with
+the list. Focus is made visible by `ClaroFocusIndication` (amber ring, set in
+`ClaroTheme`) plus `Modifier.claroFocusRing()` for Material buttons; the Classic
+deck switches Compose to keyboard input mode before moving focus so touch taps on
+the arrows move a visible focus.
+
 Settings unlock is session-long: once the Date/PIN gate is answered, protected
 settings stay unlocked until the user taps "Lock settings" or the process is
 recreated. This intentionally deviates from the PRD's two-minute inactivity
