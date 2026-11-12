@@ -1,6 +1,7 @@
 package com.clarohome.feature.onboarding.settings
 
 import android.content.res.Configuration
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -200,6 +201,7 @@ fun AccessGateScreen(
         dock = {
             ClaroPrimaryButton(
                 label = stringResource(R.string.unlock),
+                softkeyColor = ClaroColors.Blue,
                 onClick = { onUnlock(input) },
             )
             if (mode == SettingsAccessMode.CAREGIVER_PIN) {
@@ -413,19 +415,11 @@ fun SettingsHubScreen(
             )
             ClaroRowButton(
                 title = stringResource(R.string.onb_language_and_display_amp_title),
-                subtitle = if (preferences.highContrast) {
-                    stringResource(
-                        R.string.onb_language_display_summary_high_contrast,
-                        preferences.language.displayName(),
-                        preferences.textSize.displayName(),
-                    )
-                } else {
-                    stringResource(
-                        R.string.onb_language_display_summary,
-                        preferences.language.displayName(),
-                        preferences.textSize.displayName(),
-                    )
-                },
+                subtitle = stringResource(
+                    R.string.onb_language_display_summary,
+                    preferences.language.displayName(),
+                    preferences.textSize.displayName(),
+                ),
                 leading = {
                     ClaroIcon(
                         kind = ClaroIconKind.SUN,
@@ -624,8 +618,21 @@ fun DisplayLanguageSettingsScreen(
 ) {
     var language by rememberSaveable { mutableStateOf(preferences.language) }
     var textSize by rememberSaveable { mutableStateOf(preferences.textSize) }
-    var highContrast by rememberSaveable { mutableStateOf(preferences.highContrast) }
     var hapticFeedback by rememberSaveable { mutableStateOf(preferences.hapticFeedback) }
+    var picker by rememberSaveable { mutableStateOf<DisplayPicker?>(null) }
+
+    val openPicker = picker
+    if (openPicker != null) {
+        DisplayPickerScreen(
+            picker = openPicker,
+            language = language,
+            textSize = textSize,
+            onLanguageChange = { language = it },
+            onTextSizeChange = { textSize = it },
+            onClose = { picker = null },
+        )
+        return
+    }
 
     ClaroScreenScaffold(
         title = stringResource(R.string.onb_language_and_display_title),
@@ -634,11 +641,12 @@ fun DisplayLanguageSettingsScreen(
         dock = {
             ClaroPrimaryButton(
                 label = stringResource(R.string.onb_save),
+                softkeyColor = ClaroColors.Blue,
                 onClick = {
                     if (onApplyWithHaptics != null) {
-                        onApplyWithHaptics(language, textSize, highContrast, hapticFeedback)
+                        onApplyWithHaptics(language, textSize, false, hapticFeedback)
                     } else {
-                        onApply(language, textSize, highContrast)
+                        onApply(language, textSize, false)
                     }
                 },
             )
@@ -651,11 +659,8 @@ fun DisplayLanguageSettingsScreen(
     ) {
         LanguageDisplayFields(
             language = language,
-            onLanguageChange = { language = it },
             textSize = textSize,
-            onTextSizeChange = { textSize = it },
-            highContrast = highContrast,
-            onHighContrastChange = { highContrast = it },
+            onOpenPicker = { picker = it },
             hapticFeedback = hapticFeedback,
             onHapticFeedbackChange = { hapticFeedback = it },
         )
@@ -912,8 +917,21 @@ private fun LanguageDisplayOnboardingStep(
 ) {
     var language by rememberSaveable { mutableStateOf(preferences.language) }
     var textSize by rememberSaveable { mutableStateOf(preferences.textSize) }
-    var highContrast by rememberSaveable { mutableStateOf(preferences.highContrast) }
     var hapticFeedback by rememberSaveable { mutableStateOf(preferences.hapticFeedback) }
+    var picker by rememberSaveable { mutableStateOf<DisplayPicker?>(null) }
+
+    val openPicker = picker
+    if (openPicker != null) {
+        DisplayPickerScreen(
+            picker = openPicker,
+            language = language,
+            textSize = textSize,
+            onLanguageChange = { language = it },
+            onTextSizeChange = { textSize = it },
+            onClose = { picker = null },
+        )
+        return
+    }
 
     OnboardingStepScaffold(
         title = OnboardingStep.LANGUAGE_AND_DISPLAY.title(),
@@ -922,17 +940,14 @@ private fun LanguageDisplayOnboardingStep(
         dock = {
             ClaroPrimaryButton(
                 label = stringResource(R.string.onb_save_and_continue),
-                onClick = { onSave(language, textSize, highContrast, hapticFeedback) },
+                onClick = { onSave(language, textSize, false, hapticFeedback) },
             )
         },
     ) {
         LanguageDisplayFields(
             language = language,
-            onLanguageChange = { language = it },
             textSize = textSize,
-            onTextSizeChange = { textSize = it },
-            highContrast = highContrast,
-            onHighContrastChange = { highContrast = it },
+            onOpenPicker = { picker = it },
             hapticFeedback = hapticFeedback,
             onHapticFeedbackChange = { hapticFeedback = it },
         )
@@ -1812,37 +1827,24 @@ private fun ClassicShellPreview() {
 @Composable
 private fun LanguageDisplayFields(
     language: AppLanguage,
-    onLanguageChange: (AppLanguage) -> Unit,
     textSize: TextSize,
-    onTextSizeChange: (TextSize) -> Unit,
-    highContrast: Boolean,
-    onHighContrastChange: (Boolean) -> Unit,
+    onOpenPicker: (DisplayPicker) -> Unit,
     hapticFeedback: Boolean = true,
     onHapticFeedbackChange: (Boolean) -> Unit = {},
 ) {
-    SectionLabel(stringResource(R.string.onb_section_language))
-    AppLanguage.entries.forEach { option ->
-        ChoiceRow(
-            label = option.displayName(),
-            selected = language == option,
-            onClick = { onLanguageChange(option) },
-        )
-    }
-    Spacer(Modifier.height(4.dp))
-    SectionLabel(stringResource(R.string.onb_section_text_size))
-    TextSize.entries.forEach { option ->
-        ChoiceRow(
-            label = option.displayName(),
-            selected = textSize == option,
-            onClick = { onTextSizeChange(option) },
-        )
-    }
-    Spacer(Modifier.height(4.dp))
-    ToggleRow(
-        label = stringResource(R.string.onb_high_contrast),
-        checked = highContrast,
-        onChecked = onHighContrastChange,
+    ClaroRowButton(
+        title = stringResource(R.string.onb_section_language),
+        subtitle = language.displayName(),
+        leading = { Text(text = language.flag(), fontSize = 32.sp, modifier = Modifier.width(52.dp)) },
+        onClick = { onOpenPicker(DisplayPicker.LANGUAGE) },
     )
+    ClaroRowButton(
+        title = stringResource(R.string.onb_section_text_size),
+        subtitle = textSize.displayName(),
+        leading = { TextSizeSample(textSize) },
+        onClick = { onOpenPicker(DisplayPicker.TEXT_SIZE) },
+    )
+    Spacer(Modifier.height(4.dp))
     ToggleRow(
         label = stringResource(R.string.onb_keypad_and_touch_vibration),
         checked = hapticFeedback,
@@ -1852,15 +1854,88 @@ private fun LanguageDisplayFields(
     LanguageLivePreviewCard(
         language = language,
         textSize = textSize,
-        highContrast = highContrast,
     )
+}
+
+internal enum class DisplayPicker { LANGUAGE, TEXT_SIZE }
+
+@Composable
+private fun DisplayPickerScreen(
+    picker: DisplayPicker,
+    language: AppLanguage,
+    textSize: TextSize,
+    onLanguageChange: (AppLanguage) -> Unit,
+    onTextSizeChange: (TextSize) -> Unit,
+    onClose: () -> Unit,
+) {
+    BackHandler(onBack = onClose)
+    ClaroScreenScaffold(
+        title = stringResource(
+            if (picker == DisplayPicker.LANGUAGE) R.string.onb_section_language else R.string.onb_section_text_size,
+        ),
+        modifier = Modifier.testTag("onboarding-screen"),
+        dockInSoftkeys = true,
+        dock = {
+            ClaroSecondaryButton(
+                label = stringResource(R.string.onb_cancel),
+                softkey = ClaroSoftkey.BACK,
+                onClick = onClose,
+            )
+        },
+    ) {
+        if (picker == DisplayPicker.LANGUAGE) {
+            AppLanguage.entries.forEach { option ->
+                ChoiceRow(
+                    label = option.displayName(),
+                    leading = { Text(text = option.flag(), fontSize = 32.sp, modifier = Modifier.width(52.dp)) },
+                    selected = language == option,
+                    onClick = {
+                        onLanguageChange(option)
+                        onClose()
+                    },
+                )
+            }
+        } else {
+            TextSize.entries.forEach { option ->
+                ChoiceRow(
+                    label = option.displayName(),
+                    leading = { TextSizeSample(option) },
+                    selected = textSize == option,
+                    onClick = {
+                        onTextSizeChange(option)
+                        onClose()
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TextSizeSample(size: TextSize) {
+    Text(
+        text = stringResource(R.string.onb_text_size_sample),
+        color = ClaroColors.Blue,
+        fontWeight = FontWeight.Bold,
+        fontSize = when (size) {
+            TextSize.STANDARD -> 22.sp
+            TextSize.LARGE -> 28.sp
+            TextSize.HUGE -> 34.sp
+        },
+        modifier = Modifier.width(52.dp),
+    )
+}
+
+private fun AppLanguage.flag() = when (this) {
+    AppLanguage.ENGLISH -> "\uD83C\uDDFA\uD83C\uDDF8"
+    AppLanguage.SPANISH -> "\uD83C\uDDEA\uD83C\uDDF8"
+    AppLanguage.HEBREW -> "\uD83C\uDDEE\uD83C\uDDF1"
 }
 
 @Composable
 private fun LanguageLivePreviewCard(
     language: AppLanguage,
     textSize: TextSize,
-    highContrast: Boolean,
 ) {
     val baseContext = LocalContext.current
     val baseConfig = LocalConfiguration.current
@@ -1885,9 +1960,9 @@ private fun LanguageLivePreviewCard(
         TextSize.LARGE -> 1.15f
         TextSize.HUGE -> 1.3f
     }
-    val bgColor = if (highContrast) Color.White else ClaroColors.InfoBlueBg
-    val inkColor = if (highContrast) Color.Black else ClaroColors.InfoBlueInk
-    val borderColor = if (highContrast) Color.Black else ClaroColors.Blue
+    val bgColor = ClaroColors.InfoBlueBg
+    val inkColor = ClaroColors.InfoBlueInk
+    val borderColor = ClaroColors.Blue
 
     CompositionLocalProvider(
         LocalConfiguration provides previewConfig,
@@ -2124,6 +2199,7 @@ private fun ChoiceRow(
     selected: Boolean,
     onClick: () -> Unit,
     subtitle: String? = null,
+    leading: (@Composable () -> Unit)? = null,
 ) {
     val haptics = LocalClaroHaptics.current
     Row(
@@ -2150,6 +2226,7 @@ private fun ChoiceRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         SelectionDot(selected = selected)
+        leading?.invoke()
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label,

@@ -114,6 +114,7 @@
     <string name="app_no_system_camera">No system camera is available.</string>
     <string name="app_picture_delete_failed">Could not delete. Picture kept.</string>
     <string name="app_no_pictures_yet">No pictures yet.</string>
+    <string name="app_options">Options</string>
     <string name="app_delete_photo">Delete photo</string>
     <string name="app_confirm_delete_device_photo">Delete this photo from your device? Android may ask you to confirm.</string>
     <string name="app_gallery_allow_pictures">Allow pictures</string>

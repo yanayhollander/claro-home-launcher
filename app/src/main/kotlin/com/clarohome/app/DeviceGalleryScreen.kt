@@ -73,6 +73,7 @@ import com.clarohome.core.design.ClaroInfoCard
 import com.clarohome.core.design.ClaroPrimaryButton
 import com.clarohome.core.design.ClaroScreenScaffold
 import com.clarohome.core.design.ClaroSecondaryButton
+import com.clarohome.core.design.ClaroSoftkey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
@@ -289,8 +290,11 @@ internal fun DeviceGalleryScreen(onRequestAccess: () -> Unit) {
     val selected = list.getOrNull(selectedIndex)
 
     BackHandler(enabled = selected != null) {
-        selectedId = null
-        confirmingDelete = false
+        if (confirmingDelete) {
+            confirmingDelete = false
+        } else {
+            selectedId = null
+        }
     }
 
     if (selected != null) {
@@ -425,6 +429,26 @@ private fun PhotoDetail(
     val currentNext by rememberUpdatedState(onNext)
     ClaroScreenScaffold(
         title = stringResource(R.string.app_picture_position, position, total),
+        dockInSoftkeys = true,
+        dock = {
+            if (!confirmingDelete) {
+                ClaroSecondaryButton(
+                    label = stringResource(R.string.app_options),
+                    onClick = onRequestDelete,
+                )
+            } else {
+                ClaroPrimaryButton(
+                    label = stringResource(R.string.app_delete_photo),
+                    onClick = onConfirmDelete,
+                    containerColor = ClaroColors.Red,
+                )
+                ClaroSecondaryButton(
+                    label = stringResource(R.string.app_cancel),
+                    softkey = ClaroSoftkey.BACK,
+                    onClick = onCancelDelete,
+                )
+            }
+        },
         modifier = Modifier.onPreviewKeyEvent { event ->
             if (event.type != KeyEventType.KeyDown || total < 2) {
                 false
@@ -464,24 +488,10 @@ private fun PhotoDetail(
                     role = Role.Image
                 },
         )
-        if (!confirmingDelete) {
-            ClaroSecondaryButton(
-                label = stringResource(R.string.app_delete_photo),
-                onClick = onRequestDelete,
-            )
-        } else {
+        if (confirmingDelete) {
             ClaroInfoCard(
                 text = stringResource(R.string.app_confirm_delete_device_photo),
                 tone = ClaroBannerTone.WARNING,
-            )
-            ClaroPrimaryButton(
-                label = stringResource(R.string.app_delete_photo),
-                onClick = onConfirmDelete,
-                containerColor = ClaroColors.Red,
-            )
-            ClaroSecondaryButton(
-                label = stringResource(R.string.app_cancel),
-                onClick = onCancelDelete,
             )
         }
     }

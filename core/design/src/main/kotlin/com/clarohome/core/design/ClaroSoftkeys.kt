@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
 
 /**
  * Hardware-style keys of the Classic deck that a screen's action dock can take over so the
@@ -35,6 +36,8 @@ class ClaroSoftkeyAction internal constructor(val slot: ClaroSoftkey) {
     var label by mutableStateOf("")
         internal set
     var icon by mutableStateOf<ClaroIconKind?>(null)
+        internal set
+    var color by mutableStateOf<Color?>(null)
         internal set
     var enabled by mutableStateOf(true)
         internal set
@@ -78,6 +81,7 @@ internal fun registerClaroSoftkey(
     enabled: Boolean,
     onClick: () -> Unit,
     keepOnScreen: Boolean = false,
+    color: Color? = null,
 ): Boolean {
     val host = LocalClaroSoftkeyHost.current
     if (host == null || !LocalClaroDockCollecting.current || keepOnScreen) return false
@@ -87,6 +91,7 @@ internal fun registerClaroSoftkey(
     SideEffect {
         action.label = softkeyLabel ?: label
         action.icon = icon
+        action.color = color
         action.enabled = enabled
         action.onClick = onClick
     }

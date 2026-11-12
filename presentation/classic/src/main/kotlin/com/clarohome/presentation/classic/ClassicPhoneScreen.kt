@@ -848,6 +848,7 @@ fun ClassicIntegratedPad(
     menuIcon: ClaroIconKind? = null,
     greenEnabled: Boolean = true,
     menuEnabled: Boolean = true,
+    greenColor: Color? = null,
 ) {
     val focusManager = LocalFocusManager.current
     val view = LocalView.current
@@ -907,8 +908,8 @@ fun ClassicIntegratedPad(
                 )
                 ClassicDeckButton(
                     label = resolvedGreenLabel,
-                    color = ClaroColors.Green,
-                    borderColor = Color(0xFF29A564),
+                    color = greenColor ?: ClaroColors.Green,
+                    borderColor = if (greenColor != null) Color(0xFF5B9BF0) else Color(0xFF29A564),
                     modifier = Modifier.weight(1f),
                     onClick = if (greenEnabled) onGreen else null,
                     explicitIconKind = greenIcon,

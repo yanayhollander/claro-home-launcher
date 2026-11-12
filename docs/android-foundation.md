@@ -140,6 +140,14 @@ Save), a secondary button becomes the Menu key (for example Lock settings or
 Forgot PIN), Cancel becomes the Back key relabelled "Cancel", and redundant
 "back" buttons are dropped. Red destructive buttons (Reset Claro) stay on
 screen. Touch mode, onboarding and the SOS senior screen keep their normal docks.
+Unlock, Save (Language and display) and the Apps & Menu Done render a blue green-key
+(`softkeyColor`). The Gallery photo detail has no on-screen Delete button: its
+Options softkey opens the delete confirmation (Red Delete, Cancel on Back).
+
+Language and display shows Language (with country flag) and Text size as rows that
+open full-screen pickers (select-and-return, Back/Cancel closes), so more languages
+can be added without crowding the screen. The High contrast option was removed
+from the UI; saves always persist `highContrast = false`.
 
 Protected settings are the only route to phone-style changes, allowed-app/Home
 customization, contact creation/editing/deletion, SOS recipient configuration

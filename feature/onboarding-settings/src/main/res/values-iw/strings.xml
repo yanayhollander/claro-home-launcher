@@ -47,7 +47,6 @@
     <string name="onb_text_size_standard">רגיל</string>
     <string name="onb_text_size_large">גדול</string>
     <string name="onb_text_size_huge">ענק</string>
-    <string name="onb_high_contrast">ניגודיות גבוהה</string>
     <string name="onb_keypad_and_touch_vibration">רטט במקשים ובמגע</string>
     <string name="onb_preview_heading">בית</string>
     <string name="onb_preview_labels">טלפון · הודעות · הגדרות</string>
@@ -131,7 +130,6 @@
     <string name="onb_people_and_speed_dial_amp_title">אריחי מסך בית וחיוג מהיר</string>
     <string name="onb_people_configured_short">%1$d/12 אריחים הוגדרו במסך הבית</string>
     <string name="onb_language_and_display_amp_title">שפה ותצוגה</string>
-    <string name="onb_language_display_summary_high_contrast">%1$s · %2$s · ניגודיות גבוהה</string>
     <string name="onb_sos_subtitle_configured">איש קשר מהימן אושר · בדיקה בנפרד</string>
     <string name="onb_sos_subtitle_not_configured">לא הוגדר</string>
     <string name="onb_permissions_and_roles_amp_title">הרשאות וברירות מחדל</string>

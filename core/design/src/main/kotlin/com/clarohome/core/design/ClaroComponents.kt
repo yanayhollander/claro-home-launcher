@@ -189,6 +189,7 @@ fun ClaroPrimaryButton(
     icon: ClaroIconKind? = null,
     softkey: ClaroSoftkey? = null,
     softkeyLabel: String? = null,
+    softkeyColor: Color? = null,
 ) {
     if (
         registerClaroSoftkey(
@@ -200,6 +201,7 @@ fun ClaroPrimaryButton(
             enabled = enabled,
             onClick = onClick,
             keepOnScreen = containerColor == ClaroColors.Red && softkey == null,
+            color = softkeyColor,
         )
     ) {
         return

@@ -1279,6 +1279,7 @@ private fun ClassicGlobalDeck(
             backLabel = back?.label.orEmpty(),
             greenIcon = green?.let { it.icon ?: ClaroIconKind.CHECK },
             menuIcon = menu?.icon,
+            greenColor = green?.color,
             greenEnabled = green?.enabled ?: true,
             menuEnabled = menu?.enabled ?: true,
             onBack = back?.onClick ?: onBack,

@@ -114,6 +114,7 @@
     <string name="app_no_system_camera">אין מצלמת מערכת זמינה.</string>
     <string name="app_picture_delete_failed">לא ניתן למחוק. התמונה נשמרה.</string>
     <string name="app_no_pictures_yet">עדיין אין תמונות.</string>
+    <string name="app_options">אפשרויות</string>
     <string name="app_delete_photo">מחיקת תמונה</string>
     <string name="app_confirm_delete_device_photo">למחוק את התמונה הזו מהמכשיר? ייתכן ש-Android יבקש לאשר.</string>
     <string name="app_gallery_allow_pictures">לאפשר תמונות</string>

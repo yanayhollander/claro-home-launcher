@@ -91,6 +91,7 @@ fun AppsMenuScreen(
                     label = stringResource(R.string.app_done),
                     onClick = onBack,
                     containerColor = ClaroColors.Blue,
+                    softkeyColor = ClaroColors.Blue,
                 )
             }
         },
