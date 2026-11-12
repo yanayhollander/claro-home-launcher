@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.AlarmClock
 import android.provider.Settings
+import android.annotation.SuppressLint
 import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -164,6 +165,7 @@ private const val TARGET_CONTACTS = "contacts"
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode in FOCUS_KEYS) ClaroFocusVisibility.visible = true
         return super.dispatchKeyEvent(event)
