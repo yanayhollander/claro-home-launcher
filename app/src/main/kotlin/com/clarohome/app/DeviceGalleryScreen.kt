@@ -21,7 +21,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,10 +29,13 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -41,7 +43,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
@@ -65,6 +75,7 @@ import com.clarohome.core.design.ClaroScreenScaffold
 import com.clarohome.core.design.ClaroSecondaryButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.math.abs
 
 internal enum class DeviceMediaAccess { FULL, PARTIAL, DENIED }
 
@@ -337,10 +348,6 @@ internal fun DeviceGalleryScreen(onRequestAccess: () -> Unit) {
                     status = resources.getString(R.string.app_picture_delete_failed) to ClaroBannerTone.ERROR
                 }
             },
-            onBackToGrid = {
-                selectedId = null
-                confirmingDelete = false
-            },
         )
         return
     }
@@ -420,32 +427,23 @@ private fun PhotoDetail(
     onRequestDelete: () -> Unit,
     onCancelDelete: () -> Unit,
     onConfirmDelete: () -> Unit,
-    onBackToGrid: () -> Unit,
 ) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+    val currentPrevious by rememberUpdatedState(onPrevious)
+    val currentNext by rememberUpdatedState(onNext)
     ClaroScreenScaffold(
         title = stringResource(R.string.app_picture_position, position, total),
-        dock = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
-                ClaroSecondaryButton(
-                    label = stringResource(R.string.app_photo_previous),
-                    onClick = onPrevious,
-                    enabled = total > 1,
-                    modifier = Modifier.weight(1f),
-                )
-                ClaroSecondaryButton(
-                    label = stringResource(R.string.app_photo_next),
-                    onClick = onNext,
-                    enabled = total > 1,
-                    modifier = Modifier.weight(1f),
-                )
+        modifier = Modifier.onPreviewKeyEvent { event ->
+            if (event.type != KeyEventType.KeyDown || total < 2) {
+                false
+            } else {
+                when (event.key) {
+                    Key.DirectionLeft -> { currentPrevious(); true }
+                    Key.DirectionRight -> { currentNext(); true }
+                    else -> false
+                }
             }
-            ClaroSecondaryButton(
-                label = stringResource(R.string.app_all_pictures),
-                onClick = onBackToGrid,
-            )
         },
     ) {
         status?.let { (message, tone) -> ClaroInfoCard(text = message, tone = tone) }
@@ -456,6 +454,20 @@ private fun PhotoDetail(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(340.dp)
+                .focusRequester(focusRequester)
+                .focusable()
+                .pointerInput(total) {
+                    var drag = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { drag = 0f },
+                        onHorizontalDrag = { _, amount -> drag += amount },
+                        onDragEnd = {
+                            if (total > 1 && abs(drag) > 80f) {
+                                if (drag > 0) currentPrevious() else currentNext()
+                            }
+                        },
+                    )
+                }
                 .semantics {
                     contentDescription = photo.name
                     role = Role.Image

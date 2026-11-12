@@ -127,10 +127,7 @@
     <string name="app_picture_delete_failed">Could not delete. Picture kept.</string>
     <string name="app_no_pictures_yet">No pictures yet.</string>
     <string name="app_delete_photo">Delete photo</string>
-    <string name="app_photo_previous">← Previous</string>
-    <string name="app_photo_next">Next →</string>
     <string name="app_confirm_delete_device_photo">Delete this photo from your device? Android may ask you to confirm.</string>
-    <string name="app_all_pictures">All pictures</string>
     <string name="app_gallery_allow_pictures">Allow pictures</string>
     <string name="app_gallery_access_needed">Allow Claro to show your pictures. If Android no longer asks, open settings and allow Photos.</string>
     <string name="app_gallery_partial_access">Android is sharing only some pictures. Allow all pictures to see them all.</string>

@@ -127,10 +127,7 @@
     <string name="app_picture_delete_failed">No se pudo eliminar. Se conservó la foto.</string>
     <string name="app_no_pictures_yet">Aún no hay fotos.</string>
     <string name="app_delete_photo">Eliminar foto</string>
-    <string name="app_photo_previous">← Anterior</string>
-    <string name="app_photo_next">Siguiente →</string>
     <string name="app_confirm_delete_device_photo">¿Eliminar esta foto del dispositivo? Android podría pedir confirmación.</string>
-    <string name="app_all_pictures">Todas las fotos</string>
     <string name="app_gallery_allow_pictures">Permitir fotos</string>
     <string name="app_gallery_access_needed">Permite que Claro muestre tus fotos. Si Android ya no lo pregunta, abre los ajustes y permite Fotos.</string>
     <string name="app_gallery_partial_access">Android comparte solo algunas fotos. Permite todas las fotos para verlas todas.</string>

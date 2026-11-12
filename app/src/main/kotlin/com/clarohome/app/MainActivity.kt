@@ -1173,9 +1173,12 @@ private fun ClaroApp(
                         onHome = { navController.goHome(state.preferences.visualMode) },
                     )
                 } else if (!isRecoveryOrOnboarding && !classicRouteOwnsDeck) {
+                    val classicBackDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
                     ClassicGlobalDeck(
                         onBack = {
-                            if (!navController.popBackStack()) {
+                            if (navController.previousBackStackEntry != null && classicBackDispatcher != null) {
+                                classicBackDispatcher.onBackPressed()
+                            } else {
                                 navController.goHome(state.preferences.visualMode)
                             }
                         },
