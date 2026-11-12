@@ -90,8 +90,10 @@ is absent, the request fails into a repair state instead of simulating success.
 Emergency access is a separate native dialer handoff and is never gated by Claro
 configuration or entitlement.
 
-Camera opens the system camera immediately (no intermediate Claro screen) and,
-after a capture, lands in the Gallery. The Gallery lists every image on the
+Camera opens the device's own camera app immediately
+(`MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA`, so flash, modes and settings are the
+camera app's; Claro adds no save/discard step) and returns to the previous
+screen when the user comes back. The Gallery lists every image on the
 device from `MediaStore` (newest first, `READ_MEDIA_IMAGES`, with
 `READ_MEDIA_VISUAL_USER_SELECTED` for partial access on Android 14+ and
 `READ_EXTERNAL_STORAGE` up to API 32); there is no "add picture" import step.

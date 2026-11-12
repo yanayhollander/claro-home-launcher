@@ -144,10 +144,7 @@ fun SafetyMediaAppsScreen(
                 onTestStarted = { destination = SafetyMediaAppsDestination.SOS },
                 onBack = onBack,
             )
-            SafetyMediaAppsDestination.CAMERA -> CameraLaunchScreen(
-                onCaptured = { destination = SafetyMediaAppsDestination.GALLERY },
-                onCanceled = onBack,
-            )
+            SafetyMediaAppsDestination.CAMERA -> CameraLaunchScreen(onClosed = onBack)
             SafetyMediaAppsDestination.GALLERY -> DeviceGalleryScreen(
                 onRequestAccess = onRequestMediaAccess,
             )

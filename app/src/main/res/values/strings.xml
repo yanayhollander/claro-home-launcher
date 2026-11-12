@@ -59,7 +59,8 @@
     <string name="app_apps_hiding_convenience_notice">Hiding apps here is a menu convenience only. It does not lock the device or block Android settings.</string>
     <string name="app_no_eligible_apps">No eligible apps found on this device.</string>
     <string name="app_no_apps_match_search">No apps match your search.</string>
-    <string name="app_no_allowed_apps_yet">No allowed apps yet.</string>
+    <string name="app_apps_empty_title">No apps here yet</string>
+    <string name="app_apps_empty_body">Apps that a caregiver chooses to allow will appear here. To add some, open Settings \u2192 Apps &amp; Menu and turn on the apps you want.</string>
     <string name="app_is_missing_or_disabled">App is missing or disabled</string>
 
     <string name="app_not_set">Not set</string>
@@ -110,7 +111,6 @@
     <string name="app_photo_deleted">Photo deleted.</string>
     <string name="app_photo_delete_canceled">Delete canceled or denied. Photo kept.</string>
     <string name="app_open_camera">Open camera</string>
-    <string name="app_camera_storage_unavailable">Camera or storage is unavailable.</string>
     <string name="app_no_system_camera">No system camera is available.</string>
     <string name="app_picture_delete_failed">Could not delete. Picture kept.</string>
     <string name="app_no_pictures_yet">No pictures yet.</string>

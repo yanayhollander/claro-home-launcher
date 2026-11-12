@@ -1015,8 +1015,8 @@ private fun ClaroApp(
                             },
                             onDone = { navController.goHome(state.preferences.visualMode) },
                             onLockAndExit = {
+                                navController.leaveSettingsForMenu(state.preferences.visualMode)
                                 viewModel.lockSettings()
-                                navController.goHome(state.preferences.visualMode)
                             },
                             onResetClaro = {
                                 navController.navigate(ResetRoute)
@@ -1305,9 +1305,12 @@ private fun ProtectedSessionMonitor(
     viewModel: MainViewModel,
     navController: NavHostController,
 ) {
+    val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(Unit) {
         while (true) {
             delay(1_000)
+            // A screen already navigating away (for example after "Lock settings") must not re-open the gate.
+            if (!lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) continue
             if (!viewModel.isSettingsUnlocked()) {
                 navController.navigate(AccessGateRoute()) {
                     popUpTo(SettingsRoute) { inclusive = true }
@@ -1550,6 +1553,17 @@ private fun NavHostController.navigateToUnlockedTarget(
             popUpTo<AccessGateRoute> { inclusive = true }
         }
         launchSingleTop = true
+    }
+}
+
+private fun NavHostController.leaveSettingsForMenu(mode: VisualMode) {
+    if (mode == VisualMode.TOUCH) {
+        goHome(mode)
+    } else if (!popBackStack<LauncherMenuRoute>(inclusive = false)) {
+        navigate(LauncherMenuRoute) {
+            popUpTo<SettingsRoute> { inclusive = true }
+            launchSingleTop = true
+        }
     }
 }
 

@@ -59,7 +59,8 @@
     <string name="app_apps_hiding_convenience_notice">Ocultar aplicaciones aquí solo simplifica el menú. No bloquea el dispositivo ni impide abrir los ajustes de Android.</string>
     <string name="app_no_eligible_apps">No se encontraron aplicaciones compatibles en este dispositivo.</string>
     <string name="app_no_apps_match_search">Ninguna aplicación coincide con su búsqueda.</string>
-    <string name="app_no_allowed_apps_yet">Aún no hay aplicaciones permitidas.</string>
+    <string name="app_apps_empty_title">Aún no hay aplicaciones</string>
+    <string name="app_apps_empty_body">Aquí aparecerán las aplicaciones que un cuidador permita. Para añadirlas, abre Configuración \u2192 Aplicaciones y menú y activa las que quieras.</string>
     <string name="app_is_missing_or_disabled">La aplicación falta o está desactivada</string>
 
     <string name="app_not_set">Sin asignar</string>
@@ -110,7 +111,6 @@
     <string name="app_photo_deleted">Foto eliminada.</string>
     <string name="app_photo_delete_canceled">Eliminación cancelada o denegada. Se conservó la foto.</string>
     <string name="app_open_camera">Abrir cámara</string>
-    <string name="app_camera_storage_unavailable">La cámara o el almacenamiento no están disponibles.</string>
     <string name="app_no_system_camera">No hay ninguna cámara del sistema disponible.</string>
     <string name="app_picture_delete_failed">No se pudo eliminar. Se conservó la foto.</string>
     <string name="app_no_pictures_yet">Aún no hay fotos.</string>

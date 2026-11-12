@@ -153,10 +153,7 @@ fun AppsMenuScreen(
                 }
             }
             if (visible.isEmpty()) {
-                ClaroInfoCard(
-                    text = stringResource(R.string.app_no_allowed_apps_yet),
-                    tone = ClaroBannerTone.INFO,
-                )
+                AppsEmptyState()
             } else if (useGrid) {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
@@ -357,5 +354,34 @@ private fun CaregiverAppRow(
             )
         }
         HorizontalDivider(thickness = 2.dp, color = ClaroColors.Charcoal)
+    }
+}
+
+@Composable
+private fun AppsEmptyState() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(ClaroColors.AppsPale)
+            .border(1.dp, ClaroColors.Border, RoundedCornerShape(12.dp))
+            .padding(horizontal = 20.dp, vertical = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        ClaroIcon(kind = ClaroIconKind.APPS, tint = ClaroColors.Blue, size = 48.dp)
+        Text(
+            text = stringResource(R.string.app_apps_empty_title),
+            color = ClaroColors.Ink,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+        )
+        Text(
+            text = stringResource(R.string.app_apps_empty_body),
+            color = ClaroColors.Muted,
+            fontSize = 18.sp,
+            textAlign = TextAlign.Center,
+        )
     }
 }

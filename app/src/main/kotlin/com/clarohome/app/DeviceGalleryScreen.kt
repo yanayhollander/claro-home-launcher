@@ -3,7 +3,7 @@ package com.clarohome.app
 import android.Manifest
 import android.app.Activity
 import android.content.ContentUris
-import android.content.ContentValues
+import android.content.Intent
 import android.content.Context
 import android.content.ContentResolver
 import android.content.pm.PackageManager
@@ -184,39 +184,22 @@ private fun DevicePhotoImage(
 
 @Composable
 internal fun CameraLaunchScreen(
-    onCaptured: () -> Unit,
-    onCanceled: () -> Unit,
+    onClosed: () -> Unit,
 ) {
     val context = LocalContext.current
-    var pendingUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     var launched by rememberSaveable { mutableStateOf(false) }
+    var leftToCamera by rememberSaveable { mutableStateOf(false) }
     var errorRes by rememberSaveable { mutableStateOf<Int?>(null) }
 
-    val captureLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.TakePicture(),
-    ) { saved ->
-        val uri = pendingUri
-        pendingUri = null
-        if (saved) {
-            onCaptured()
-        } else {
-            uri?.let { runCatching { context.contentResolver.delete(it, null, null) } }
-            onCanceled()
-        }
-    }
-
+    // Opens the camera app itself (all modes, flash, settings); it saves photos on its own.
     val openCamera = {
         errorRes = null
-        val uri = createCaptureUri(context)
-        if (uri == null) {
-            errorRes = R.string.app_camera_storage_unavailable
-        } else {
-            pendingUri = uri
-            runCatching { captureLauncher.launch(uri) }.onFailure {
-                runCatching { context.contentResolver.delete(uri, null, null) }
-                pendingUri = null
-                errorRes = R.string.app_no_system_camera
-            }
+        runCatching {
+            context.startActivity(Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }.onSuccess {
+            leftToCamera = true
+        }.onFailure {
+            errorRes = R.string.app_no_system_camera
         }
     }
 
@@ -224,6 +207,14 @@ internal fun CameraLaunchScreen(
         if (!launched) {
             launched = true
             openCamera()
+        }
+    }
+
+    // Coming back from the camera app returns to where the user started.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        if (leftToCamera) {
+            leftToCamera = false
+            onClosed()
         }
     }
 
@@ -494,15 +485,4 @@ private fun PhotoDetail(
             )
         }
     }
-}
-
-private fun createCaptureUri(context: Context): Uri? {
-    val values = ContentValues().apply {
-        put(MediaStore.Images.Media.DISPLAY_NAME, "claro-${System.currentTimeMillis()}.jpg")
-        put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Claro")
-    }
-    return runCatching {
-        context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
-    }.getOrNull()
 }

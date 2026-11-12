@@ -59,7 +59,8 @@
     <string name="app_apps_hiding_convenience_notice">הסתרת אפליקציות כאן נועדה לנוחות התפריט בלבד. היא אינה נועלת את המכשיר ואינה חוסמת את הגדרות Android.</string>
     <string name="app_no_eligible_apps">לא נמצאו אפליקציות מתאימות במכשיר זה.</string>
     <string name="app_no_apps_match_search">אין אפליקציות התואמות לחיפוש.</string>
-    <string name="app_no_allowed_apps_yet">עדיין אין אפליקציות מורשות.</string>
+    <string name="app_apps_empty_title">עדיין אין אפליקציות</string>
+    <string name="app_apps_empty_body">כאן יופיעו האפליקציות שמטפל יאשר. כדי להוסיף, פתחו הגדרות \u2192 אפליקציות ותפריט והפעילו את האפליקציות הרצויות.</string>
     <string name="app_is_missing_or_disabled">האפליקציה חסרה או מושבתת</string>
 
     <string name="app_not_set">לא הוגדר</string>
@@ -110,7 +111,6 @@
     <string name="app_photo_deleted">התמונה נמחקה.</string>
     <string name="app_photo_delete_canceled">המחיקה בוטלה או נדחתה. התמונה נשמרה.</string>
     <string name="app_open_camera">פתיחת מצלמה</string>
-    <string name="app_camera_storage_unavailable">המצלמה או האחסון אינם זמינים.</string>
     <string name="app_no_system_camera">אין מצלמת מערכת זמינה.</string>
     <string name="app_picture_delete_failed">לא ניתן למחוק. התמונה נשמרה.</string>
     <string name="app_no_pictures_yet">עדיין אין תמונות.</string>
