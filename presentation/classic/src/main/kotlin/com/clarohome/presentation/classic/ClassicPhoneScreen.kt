@@ -2,6 +2,7 @@ package com.clarohome.presentation.classic
 
 import android.os.SystemClock
 import android.view.KeyEvent
+import android.view.ViewTreeObserver
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.ScrollState
@@ -33,6 +34,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -853,10 +855,21 @@ fun ClassicIntegratedPad(
     greenEnabled: Boolean = true,
     menuEnabled: Boolean = true,
     greenColor: Color? = null,
+    screenKey: Any? = null,
 ) {
     val focusManager = LocalFocusManager.current
     val inputModeManager = LocalInputModeManager.current
+    var arrowsStarted by remember(screenKey) { mutableStateOf(false) }
     val view = LocalView.current
+    // A deck tap would otherwise flip Compose into touch mode and drop the focused item.
+    DisposableEffect(view, inputModeManager) {
+        view.isFocusableInTouchMode = true
+        val listener = ViewTreeObserver.OnTouchModeChangeListener { inTouchMode ->
+            if (inTouchMode) inputModeManager.requestInputMode(InputMode.Keyboard)
+        }
+        view.viewTreeObserver.addOnTouchModeChangeListener(listener)
+        onDispose { view.viewTreeObserver.removeOnTouchModeChangeListener(listener) }
+    }
     val scope = rememberCoroutineScope()
     val resolvedMenuLabel = if (menuLabel.isBlank() || menuLabel == "Menu") {
         stringResource(R.string.classic_menu)
@@ -874,16 +887,25 @@ fun ClassicIntegratedPad(
         redLabel
     }
 
-    val sendKey: (Int) -> Unit = { keyCode ->
-        view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
+    val sendKey: (Int) -> Boolean = { keyCode ->
+        val handled = view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
         view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
+        handled
     }
     val navigate: (FocusDirection, Int, Int) -> Unit = { direction, keyCode, scrollDelta ->
         // Compose only focuses clickable items in keyboard mode; deck taps arrive as touch.
         inputModeManager.requestInputMode(InputMode.Keyboard)
-        val moved = runCatching { focusManager.moveFocus(direction) }.getOrDefault(false)
+        // The first arrow on a screen starts from the first item, whatever was implicitly focused.
+        val moved = runCatching {
+            if (!arrowsStarted) {
+                arrowsStarted = true
+                focusManager.clearFocus(force = true)
+                true
+            } else {
+                sendKey(keyCode)
+            }
+        }.getOrDefault(false)
         if (!moved) {
-            sendKey(keyCode)
             if (scrollState != null && scrollDelta != 0) {
                 val target = (scrollState.value + scrollDelta).coerceIn(0, scrollState.maxValue)
                 if (target != scrollState.value) {

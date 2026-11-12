@@ -133,8 +133,9 @@ Choosing a contact/app/shortcut for a Home tile or speed-dial key opens a
 full-screen picker with search. The Apps editor's notice and search scroll with
 the list. Focus is made visible by `ClaroFocusIndication` (amber ring, set in
 `ClaroTheme`) plus `Modifier.claroFocusRing()` for Material buttons; the Classic
-deck switches Compose to keyboard input mode before moving focus so touch taps on
-the arrows move a visible focus.
+deck keeps Compose in keyboard input mode (a touch-mode listener flips it back) so
+taps on the arrows move a visible focus without resetting it, and the first arrow on
+a screen focuses the first item whatever its direction.
 
 Settings unlock is session-long: once the Date/PIN gate is answered, protected
 settings stay unlocked until the user taps "Lock settings" or the process is

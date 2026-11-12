@@ -1178,6 +1178,7 @@ private fun ClaroApp(
                         onMenu = { navController.navigate(LauncherMenuRoute) },
                         onHome = { navController.goHome(state.preferences.visualMode) },
                         softkeyHost = softkeyHost,
+                        screenKey = currentBackStackEntry?.id,
                     )
                 }
             }
@@ -1275,6 +1276,7 @@ private fun ClassicGlobalDeck(
     onMenu: () -> Unit,
     onHome: () -> Unit,
     softkeyHost: ClaroSoftkeyHost,
+    screenKey: Any? = null,
 ) {
     val view = LocalView.current
     val green = softkeyHost.actionFor(ClaroSoftkey.GREEN)
@@ -1305,6 +1307,7 @@ private fun ClassicGlobalDeck(
             onMenu = menu?.onClick ?: onMenu,
             onGreen = green?.onClick ?: onCall,
             onRed = onHome,
+            screenKey = screenKey,
         )
         ClassicNumericKeypad(
             onDigitSelected = { digit ->
