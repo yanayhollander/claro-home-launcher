@@ -31,6 +31,7 @@
     <string name="onb_welcome_permissions_sos_note">Android pide acceso a Inicio, Teléfono, SMS y Cámara por separado cuando hace falta. SOS llama a una persona de confianza; no es un servicio de emergencias supervisado.</string>
 
     <string name="onb_use_style">Usar %1$s</string>
+    <string name="onb_apply">Aplicar</string>
     <string name="onb_apply_style">Aplicar %1$s</string>
     <string name="onb_phone_style_choice_body">Elige cómo se ve Claro. Ambos estilos comparten las mismas personas, mensajes y configuración.</string>
     <string name="onb_phone_style_settings_body">Prueba cualquiera de los dos estilos. Cambiar solo modifica la apariencia; tus contactos, mensajes y configuración se mantienen igual.</string>

@@ -100,6 +100,7 @@ fun PeopleSettingsScreen(
     ClaroScreenScaffold(
         title = stringResource(R.string.app_home_tiles_and_speed_dial),
         scrollable = false,
+        dockInSoftkeys = true,
         dock = {
             ClaroPrimaryButton(
                 label = stringResource(R.string.app_done),

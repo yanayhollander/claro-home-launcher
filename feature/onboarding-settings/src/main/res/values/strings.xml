@@ -43,6 +43,7 @@
     <string name="onb_welcome_permissions_sos_note">Android asks separately for Home, Phone, SMS and Camera access when needed. SOS calls one trusted person — it is not monitored emergency dispatch.</string>
 
     <string name="onb_use_style">Use %1$s</string>
+    <string name="onb_apply">Apply</string>
     <string name="onb_apply_style">Apply %1$s</string>
     <string name="onb_phone_style_choice_body">Choose how Claro looks. Both styles share the same people, messages and settings.</string>
     <string name="onb_phone_style_settings_body">Preview either style. Switching changes only the presentation — your contacts, messages and settings stay in place.</string>

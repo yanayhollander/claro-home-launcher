@@ -47,6 +47,7 @@ import com.clarohome.core.design.ClaroInfoCard
 import com.clarohome.core.design.ClaroPrimaryButton
 import com.clarohome.core.design.ClaroScreenScaffold
 import com.clarohome.core.design.ClaroSecondaryButton
+import com.clarohome.core.design.ClaroSoftkey
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -77,11 +78,13 @@ fun BillingObservabilityScreen(
             if (classicShell) R.string.bill_title_classic else R.string.bill_title_touch,
         ),
         modifier = Modifier.testTag("billing-screen"),
+        dockInSoftkeys = true,
         dock = {
             ClaroSecondaryButton(
                 label = stringResource(
                     if (classicShell) R.string.bill_back_to_phone else R.string.bill_back,
                 ),
+                softkey = ClaroSoftkey.HIDDEN,
                 onClick = onBack,
             )
         },

@@ -77,6 +77,7 @@ import com.clarohome.core.design.ClaroPrimaryButton
 import com.clarohome.core.design.ClaroRowButton
 import com.clarohome.core.design.ClaroScreenScaffold
 import com.clarohome.core.design.ClaroSecondaryButton
+import com.clarohome.core.design.ClaroSoftkey
 import com.clarohome.core.design.LocalClaroHaptics
 import com.clarohome.core.design.toLocale
 import com.clarohome.core.model.AppLanguage
@@ -195,6 +196,7 @@ fun AccessGateScreen(
         modifier = Modifier.testTag("onboarding-screen"),
         bannerText = message,
         bannerTone = messageBannerTone(message),
+        dockInSoftkeys = true,
         dock = {
             ClaroPrimaryButton(
                 label = stringResource(R.string.unlock),
@@ -273,6 +275,7 @@ fun PinRecoveryScreen(
         modifier = Modifier.testTag("onboarding-screen"),
         bannerText = message,
         bannerTone = messageBannerTone(message),
+        dockInSoftkeys = true,
         dock = {
             ClaroPrimaryButton(
                 label = stringResource(R.string.onb_set_new_pin),
@@ -280,6 +283,7 @@ fun PinRecoveryScreen(
             )
             ClaroSecondaryButton(
                 label = stringResource(R.string.onb_cancel),
+                softkey = ClaroSoftkey.BACK,
                 onClick = onCancel,
             )
         },
@@ -354,6 +358,7 @@ fun SettingsHubScreen(
     ClaroScreenScaffold(
         title = stringResource(R.string.settings),
         modifier = Modifier.testTag("onboarding-screen"),
+        dockInSoftkeys = true,
         dock = {
             ClaroPrimaryButton(
                 label = stringResource(R.string.onb_done_settings),
@@ -524,9 +529,11 @@ fun AccessMethodSettingsScreen(
         modifier = Modifier.testTag("onboarding-screen"),
         bannerText = message,
         bannerTone = messageBannerTone(message),
+        dockInSoftkeys = true,
         dock = {
             ClaroPrimaryButton(
                 label = stringResource(R.string.onb_save_access_method),
+                softkeyLabel = stringResource(R.string.onb_save),
                 onClick = {
                     if (mode == SettingsAccessMode.DATE_QUESTION) {
                         onUseDateQuestion()
@@ -537,6 +544,7 @@ fun AccessMethodSettingsScreen(
             )
             ClaroSecondaryButton(
                 label = stringResource(R.string.onb_cancel),
+                softkey = ClaroSoftkey.BACK,
                 onClick = onCancel,
             )
         },
@@ -570,13 +578,16 @@ fun PhoneStyleSettingsScreen(
         modifier = Modifier.testTag("onboarding-screen"),
         bannerText = message,
         bannerTone = messageBannerTone(message),
+        dockInSoftkeys = true,
         dock = {
             ClaroPrimaryButton(
                 label = stringResource(R.string.onb_apply_style, preview.localizedDisplayName()),
+                softkeyLabel = stringResource(R.string.onb_apply),
                 onClick = { onApply(preview) },
             )
             ClaroSecondaryButton(
                 label = stringResource(R.string.onb_cancel),
+                softkey = ClaroSoftkey.BACK,
                 onClick = onCancel,
             )
         },
@@ -619,6 +630,7 @@ fun DisplayLanguageSettingsScreen(
     ClaroScreenScaffold(
         title = stringResource(R.string.onb_language_and_display_title),
         modifier = Modifier.testTag("onboarding-screen"),
+        dockInSoftkeys = true,
         dock = {
             ClaroPrimaryButton(
                 label = stringResource(R.string.onb_save),
@@ -632,6 +644,7 @@ fun DisplayLanguageSettingsScreen(
             )
             ClaroSecondaryButton(
                 label = stringResource(R.string.onb_cancel),
+                softkey = ClaroSoftkey.BACK,
                 onClick = onCancel,
             )
         },
@@ -658,9 +671,11 @@ fun ReadinessSettingsScreen(
     ClaroScreenScaffold(
         title = stringResource(R.string.onb_permissions_and_roles_amp_title),
         modifier = Modifier.testTag("onboarding-screen"),
+        dockInSoftkeys = true,
         dock = {
             ClaroPrimaryButton(
                 label = stringResource(R.string.onb_back_to_settings),
+                softkey = ClaroSoftkey.HIDDEN,
                 onClick = onBack,
             )
         },
@@ -691,6 +706,7 @@ fun ResetClaroScreen(
     ClaroScreenScaffold(
         title = stringResource(R.string.onb_reset_claro_confirm_title),
         modifier = Modifier.testTag("onboarding-screen"),
+        dockInSoftkeys = true,
         dock = {
             when {
                 hasActiveCall -> {
@@ -702,6 +718,7 @@ fun ResetClaroScreen(
                     )
                     ClaroSecondaryButton(
                         label = stringResource(R.string.onb_cancel),
+                        softkey = ClaroSoftkey.BACK,
                         onClick = onCancel,
                     )
                 }
@@ -713,6 +730,7 @@ fun ResetClaroScreen(
                     )
                     ClaroSecondaryButton(
                         label = stringResource(R.string.onb_cancel),
+                        softkey = ClaroSoftkey.BACK,
                         onClick = {
                             confirming = false
                             onCancel()
@@ -727,6 +745,7 @@ fun ResetClaroScreen(
                     )
                     ClaroSecondaryButton(
                         label = stringResource(R.string.onb_cancel),
+                        softkey = ClaroSoftkey.BACK,
                         onClick = onCancel,
                     )
                 }

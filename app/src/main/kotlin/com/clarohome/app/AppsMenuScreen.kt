@@ -84,6 +84,7 @@ fun AppsMenuScreen(
     ClaroScreenScaffold(
         title = if (editing) stringResource(R.string.app_apps_and_menu) else stringResource(R.string.app_apps),
         scrollable = false,
+        dockInSoftkeys = true,
         dock = {
             if (editing) {
                 ClaroPrimaryButton(

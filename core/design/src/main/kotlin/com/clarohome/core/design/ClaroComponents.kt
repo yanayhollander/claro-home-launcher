@@ -25,10 +25,13 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -53,6 +56,7 @@ fun ClaroScreenScaffold(
     bannerTone: ClaroBannerTone = ClaroBannerTone.INFO,
     scrollable: Boolean = true,
     dock: (@Composable ColumnScope.() -> Unit)? = null,
+    dockInSoftkeys: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
@@ -76,7 +80,7 @@ fun ClaroScreenScaffold(
             content()
         }
         if (dock != null) {
-            ClaroActionDock(content = dock)
+            ClaroActionDock(softkeys = dockInSoftkeys, content = dock)
         }
     }
 }
@@ -109,16 +113,36 @@ fun ClaroHeader(
 @Composable
 fun ClaroActionDock(
     modifier: Modifier = Modifier,
+    softkeys: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(ClaroColors.Charcoal)
-            .padding(3.dp),
-        verticalArrangement = Arrangement.spacedBy(3.dp),
-        content = content,
-    )
+    val collecting = softkeys && LocalClaroSoftkeyHost.current != null
+    val collapsedHeight = with(LocalDensity.current) { 6.dp.roundToPx() }
+    CompositionLocalProvider(LocalClaroDockCollecting provides collecting) {
+        Column(
+            modifier = modifier
+                .fillMaxWidth()
+                .then(
+                    if (collecting) {
+                        // Buttons handed to the Classic deck draw nothing; hide the empty dock.
+                        Modifier.layout { measurable, constraints ->
+                            val placeable = measurable.measure(constraints)
+                            if (placeable.height <= collapsedHeight) {
+                                layout(placeable.width, 0) {}
+                            } else {
+                                layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                            }
+                        }
+                    } else {
+                        Modifier
+                    },
+                )
+                .background(ClaroColors.Charcoal)
+                .padding(3.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+            content = content,
+        )
+    }
 }
 
 @Composable
@@ -163,7 +187,23 @@ fun ClaroPrimaryButton(
     enabled: Boolean = true,
     containerColor: Color = ClaroColors.Blue,
     icon: ClaroIconKind? = null,
+    softkey: ClaroSoftkey? = null,
+    softkeyLabel: String? = null,
 ) {
+    if (
+        registerClaroSoftkey(
+            slot = softkey,
+            defaultSlot = ClaroSoftkey.GREEN,
+            label = label,
+            softkeyLabel = softkeyLabel,
+            icon = icon,
+            enabled = enabled,
+            onClick = onClick,
+            keepOnScreen = containerColor == ClaroColors.Red && softkey == null,
+        )
+    ) {
+        return
+    }
     val haptics = LocalClaroHaptics.current
     Button(
         onClick = {
@@ -212,7 +252,22 @@ fun ClaroSecondaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     icon: ClaroIconKind? = null,
+    softkey: ClaroSoftkey? = null,
+    softkeyLabel: String? = null,
 ) {
+    if (
+        registerClaroSoftkey(
+            slot = softkey,
+            defaultSlot = ClaroSoftkey.MENU,
+            label = label,
+            softkeyLabel = softkeyLabel,
+            icon = icon,
+            enabled = enabled,
+            onClick = onClick,
+        )
+    ) {
+        return
+    }
     val haptics = LocalClaroHaptics.current
     OutlinedButton(
         onClick = {

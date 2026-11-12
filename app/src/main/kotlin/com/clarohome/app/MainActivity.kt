@@ -37,6 +37,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -73,8 +74,11 @@ import com.clarohome.core.design.ClaroColors
 import com.clarohome.core.design.ClaroIcon
 import com.clarohome.core.design.ClaroIconKind
 import com.clarohome.core.design.ClaroLocaleContainer
+import com.clarohome.core.design.ClaroSoftkey
+import com.clarohome.core.design.ClaroSoftkeyHost
 import com.clarohome.core.design.ClaroTheme
 import com.clarohome.core.design.LocalClaroHaptics
+import com.clarohome.core.design.LocalClaroSoftkeyHost
 import com.clarohome.core.design.toLocale
 import com.clarohome.core.design.withClaroLanguage
 import java.util.Locale
@@ -611,6 +615,13 @@ private fun ClaroApp(
             highContrast = state.preferences.highContrast,
             hapticFeedback = state.preferences.hapticFeedback,
         ) {
+            val softkeyHost = remember { ClaroSoftkeyHost() }
+            val classicDeckShown = !isRecoveryOrOnboarding &&
+                !classicRouteOwnsDeck &&
+                state.preferences.visualMode != VisualMode.TOUCH
+            CompositionLocalProvider(
+                LocalClaroSoftkeyHost provides if (classicDeckShown) softkeyHost else null,
+            ) {
             Column(
                 Modifier
                     .fillMaxSize()
@@ -1149,8 +1160,10 @@ private fun ClaroApp(
                         onCall = openPhoneFromHome,
                         onMenu = { navController.navigate(LauncherMenuRoute) },
                         onHome = { navController.goHome(state.preferences.visualMode) },
+                        softkeyHost = softkeyHost,
                     )
                 }
+            }
             }
         }
     }
@@ -1242,8 +1255,12 @@ private fun ClassicGlobalDeck(
     onCall: () -> Unit,
     onMenu: () -> Unit,
     onHome: () -> Unit,
+    softkeyHost: ClaroSoftkeyHost,
 ) {
     val view = LocalView.current
+    val green = softkeyHost.actionFor(ClaroSoftkey.GREEN)
+    val menu = softkeyHost.actionFor(ClaroSoftkey.MENU)
+    val back = softkeyHost.actionFor(ClaroSoftkey.BACK)
     val sendKey: (Int) -> Unit = { keyCode ->
         view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
         view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
@@ -1256,12 +1273,17 @@ private fun ClassicGlobalDeck(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         ClassicIntegratedPad(
-            menuLabel = stringResource(R.string.app_menu),
-            greenLabel = "☎ ${stringResource(R.string.app_call)}",
+            menuLabel = menu?.label ?: stringResource(R.string.app_menu),
+            greenLabel = green?.label ?: "☎ ${stringResource(R.string.app_call)}",
             redLabel = "⌂ ${stringResource(R.string.app_home)}",
-            onBack = onBack,
-            onMenu = onMenu,
-            onGreen = onCall,
+            backLabel = back?.label.orEmpty(),
+            greenIcon = green?.let { it.icon ?: ClaroIconKind.CHECK },
+            menuIcon = menu?.icon,
+            greenEnabled = green?.enabled ?: true,
+            menuEnabled = menu?.enabled ?: true,
+            onBack = back?.onClick ?: onBack,
+            onMenu = menu?.onClick ?: onMenu,
+            onGreen = green?.onClick ?: onCall,
             onRed = onHome,
         )
         ClassicNumericKeypad(

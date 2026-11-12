@@ -130,6 +130,15 @@ recreated. This intentionally deviates from the PRD's two-minute inactivity
 and screen-lock proposal at the user's request; "Done" leaves settings
 without locking.
 
+In Classic mode, settings/unlock/editor screens hand their action dock to the
+hardware-style deck instead of drawing on-screen buttons
+(`ClaroScreenScaffold(dockInSoftkeys = true)`, `ClaroSoftkeyHost` in
+`core/design`): the primary button becomes the green key (Unlock, Done, Apply,
+Save), a secondary button becomes the Menu key (for example Lock settings or
+Forgot PIN), Cancel becomes the Back key relabelled "Cancel", and redundant
+"back" buttons are dropped. Red destructive buttons (Reset Claro) stay on
+screen. Touch mode, onboarding and the SOS senior screen keep their normal docks.
+
 Protected settings are the only route to phone-style changes, allowed-app/Home
 customization, contact creation/editing/deletion, SOS recipient configuration
 and caregiver test calls, local Claro reset, membership, and diagnostics. Senior

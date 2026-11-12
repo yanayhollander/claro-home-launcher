@@ -75,6 +75,7 @@ import com.clarohome.core.design.ClaroPrimaryButton
 import com.clarohome.core.design.ClaroRowButton
 import com.clarohome.core.design.ClaroScreenScaffold
 import com.clarohome.core.design.ClaroSecondaryButton
+import com.clarohome.core.design.ClaroSoftkey
 import com.clarohome.feature.communication.ClaroContact
 import com.clarohome.feature.safety.media.apps.ClaroPhoto
 import com.clarohome.feature.safety.media.apps.MediaLibrary
@@ -517,6 +518,7 @@ private fun SosSettingsScreen(
 
     ClaroScreenScaffold(
         title = stringResource(R.string.app_sos_contact_title),
+        dockInSoftkeys = true,
         dock = {
             ClaroPrimaryButton(
                 label = stringResource(R.string.app_save),
@@ -533,6 +535,7 @@ private fun SosSettingsScreen(
             )
             ClaroSecondaryButton(
                 label = stringResource(R.string.app_cancel),
+                softkey = ClaroSoftkey.BACK,
                 onClick = onBack,
             )
         },

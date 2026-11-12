@@ -842,6 +842,12 @@ fun ClassicIntegratedPad(
     onRed: (() -> Unit)? = null,
     scrollState: ScrollState? = null,
     onOk: (() -> Unit)? = null,
+    backLabel: String = "",
+    backIcon: ClaroIconKind? = null,
+    greenIcon: ClaroIconKind? = null,
+    menuIcon: ClaroIconKind? = null,
+    greenEnabled: Boolean = true,
+    menuEnabled: Boolean = true,
 ) {
     val focusManager = LocalFocusManager.current
     val view = LocalView.current
@@ -892,18 +898,20 @@ fun ClassicIntegratedPad(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 ClassicDeckButton(
-                    label = stringResource(R.string.classic_back),
+                    label = backLabel.ifBlank { stringResource(R.string.classic_back) },
                     color = ClassicDeck,
                     borderColor = ClassicDeckBorder,
                     modifier = Modifier.weight(1f),
                     onClick = onBack,
+                    explicitIconKind = backIcon,
                 )
                 ClassicDeckButton(
                     label = resolvedGreenLabel,
                     color = ClaroColors.Green,
                     borderColor = Color(0xFF29A564),
                     modifier = Modifier.weight(1f),
-                    onClick = onGreen,
+                    onClick = if (greenEnabled) onGreen else null,
+                    explicitIconKind = greenIcon,
                 )
             }
             Column(
@@ -969,7 +977,8 @@ fun ClassicIntegratedPad(
                     color = ClassicDeck,
                     borderColor = ClassicDeckBorder,
                     modifier = Modifier.weight(1f),
-                    onClick = onMenu,
+                    onClick = if (menuEnabled) onMenu else null,
+                    explicitIconKind = menuIcon,
                 )
                 ClassicDeckButton(
                     label = resolvedRedLabel,
