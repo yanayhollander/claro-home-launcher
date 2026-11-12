@@ -4,7 +4,6 @@
     <string name="touch_settings">Configuración</string>
     <string name="touch_battery_percentage">%1$d%%</string>
     <string name="touch_return_to_call">Volver a la llamada · %1$s</string>
-    <string name="touch_more_apps_below">Más aplicaciones abajo</string>
     <string name="touch_home_role_available">Claro aún no es tu aplicación de inicio.</string>
     <string name="touch_home_role_unavailable">Este dispositivo no permite usar Claro como aplicación de inicio.</string>
     <string name="touch_home_role_unknown">El estado de la aplicación de inicio no está disponible.</string>
@@ -12,11 +11,6 @@
     <string name="touch_home_role_open_settings">Abrir configuración de inicio</string>
     <string name="touch_add_person">Añadir persona</string>
     <string name="touch_favorite_action_call">Llamar a %1$s</string>
-    <string name="touch_favorite_action_repair">Reparar favorito de %1$s</string>
-    <string name="touch_favorite_desc_ready">%1$s, persona favorita</string>
-    <string name="touch_favorite_desc_unassigned">Favorito sin asignar. Pide a quien te ayuda que añada una persona</string>
-    <string name="touch_favorite_desc_contact_missing">%1$s, el contacto necesita reparación</string>
-    <string name="touch_favorite_desc_photo_unavailable">%1$s, foto no disponible</string>
     <string name="touch_signal_no_sim">Sin SIM</string>
     <string name="touch_signal_no_signal">Sin señal</string>
     <string name="touch_signal_airplane_mode">Modo avión</string>
@@ -199,4 +193,6 @@
     <string name="touch_msg_status_delivery_confirmed">Entrega confirmada por el operador</string>
     <string name="touch_msg_status_carrier_unconfirmed">El operador no confirmó el resultado. Es posible que ya se haya enviado.</string>
     <string name="touch_msg_status_duplicate_prompt">Es posible que este mensaje ya se haya enviado. ¿Enviarlo de nuevo?</string>
+    <string name="touch_home_empty">Pide a tu cuidador que añada mosaicos al inicio en Ajustes</string>
+    <string name="touch_tile_alarm">Despertador</string>
 </resources>

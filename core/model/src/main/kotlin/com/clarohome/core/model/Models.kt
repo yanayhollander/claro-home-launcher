@@ -107,20 +107,7 @@ data class ClaroPreferences(
     val hapticFeedback: Boolean = true,
 )
 
-data class FavoritePerson(
-    val id: String,
-    val displayName: String,
-    val phoneNumber: String? = null,
-    val photoUri: String? = null,
-    val state: FavoriteState = FavoriteState.READY,
-)
-
-enum class FavoriteState {
-    READY,
-    UNASSIGNED,
-    CONTACT_MISSING,
-    PHOTO_UNAVAILABLE,
-}
+const val HOME_SLOT_COUNT = 12
 
 data class HomeTile(
     val id: String,
@@ -130,6 +117,8 @@ data class HomeTile(
     val badge: BadgeValue? = null,
     val packageName: String? = null,
     val isCore: Boolean = true,
+    val phoneNumber: String? = null,
+    val photoUri: String? = null,
 )
 
 enum class HomeTileKind {
@@ -140,6 +129,8 @@ enum class HomeTileKind {
     SOS,
     APPS,
     INSTALLED_APP,
+    CONTACT,
+    ALARM,
 }
 
 enum class TileAccent {
@@ -213,12 +204,14 @@ data class HomeSnapshot(
     val time: String,
     val battery: BatteryStatus,
     val cellular: CellularStatus,
-    val favorites: List<FavoritePerson>,
+    val homeSlots: List<HomeTile?>,
     val tiles: List<HomeTile>,
     val installedApps: List<InstalledApp>,
     val homeRole: HomeRoleState,
     val activeCall: ActiveCall? = null,
-)
+) {
+    val homeTiles: List<HomeTile> get() = homeSlots.filterNotNull()
+}
 
 enum class CapabilityStatus {
     READY,

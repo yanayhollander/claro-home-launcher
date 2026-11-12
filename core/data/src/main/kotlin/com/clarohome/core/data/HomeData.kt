@@ -5,8 +5,7 @@ import com.clarohome.core.model.BadgeValue
 import com.clarohome.core.model.BatteryStatus
 import com.clarohome.core.model.CellularAvailability
 import com.clarohome.core.model.CellularStatus
-import com.clarohome.core.model.FavoritePerson
-import com.clarohome.core.model.FavoriteState
+import com.clarohome.core.model.HOME_SLOT_COUNT
 import com.clarohome.core.model.HomeRoleState
 import com.clarohome.core.model.HomeSnapshot
 import com.clarohome.core.model.HomeTile
@@ -26,60 +25,130 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-interface FavoriteStore {
-    fun load(): List<FavoritePerson?>
-    fun save(favorites: List<FavoritePerson>)
+interface HomeSlotStore {
+    fun load(): List<HomeTile?>
+    fun save(slots: List<HomeTile?>)
 }
 
-class InMemoryFavoriteStore : FavoriteStore {
-    private var saved: List<FavoritePerson?> = emptyList()
+class InMemoryHomeSlotStore(
+    private var saved: List<HomeTile?> = defaultHomeSlots(),
+) : HomeSlotStore {
     override fun load() = saved
-    override fun save(favorites: List<FavoritePerson>) {
-        saved = favorites
+    override fun save(slots: List<HomeTile?>) {
+        saved = slots
+    }
+}
+
+fun homeSlotTile(
+    slot: Int,
+    kind: HomeTileKind,
+    label: String,
+    packageName: String? = null,
+    phoneNumber: String? = null,
+    photoUri: String? = null,
+): HomeTile = HomeTile(
+    id = "slot-$slot",
+    label = label,
+    accent = when (kind) {
+        HomeTileKind.PHONE -> TileAccent.GREEN
+        HomeTileKind.CAMERA, HomeTileKind.ALARM -> TileAccent.ORANGE
+        HomeTileKind.GALLERY, HomeTileKind.INSTALLED_APP -> TileAccent.VIOLET
+        HomeTileKind.SOS -> TileAccent.RED
+        HomeTileKind.MESSAGES, HomeTileKind.APPS, HomeTileKind.CONTACT -> TileAccent.BLUE
+    },
+    kind = kind,
+    badge = if (kind == HomeTileKind.PHONE || kind == HomeTileKind.MESSAGES) {
+        BadgeValue.Unknown
+    } else {
+        null
+    },
+    packageName = packageName,
+    isCore = false,
+    phoneNumber = phoneNumber,
+    photoUri = photoUri,
+)
+
+/** Fresh installs start with the essentials; everything else is optional. */
+fun defaultHomeSlots(extra: List<HomeTile> = emptyList()): List<HomeTile?> {
+    val essentials = listOf(
+        HomeTileKind.PHONE to "Phone",
+        HomeTileKind.CAMERA to "Camera",
+        HomeTileKind.GALLERY to "Gallery",
+        HomeTileKind.SOS to "SOS",
+        HomeTileKind.APPS to "Apps",
+    ).map { (kind, label) -> homeSlotTile(0, kind, label) }
+    val seeded = (essentials + extra).take(HOME_SLOT_COUNT)
+    return List(HOME_SLOT_COUNT) { index ->
+        seeded.getOrNull(index)?.let { it.copy(id = "slot-$index") }
     }
 }
 
 @Singleton
-class SharedPreferencesFavoriteStore @Inject constructor(
-    @ApplicationContext context: Context,
-) : FavoriteStore {
-    private val prefs = context.getSharedPreferences("claro_favorites", Context.MODE_PRIVATE)
+class SharedPreferencesHomeSlotStore @Inject constructor(
+    @ApplicationContext private val context: Context,
+) : HomeSlotStore {
+    private val prefs = context.getSharedPreferences("claro_home_slots", Context.MODE_PRIVATE)
 
-    override fun load(): List<FavoritePerson?> = List(FAVORITE_SLOTS) { slot ->
-        val id = prefs.getString("$slot.id", null) ?: return@List null
-        val state = runCatching {
-            FavoriteState.valueOf(prefs.getString("$slot.state", null).orEmpty())
-        }.getOrDefault(FavoriteState.READY)
-        if (state == FavoriteState.UNASSIGNED) return@List null
-        FavoritePerson(
-            id = id,
-            displayName = prefs.getString("$slot.name", null).orEmpty(),
-            phoneNumber = prefs.getString("$slot.number", null),
-            photoUri = prefs.getString("$slot.photo", null),
-            state = state,
-        )
+    override fun load(): List<HomeTile?> {
+        if (!prefs.getBoolean(INITIALIZED, false)) {
+            val migrated = defaultHomeSlots(legacyFavorites())
+            save(migrated)
+            return migrated
+        }
+        return List(HOME_SLOT_COUNT) { slot ->
+            val kind = runCatching {
+                HomeTileKind.valueOf(prefs.getString("$slot.kind", null).orEmpty())
+            }.getOrNull() ?: return@List null
+            homeSlotTile(
+                slot = slot,
+                kind = kind,
+                label = prefs.getString("$slot.label", null).orEmpty(),
+                packageName = prefs.getString("$slot.package", null),
+                phoneNumber = prefs.getString("$slot.number", null),
+                photoUri = prefs.getString("$slot.photo", null),
+            )
+        }
     }
 
-    override fun save(favorites: List<FavoritePerson>) {
+    override fun save(slots: List<HomeTile?>) {
         prefs.edit {
             clear()
-            favorites.take(FAVORITE_SLOTS).forEachIndexed { slot, person ->
-                if (person.state == FavoriteState.UNASSIGNED) return@forEachIndexed
-                putString("$slot.id", person.id)
-                putString("$slot.name", person.displayName)
-                putString("$slot.number", person.phoneNumber)
-                putString("$slot.photo", person.photoUri)
-                putString("$slot.state", person.state.name)
+            putBoolean(INITIALIZED, true)
+            slots.take(HOME_SLOT_COUNT).forEachIndexed { slot, tile ->
+                if (tile == null) return@forEachIndexed
+                putString("$slot.kind", tile.kind.name)
+                putString("$slot.label", tile.label)
+                putString("$slot.package", tile.packageName)
+                putString("$slot.number", tile.phoneNumber)
+                putString("$slot.photo", tile.photoUri)
             }
         }
     }
-}
 
-private const val FAVORITE_SLOTS = 4
+    // Earlier builds kept four direct-call favorites; keep them as Home tiles.
+    private fun legacyFavorites(): List<HomeTile> {
+        val legacy = context.getSharedPreferences("claro_favorites", Context.MODE_PRIVATE)
+        return (0 until 4).mapNotNull { slot ->
+            val number = legacy.getString("$slot.number", null)?.takeIf { it.isNotBlank() }
+                ?: return@mapNotNull null
+            homeSlotTile(
+                slot = slot,
+                kind = HomeTileKind.CONTACT,
+                label = legacy.getString("$slot.name", null).orEmpty(),
+                phoneNumber = number,
+                photoUri = legacy.getString("$slot.photo", null),
+            )
+        }
+    }
+
+    private companion object {
+        const val INITIALIZED = "initialized"
+    }
+}
 
 @Singleton
 class LocalHomeRepository @Inject constructor(
-    private val favoriteStore: FavoriteStore,
+    private val slotStore: HomeSlotStore,
 ) : HomeRepository {
     private val state = MutableStateFlow(
         HomeSnapshot(
@@ -88,13 +157,7 @@ class LocalHomeRepository @Inject constructor(
             time = "",
             battery = BatteryStatus(0, isCharging = false),
             cellular = CellularStatus(CellularAvailability.UNKNOWN),
-            favorites = List(4) { index ->
-                favoriteStore.load().getOrNull(index) ?: FavoritePerson(
-                    id = "favorite-$index",
-                    displayName = "Add person",
-                    state = FavoriteState.UNASSIGNED,
-                )
-            },
+            homeSlots = slotStore.load(),
             tiles = listOf(
                 HomeTile(
                     "phone",
@@ -122,32 +185,34 @@ class LocalHomeRepository @Inject constructor(
 
     override val home: Flow<HomeSnapshot> = state.asStateFlow()
 
-    override suspend fun setFavorite(slot: Int, person: FavoritePerson) {
-        if (slot !in 0..3) return
-        state.value = state.value.copy(
-            favorites = state.value.favorites.mapIndexed { index, current ->
-                if (index == slot) person else current
-            },
-        )
-        favoriteStore.save(state.value.favorites)
+    override suspend fun setHomeSlot(slot: Int, tile: HomeTile) {
+        if (slot !in 0 until HOME_SLOT_COUNT) return
+        val updated = state.value.homeSlots.mapIndexed { index, current ->
+            when {
+                index == slot -> homeSlotTile(
+                    slot = slot,
+                    kind = tile.kind,
+                    label = tile.label,
+                    packageName = tile.packageName,
+                    phoneNumber = tile.phoneNumber,
+                    photoUri = tile.photoUri,
+                ).copy(badge = state.value.badgeFor(tile.kind))
+                // Built-in shortcuts exist once; placing one elsewhere moves it.
+                tile.kind.isUniqueShortcut && current?.kind == tile.kind -> null
+                else -> current
+            }
+        }
+        state.value = state.value.copy(homeSlots = updated)
+        slotStore.save(updated)
     }
 
-    override suspend fun clearFavorite(slot: Int) {
-        if (slot !in 0..3) return
-        state.value = state.value.copy(
-            favorites = state.value.favorites.mapIndexed { index, current ->
-                if (index == slot) {
-                    FavoritePerson(
-                        id = "favorite-$slot",
-                        displayName = "Add person",
-                        state = FavoriteState.UNASSIGNED,
-                    )
-                } else {
-                    current
-                }
-            },
-        )
-        favoriteStore.save(state.value.favorites)
+    override suspend fun clearHomeSlot(slot: Int) {
+        if (slot !in 0 until HOME_SLOT_COUNT) return
+        val updated = state.value.homeSlots.mapIndexed { index, current ->
+            if (index == slot) null else current
+        }
+        state.value = state.value.copy(homeSlots = updated)
+        slotStore.save(updated)
     }
 
     override suspend fun reset() {
@@ -155,16 +220,9 @@ class LocalHomeRepository @Inject constructor(
         val clearedApps = current.installedApps.map {
             it.copy(isAllowed = false, isFavorite = false, isOnHome = false)
         }
-        state.value = current.copy(
-            favorites = List(4) { index ->
-                FavoritePerson(
-                    id = "favorite-$index",
-                    displayName = "Add person",
-                    state = FavoriteState.UNASSIGNED,
-                )
-            },
-        ).withApps(clearedApps)
-        favoriteStore.save(state.value.favorites)
+        val defaults = defaultHomeSlots()
+        state.value = current.copy(homeSlots = defaults).withApps(clearedApps)
+        slotStore.save(defaults)
     }
 
     override suspend fun setInstalledApps(apps: List<InstalledApp>) {
@@ -216,13 +274,8 @@ class LocalHomeRepository @Inject constructor(
         }
         this.state.value = current.copy(
             homeRole = state,
-            tiles = current.tiles.map { tile ->
-                if (tile.kind == HomeTileKind.PHONE || tile.kind == HomeTileKind.MESSAGES) {
-                    tile.copy(badge = badge)
-                } else {
-                    tile
-                }
-            },
+            tiles = current.tiles.map { tile -> tile.withBadge(badge) },
+            homeSlots = current.homeSlots.map { tile -> tile?.withBadge(badge) },
         )
     }
 
@@ -239,6 +292,15 @@ class LocalHomeRepository @Inject constructor(
             cellular = cellular,
         )
     }
+
+    private fun HomeTile.withBadge(badge: BadgeValue): HomeTile =
+        if (kind == HomeTileKind.PHONE || kind == HomeTileKind.MESSAGES) copy(badge = badge) else this
+
+    private fun HomeSnapshot.badgeFor(kind: HomeTileKind): BadgeValue? =
+        tiles.firstOrNull { it.kind == kind }?.badge
+
+    private val HomeTileKind.isUniqueShortcut: Boolean
+        get() = this != HomeTileKind.CONTACT && this != HomeTileKind.INSTALLED_APP
 
     private fun HomeSnapshot.withApps(apps: List<InstalledApp>): HomeSnapshot {
         val coreTiles = tiles.filter { it.isCore }
@@ -265,5 +327,5 @@ abstract class HomeDataModule {
     abstract fun bindHomeRepository(repository: LocalHomeRepository): HomeRepository
 
     @Binds
-    abstract fun bindFavoriteStore(store: SharedPreferencesFavoriteStore): FavoriteStore
+    abstract fun bindHomeSlotStore(store: SharedPreferencesHomeSlotStore): HomeSlotStore
 }

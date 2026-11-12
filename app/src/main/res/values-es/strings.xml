@@ -24,7 +24,6 @@
     <string name="app_home_settings_unavailable">La configuración de inicio no está disponible en este dispositivo.</string>
     <string name="app_missing_or_disabled_notice">Esta aplicación falta o está desactivada.</string>
     <string name="app_could_not_open_notice">No se pudo abrir esta aplicación.</string>
-    <string name="app_ask_caregiver_add_person">Pida a su persona de apoyo que añada un contacto.</string>
     <string name="app_contacts_permission_save">Se necesita permiso de Contactos para guardar.</string>
     <string name="app_contacts_permission_delete">Se necesita permiso de Contactos para eliminar.</string>
     <string name="app_contact_account_read_only">Esta cuenta de contactos es de solo lectura.</string>
@@ -57,23 +56,12 @@
     <string name="app_badge_new_count">%1$d nuevos</string>
     <string name="app_badge_unknown">Se necesita permiso · cantidad desconocida</string>
 
-    <string name="app_home_and_apps">Inicio y aplicaciones</string>
-    <string name="app_edit_apps">Editar aplicaciones</string>
     <string name="app_apps_hiding_convenience_notice">Ocultar aplicaciones aquí solo simplifica el menú. No bloquea el dispositivo ni impide abrir los ajustes de Android.</string>
     <string name="app_no_eligible_apps">No se encontraron aplicaciones compatibles en este dispositivo.</string>
     <string name="app_no_apps_match_search">Ninguna aplicación coincide con su búsqueda.</string>
     <string name="app_no_allowed_apps_yet">Aún no hay aplicaciones permitidas.</string>
-    <string name="app_no_allowed_apps_on_home">Aún no hay aplicaciones permitidas en Inicio.</string>
-    <string name="app_unavailable_review_edit_apps">%1$s falta o está desactivada. Pida a una persona de apoyo que revise Editar aplicaciones.</string>
-    <string name="app_tab_all_allowed">Permitidas</string>
-    <string name="app_tab_on_home">En Inicio</string>
-    <string name="app_subtitle_on_home_external">En Inicio · se abre fuera de Claro</string>
-    <string name="app_subtitle_opens_external">Se abre fuera de Claro</string>
     <string name="app_is_missing_or_disabled">La aplicación falta o está desactivada</string>
-    <string name="app_show_on_home">Mostrar en Inicio</string>
 
-    <string name="app_people_and_speed_dial">Contactos y marcación rápida</string>
-    <string name="app_favorite_slot">Espacio %1$d</string>
     <string name="app_not_set">Sin asignar</string>
     <string name="app_speed_dial_hold_slot">Mantener %1$s · %2$s</string>
     <string name="app_speed_dial_immediate_notice">Mantener pulsado 1 o 2 llama de inmediato, sin confirmación.</string>
@@ -132,4 +120,13 @@
     <string name="app_gallery_access_needed">Permite que Claro muestre tus fotos. Si Android ya no lo pregunta, abre los ajustes y permite Fotos.</string>
     <string name="app_gallery_partial_access">Android comparte solo algunas fotos. Permite todas las fotos para verlas todas.</string>
     <string name="app_picture_position">Foto %1$d de %2$d</string>
+    <string name="app_apps_and_menu">Aplicaciones y menú</string>
+    <string name="app_home_slot">Mosaico %1$d</string>
+    <string name="app_alarm_clock">Despertador</string>
+    <string name="app_section_shortcuts">Accesos directos</string>
+    <string name="app_section_apps">Aplicaciones</string>
+    <string name="app_section_contacts">Contactos</string>
+    <string name="app_home_tiles_and_speed_dial">Mosaicos de inicio y marcación rápida</string>
+    <string name="app_show_in_menu">Mostrar en el menú</string>
+    <string name="app_unavailable_review_in_settings">%1$s falta o está desactivada. Pida a una persona de apoyo que la revise en Ajustes.</string>
 </resources>

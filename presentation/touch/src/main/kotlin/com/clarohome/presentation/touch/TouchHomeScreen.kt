@@ -54,8 +54,6 @@ import com.clarohome.core.design.LocalClaroHaptics
 import com.clarohome.core.model.BadgeValue
 import com.clarohome.core.model.CellularAvailability
 import com.clarohome.core.model.CellularStatus
-import com.clarohome.core.model.FavoritePerson
-import com.clarohome.core.model.FavoriteState
 import com.clarohome.core.model.HomeRoleState
 import com.clarohome.core.model.HomeSnapshot
 import com.clarohome.core.model.HomeTile
@@ -71,9 +69,9 @@ data class TouchHomeContentModel(
 
 fun touchHomeContentModel(home: HomeSnapshot): TouchHomeContentModel =
     TouchHomeContentModel(
-        visibleTileIds = home.tiles.map { it.id },
+        visibleTileIds = home.homeTiles.map { it.id },
         showsRoleRepair = home.homeRole != HomeRoleState.GRANTED,
-        badgeDescriptions = home.tiles
+        badgeDescriptions = home.homeTiles
             .filter { it.badge != null }
             .map { HomeCustomizationPolicy.badgeLabel(it.label, it.badge) },
     )
@@ -83,12 +81,10 @@ fun TouchHomeScreen(
     home: HomeSnapshot,
     onUseClassicMode: () -> Unit,
     onTileSelected: (HomeTile) -> Unit,
-    onFavoriteSelected: (FavoritePerson) -> Unit,
     onRepairHomeRole: () -> Unit,
     onReturnToCall: () -> Unit,
 ) {
-    val coreTiles = home.tiles.take(6)
-    val extraTiles = home.tiles.drop(6)
+    val tiles = home.homeTiles
 
     LazyColumn(
         modifier = Modifier
@@ -121,32 +117,23 @@ fun TouchHomeScreen(
                 }
             }
         }
-        item {
-            FavoriteStrip(home.favorites, onFavoriteSelected)
+        if (tiles.isEmpty()) {
+            item(key = "empty-home") {
+                Box(modifier = Modifier.padding(horizontal = ClaroDimensions.TileGap)) {
+                    ClaroInfoCard(
+                        text = stringResource(R.string.touch_home_empty),
+                        tone = ClaroBannerTone.INFO,
+                    )
+                }
+            }
         }
-        items(coreTiles.chunked(2), key = { row -> "core-${row.joinToString { it.id }}" }) { row ->
+        items(tiles.chunked(HOME_COLUMNS), key = { row -> "row-${row.joinToString { it.id }}" }) { row ->
             TileGridRow(row = row, onTileSelected = onTileSelected)
-        }
-        if (extraTiles.isNotEmpty()) {
-            item(key = "scroll-cue") {
-                val moreAppsDescription = stringResource(R.string.touch_more_apps_below)
-                Text(
-                    text = "⌄",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .semantics { contentDescription = moreAppsDescription },
-                    color = Color.White,
-                    fontSize = 20.sp,
-                    lineHeight = 20.sp,
-                    textAlign = TextAlign.Center,
-                )
-            }
-            items(extraTiles.chunked(2), key = { row -> "extra-${row.joinToString { it.id }}" }) { row ->
-                TileGridRow(row = row, onTileSelected = onTileSelected)
-            }
         }
     }
 }
+
+private const val HOME_COLUMNS = 3
 
 @Composable
 private fun TouchStatusHeader(
@@ -283,77 +270,6 @@ private fun RoleRepairCard(
 }
 
 @Composable
-private fun FavoriteStrip(
-    favorites: List<FavoritePerson>,
-    onFavoriteSelected: (FavoritePerson) -> Unit,
-) {
-    val haptics = LocalClaroHaptics.current
-    val addPersonLabel = stringResource(R.string.touch_add_person)
-    val visibleFavorites = List(4) { index ->
-        favorites.getOrNull(index) ?: FavoritePerson(
-            id = "favorite-$index",
-            displayName = addPersonLabel,
-            state = FavoriteState.UNASSIGNED,
-        )
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = ClaroDimensions.TileGap),
-        horizontalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
-    ) {
-        visibleFavorites.forEachIndexed { index, person ->
-            val unassigned = person.state == FavoriteState.UNASSIGNED
-            val shortName = if (unassigned) {
-                "+"
-            } else {
-                person.displayName.trim().split(Regex("\\s+")).firstOrNull()?.ifBlank { "+" } ?: "+"
-            }
-            val actionLabel = person.favoriteActionLabel()
-            val favoriteDesc = person.favoriteDescription()
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 84.dp)
-                    .clip(RoundedCornerShape(1.dp))
-                    .background(Color(0xFFF0F3F8))
-                    .clickable(
-                        role = Role.Button,
-                        onClickLabel = actionLabel,
-                    ) {
-                        haptics.softkey()
-                        onFavoriteSelected(person)
-                    }
-                    .semantics {
-                        contentDescription = favoriteDesc
-                        role = Role.Button
-                    }
-                    .padding(horizontal = 2.dp, vertical = 3.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),
-            ) {
-                ClaroAvatar(
-                    name = if (unassigned) addPersonLabel else person.displayName,
-                    size = 51.dp,
-                    paletteSeed = index,
-                    isUnassigned = unassigned,
-                )
-                Text(
-                    text = shortName,
-                    color = ClaroColors.Ink,
-                    fontSize = 19.sp,
-                    lineHeight = 21.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun TileGridRow(
     row: List<HomeTile>,
     onTileSelected: (HomeTile) -> Unit,
@@ -371,7 +287,7 @@ private fun TileGridRow(
                 modifier = Modifier.weight(1f),
             )
         }
-        if (row.size == 1) {
+        repeat(HOME_COLUMNS - row.size) {
             Spacer(Modifier.weight(1f))
         }
     }
@@ -385,10 +301,10 @@ private fun HomeTileCard(
 ) {
     val haptics = LocalClaroHaptics.current
     val displayLabel = tile.kind.localizedLabel(tile.label)
-    val accessibleLabel = if (tile.kind == HomeTileKind.SOS) {
-        stringResource(R.string.touch_tile_sos_a11y)
-    } else {
-        displayLabel
+    val accessibleLabel = when (tile.kind) {
+        HomeTileKind.SOS -> stringResource(R.string.touch_tile_sos_a11y)
+        HomeTileKind.CONTACT -> stringResource(R.string.touch_favorite_action_call, displayLabel)
+        else -> displayLabel
     }
     val description = when (val badge = tile.badge) {
         is BadgeValue.Known -> if (badge.count == 0) {
@@ -401,7 +317,7 @@ private fun HomeTileCard(
     }
     Box(
         modifier = modifier
-            .heightIn(min = 160.dp)
+            .heightIn(min = 124.dp)
             .clip(RoundedCornerShape(1.dp))
             .background(tile.kind.tileBackgroundColor())
             .clickable(
@@ -425,10 +341,10 @@ private fun HomeTileCard(
             Text(
                 text = displayLabel,
                 color = ClaroColors.Red,
-                fontSize = 54.sp,
-                lineHeight = 58.sp,
+                fontSize = 40.sp,
+                lineHeight = 44.sp,
                 fontWeight = FontWeight.Black,
-                letterSpacing = (-2).sp,
+                letterSpacing = (-1).sp,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(8.dp),
             )
@@ -438,24 +354,24 @@ private fun HomeTileCard(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
             ) {
-                if (tile.kind == HomeTileKind.INSTALLED_APP) {
-                    ClaroAppIcon(
+                when (tile.kind) {
+                    HomeTileKind.INSTALLED_APP -> ClaroAppIcon(
                         packageName = tile.packageName,
-                        size = 60.dp,
+                        size = 52.dp,
                         fallbackTint = tile.kind.tileIconTint(),
                     )
-                } else {
-                    ClaroIcon(
+                    HomeTileKind.CONTACT -> ClaroAvatar(name = tile.label, size = 52.dp)
+                    else -> ClaroIcon(
                         kind = tile.kind.iconKind(),
                         tint = tile.kind.tileIconTint(),
-                        size = 68.dp,
+                        size = 52.dp,
                     )
                 }
                 Text(
                     text = displayLabel,
                     color = ClaroColors.Ink,
-                    fontSize = 22.sp,
-                    lineHeight = 25.sp,
+                    fontSize = 18.sp,
+                    lineHeight = 21.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                     maxLines = 2,
@@ -499,25 +415,6 @@ private fun BadgeBubble(badge: BadgeValue, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun FavoritePerson.favoriteActionLabel(): String = when (state) {
-    FavoriteState.READY -> stringResource(R.string.touch_favorite_action_call, displayName)
-    FavoriteState.UNASSIGNED -> stringResource(R.string.touch_add_person)
-    FavoriteState.CONTACT_MISSING,
-    FavoriteState.PHOTO_UNAVAILABLE,
-    -> stringResource(R.string.touch_favorite_action_repair, displayName)
-}
-
-@Composable
-private fun FavoritePerson.favoriteDescription(): String = when (state) {
-    FavoriteState.READY -> stringResource(R.string.touch_favorite_desc_ready, displayName)
-    FavoriteState.UNASSIGNED -> stringResource(R.string.touch_favorite_desc_unassigned)
-    FavoriteState.CONTACT_MISSING ->
-        stringResource(R.string.touch_favorite_desc_contact_missing, displayName)
-    FavoriteState.PHOTO_UNAVAILABLE ->
-        stringResource(R.string.touch_favorite_desc_photo_unavailable, displayName)
-}
-
-@Composable
 private fun CellularStatus.unavailableLabel(): String? = when (availability) {
     CellularAvailability.AVAILABLE -> null
     CellularAvailability.NO_SIM -> stringResource(R.string.touch_signal_no_sim)
@@ -534,6 +431,8 @@ private fun HomeTileKind.tileBackgroundColor(): Color = when (this) {
     HomeTileKind.SOS -> ClaroColors.PaleRed
     HomeTileKind.APPS -> ClaroColors.AppsPale
     HomeTileKind.INSTALLED_APP -> Color(0xFFF2F4F8)
+    HomeTileKind.CONTACT -> ClaroColors.PaleBlue
+    HomeTileKind.ALARM -> ClaroColors.PaleOrange
 }
 
 private fun HomeTileKind.tileIconTint(): Color = when (this) {
@@ -544,6 +443,8 @@ private fun HomeTileKind.tileIconTint(): Color = when (this) {
     HomeTileKind.SOS -> ClaroColors.Red
     HomeTileKind.APPS -> ClaroColors.AppsInk
     HomeTileKind.INSTALLED_APP -> ClaroColors.Blue
+    HomeTileKind.CONTACT -> ClaroColors.Blue
+    HomeTileKind.ALARM -> ClaroColors.Orange
 }
 
 private fun HomeTileKind.iconKind(): ClaroIconKind = when (this) {
@@ -554,6 +455,8 @@ private fun HomeTileKind.iconKind(): ClaroIconKind = when (this) {
     HomeTileKind.SOS -> ClaroIconKind.SOS
     HomeTileKind.APPS -> ClaroIconKind.APPS
     HomeTileKind.INSTALLED_APP -> ClaroIconKind.APPS
+    HomeTileKind.CONTACT -> ClaroIconKind.CONTACT
+    HomeTileKind.ALARM -> ClaroIconKind.CLOCK
 }
 
 @Composable
@@ -564,5 +467,6 @@ private fun HomeTileKind.localizedLabel(fallback: String): String = when (this) 
     HomeTileKind.GALLERY -> stringResource(R.string.touch_tile_gallery)
     HomeTileKind.SOS -> stringResource(R.string.touch_tile_sos)
     HomeTileKind.APPS -> stringResource(R.string.touch_tile_apps)
-    HomeTileKind.INSTALLED_APP -> fallback
+    HomeTileKind.INSTALLED_APP, HomeTileKind.CONTACT -> fallback
+    HomeTileKind.ALARM -> stringResource(R.string.touch_tile_alarm)
 }

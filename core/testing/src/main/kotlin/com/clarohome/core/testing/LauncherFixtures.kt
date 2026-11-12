@@ -4,7 +4,6 @@ import com.clarohome.core.model.BadgeValue
 import com.clarohome.core.model.BatteryStatus
 import com.clarohome.core.model.CellularAvailability
 import com.clarohome.core.model.CellularStatus
-import com.clarohome.core.model.FavoritePerson
 import com.clarohome.core.model.HomeRoleState
 import com.clarohome.core.model.HomeSnapshot
 import com.clarohome.core.model.HomeTile
@@ -22,12 +21,12 @@ fun launcherHomeFixture(
     time = "9:41",
     battery = BatteryStatus(82, false),
     cellular = CellularStatus(CellularAvailability.AVAILABLE, 3),
-    favorites = listOf(
-        FavoritePerson("1", "Mira", "+1"),
-        FavoritePerson("2", "Daniel", "+2"),
-        FavoritePerson("3", "Leah", "+3"),
-        FavoritePerson("4", "Noah", "+4"),
-    ),
+    homeSlots = listOf(
+        HomeTile("slot-0", "Phone", TileAccent.GREEN, HomeTileKind.PHONE, phoneBadge),
+        HomeTile("slot-1", "Mira", TileAccent.BLUE, HomeTileKind.CONTACT, phoneNumber = "+1"),
+        HomeTile("slot-2", "Camera", TileAccent.ORANGE, HomeTileKind.CAMERA),
+        HomeTile("slot-3", "SOS", TileAccent.RED, HomeTileKind.SOS),
+    ) + List(8) { null },
     tiles = listOf(
         HomeTile("phone", "Phone", TileAccent.GREEN, HomeTileKind.PHONE, phoneBadge),
         HomeTile("messages", "Messages", TileAccent.BLUE, HomeTileKind.MESSAGES, messageBadge),

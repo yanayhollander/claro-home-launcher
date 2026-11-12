@@ -16,14 +16,8 @@ class TouchHomeContentModelTest {
             ),
         )
 
-        assertThat(model.visibleTileIds).containsExactly(
-            "phone",
-            "messages",
-            "camera",
-            "gallery",
-            "sos",
-            "apps",
-        ).inOrder()
+        assertThat(model.visibleTileIds)
+            .containsExactly("slot-0", "slot-1", "slot-2", "slot-3").inOrder()
         assertThat(model.showsRoleRepair).isTrue()
         assertThat(model.badgeDescriptions.first())
             .isEqualTo("Phone, count unavailable, repair required")

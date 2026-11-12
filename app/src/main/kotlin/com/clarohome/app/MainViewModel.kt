@@ -21,10 +21,9 @@ import com.clarohome.core.model.AppLanguage
 import com.clarohome.core.model.CapabilityStatus
 import com.clarohome.core.model.ClaroPreferences
 import com.clarohome.core.model.CriticalActivity
-import com.clarohome.core.model.FavoritePerson
-import com.clarohome.core.model.FavoriteState
 import com.clarohome.core.model.HandoverCheck
 import com.clarohome.core.model.HomeSnapshot
+import com.clarohome.core.model.HomeTile
 import com.clarohome.core.model.OnboardingStep
 import com.clarohome.core.model.ReadinessCapability
 import com.clarohome.core.model.TextSize
@@ -53,6 +52,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -130,6 +131,12 @@ class MainViewModel @Inject constructor(
             startup.value = recoveryCoordinator.recover()
         }
         viewModelScope.launch { billingRepository.refresh() }
+        viewModelScope.launch {
+            homeRepository.home
+                .map { it.homeSlots.count { slot -> slot != null } }
+                .distinctUntilChanged()
+                .collect { settingsManager.updateHomeTileCount(it) }
+        }
     }
 
     fun advanceOnboarding(next: OnboardingStep) {
@@ -247,8 +254,6 @@ class MainViewModel @Inject constructor(
 
     fun isSettingsUnlocked(): Boolean = settingsManager.isUnlocked()
 
-    fun recordSettingsActivity() = settingsManager.recordActivity()
-
     fun lockSettings() = settingsManager.lock()
 
     fun applyVisualMode(
@@ -333,40 +338,15 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun setFavorite(slot: Int, id: String, name: String, number: String, photoUri: String?) {
+    fun setHomeSlot(slot: Int, tile: HomeTile) {
         viewModelScope.launch {
-            val before = uiState.value.home?.favorites.orEmpty()
-            homeRepository.setFavorite(
-                slot,
-                FavoritePerson(
-                    id = id,
-                    displayName = name,
-                    phoneNumber = number,
-                    photoUri = photoUri,
-                    state = if (photoUri == null) {
-                        FavoriteState.PHOTO_UNAVAILABLE
-                    } else {
-                        FavoriteState.READY
-                    },
-                ),
-            )
-            updatePeopleSetupProgress(
-                before.mapIndexed { index, favorite ->
-                    if (index == slot) favorite.copy(phoneNumber = number) else favorite
-                },
-            )
+            homeRepository.setHomeSlot(slot, tile)
         }
     }
 
-    fun clearFavorite(slot: Int) {
+    fun clearHomeSlot(slot: Int) {
         viewModelScope.launch {
-            val before = uiState.value.home?.favorites.orEmpty()
-            homeRepository.clearFavorite(slot)
-            updatePeopleSetupProgress(
-                before.mapIndexed { index, favorite ->
-                    if (index == slot) favorite.copy(phoneNumber = null) else favorite
-                },
-            )
+            homeRepository.clearHomeSlot(slot)
         }
     }
 
@@ -542,17 +522,6 @@ class MainViewModel @Inject constructor(
                 context.getString(R.string.app_pin_enter_same_twice)
             else -> reason
         }
-    }
-
-    private suspend fun updatePeopleSetupProgress(favorites: List<FavoritePerson>) {
-        val current = uiState.value
-        val assigned = favorites.count { it.phoneNumber != null }
-        settingsManager.updateSetupAssignments(
-            favoriteSlotsAssigned = assigned,
-            speedDialOneAssigned = current.preferences.onboarding.speedDialOneAssigned,
-            speedDialTwoAssigned = current.preferences.onboarding.speedDialTwoAssigned,
-            sosRecipientAgreed = current.preferences.onboarding.sosRecipientAgreed,
-        )
     }
 
     private companion object {

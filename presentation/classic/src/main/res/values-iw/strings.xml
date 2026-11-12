@@ -26,8 +26,6 @@
     <string name="classic_badge_no_new">%1$s, אין פריטים חדשים</string>
     <string name="classic_badge_new_count">%1$s, %2$d חדשים</string>
     <string name="classic_badge_unknown">%1$s, הספירה אינה זמינה, נדרש תיקון</string>
-    <string name="classic_favorite_slot_unassigned">הוספת איש קשר, משבצת מועדפים %1$d</string>
-    <string name="classic_favorite_person">%1$s, איש קשר מועדף</string>
 
     <string name="classic_mode_letters">אותיות</string>
     <string name="classic_mode_numbers">מספרים</string>
@@ -165,4 +163,8 @@
     <string name="classic_msg_sent_delivery_unconfirmed">נשלח. המסירה לא אושרה.</string>
     <string name="classic_msg_delivery_confirmed_carrier">המסירה אושרה על ידי המפעיל הסלולרי</string>
     <string name="classic_msg_sending_status">שולח הודעה</string>
+    <string name="classic_tile_camera">מצלמה</string>
+    <string name="classic_tile_gallery">גלריה</string>
+    <string name="classic_tile_apps">אפליקציות</string>
+    <string name="classic_tile_alarm">שעון מעורר</string>
 </resources>

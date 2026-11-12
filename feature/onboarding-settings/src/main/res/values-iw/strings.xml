@@ -15,7 +15,7 @@
     <string name="onb_step_choose_phone_style">בחירת סגנון הטלפון</string>
     <string name="onb_language_and_display_title">שפה ותצוגה</string>
     <string name="onb_settings_access">גישה להגדרות</string>
-    <string name="onb_step_people_and_speed_dial">אנשי קשר וחיוג מהיר</string>
+    <string name="onb_step_people_and_speed_dial">אריחי מסך בית וחיוג מהיר</string>
     <string name="onb_sos_contact_title">איש קשר לחירום (SOS)</string>
     <string name="onb_step_permissions_and_roles">הרשאות וברירות מחדל</string>
     <string name="onb_step_handover_checklist">רשימת בדיקה למסירה</string>
@@ -78,14 +78,10 @@
     <string name="onb_recover_pin_lost_both_warning">איבדתם גם את קוד ה-PIN וגם את צופן השחזור? אפסו את Claro בהגדרות היישומים של Android. ההעדפות המקומיות והטיוטות של Claro יימחקו; אנשי הקשר, הודעות ה-SMS והתמונות בטלפון יישמרו.</string>
 
     <string name="onb_open_contacts_and_speed_dial">פתיחת אנשי קשר וחיוג מהיר</string>
-    <string name="onb_continue_setup_incomplete">המשך ללא השלמת ההגדרה</string>
-    <string name="onb_people_setup_body">שייכו אנשי קשר מהטלפון לארבעת המקומות עם תמונה במסך הבית, ולפי הצורך גם ללחיצה ארוכה על מקשים 1 ו-2.</string>
-    <string name="onb_slot_set">מוגדר</string>
-    <string name="onb_slot_open">פנוי</string>
+    <string name="onb_people_setup_body">בחרו מה יופיע במסך הבית — אנשי קשר, אפליקציות, SOS, שעון מעורר ועוד (עד 12 אריחים) — ולפי הצורך גם מקשים 1 ו-2 ללחיצה ארוכה. הכול כאן אופציונלי.</string>
     <string name="onb_speed_dial_assigned">משויך</string>
     <string name="onb_speed_dial_not_set">לא הוגדר</string>
-    <string name="onb_people_setup_status_configured">%1$d מתוך 4 אנשי קשר במסך הבית הוגדרו. לחיצה ארוכה על 1: %2$s · לחיצה ארוכה על 2: %3$s.</string>
-    <string name="onb_people_setup_status_empty">עדיין לא הוגדרו אנשי קשר במסך הבית — מקומות פנויים יוצגו בתור הוספת איש קשר. לחיצה ארוכה על 1: %1$s · לחיצה ארוכה על 2: %2$s.</string>
+    <string name="onb_people_setup_status_configured">%1$d מתוך 12 אריחים במסך הבית הוגדרו. לחיצה ארוכה על 1: %2$s · לחיצה ארוכה על 2: %3$s.</string>
     <string name="onb_people_setup_hold_note">לחיצה ארוכה על 1 או 2 מוציאה שיחה מיד, ללא מסך אישור נוסף.</string>
 
     <string name="onb_configure_trusted_person">הגדרת איש קשר מהימן</string>
@@ -127,11 +123,12 @@
     <string name="onb_allowed_apps_and_tiles_title">יישומים מורשים וכפתורים במסך הבית</string>
     <string name="onb_allowed_apps_and_tiles_subtitle">בחירת יישומים נוספים למסך הבית</string>
 
-    <string name="onb_done_lock">סיום · נעילה</string>
-    <string name="onb_home_and_apps_title">מסך הבית ויישומים</string>
-    <string name="onb_home_and_apps_subtitle">יישומים מורשים וכפתורים נוספים במסך הבית</string>
-    <string name="onb_people_and_speed_dial_amp_title">אנשי קשר וחיוג מהיר</string>
-    <string name="onb_people_configured_short">%1$d/4 אנשי קשר הוגדרו במסך הבית</string>
+    <string name="onb_done_settings">סיום</string>
+    <string name="onb_lock_settings">נעילת ההגדרות</string>
+    <string name="onb_home_and_apps_title">יישומים ותפריט</string>
+    <string name="onb_home_and_apps_subtitle">בחרו אילו יישומים מורשים ויוצגו בתפריט</string>
+    <string name="onb_people_and_speed_dial_amp_title">אריחי מסך בית וחיוג מהיר</string>
+    <string name="onb_people_configured_short">%1$d/12 אריחים הוגדרו במסך הבית</string>
     <string name="onb_language_and_display_amp_title">שפה ותצוגה</string>
     <string name="onb_language_display_summary_high_contrast">%1$s · %2$s · ניגודיות גבוהה</string>
     <string name="onb_sos_subtitle_configured">איש קשר מהימן אושר · בדיקה בנפרד</string>

@@ -4,7 +4,6 @@
     <string name="touch_settings">Settings</string>
     <string name="touch_battery_percentage">%1$d%%</string>
     <string name="touch_return_to_call">Return to call · %1$s</string>
-    <string name="touch_more_apps_below">More apps below</string>
     <string name="touch_home_role_available">Claro is not your Home app yet.</string>
     <string name="touch_home_role_unavailable">This device cannot make Claro the Home app.</string>
     <string name="touch_home_role_unknown">Home app status is unavailable.</string>
@@ -12,11 +11,6 @@
     <string name="touch_home_role_open_settings">Open Home settings</string>
     <string name="touch_add_person">Add person</string>
     <string name="touch_favorite_action_call">Call %1$s</string>
-    <string name="touch_favorite_action_repair">Repair %1$s favorite</string>
-    <string name="touch_favorite_desc_ready">%1$s, favorite person</string>
-    <string name="touch_favorite_desc_unassigned">Unassigned favorite. Ask your caregiver to add a person</string>
-    <string name="touch_favorite_desc_contact_missing">%1$s, contact needs repair</string>
-    <string name="touch_favorite_desc_photo_unavailable">%1$s, photo unavailable</string>
     <string name="touch_signal_no_sim">No SIM</string>
     <string name="touch_signal_no_signal">No signal</string>
     <string name="touch_signal_airplane_mode">Airplane mode</string>
@@ -199,4 +193,6 @@
     <string name="touch_msg_status_delivery_confirmed">Delivery confirmed by the carrier</string>
     <string name="touch_msg_status_carrier_unconfirmed">The carrier did not confirm the result. It may already have been sent.</string>
     <string name="touch_msg_status_duplicate_prompt">This message may already have been sent. Send it again?</string>
+    <string name="touch_home_empty">Ask your caregiver to add tiles to Home in Settings</string>
+    <string name="touch_tile_alarm">Alarm clock</string>
 </resources>

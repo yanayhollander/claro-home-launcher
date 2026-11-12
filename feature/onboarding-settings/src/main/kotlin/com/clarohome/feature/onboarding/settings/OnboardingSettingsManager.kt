@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.SystemClock
 import android.provider.Settings
 import com.clarohome.core.domain.ClaroPreferencesRepository
+import com.clarohome.core.model.HOME_SLOT_COUNT
 import com.clarohome.core.model.AccessProtection
 import com.clarohome.core.model.AppLanguage
 import com.clarohome.core.model.CapabilityStatus
@@ -130,7 +131,7 @@ class OnboardingSettingsManager @Inject constructor(
     private val timeProvider: SettingsTimeProvider,
 ) {
     private val mutex = Mutex()
-    private var unlockedUntilElapsedMillis = 0L
+    @Volatile private var unlocked = false
 
     suspend fun advanceOnboarding(next: OnboardingStep) = update { current ->
         current.copy(
@@ -211,7 +212,7 @@ class OnboardingSettingsManager @Inject constructor(
                 } == true
         }
         if (matches) {
-            unlockedUntilElapsedMillis = now.elapsedRealtimeMillis + INACTIVITY_TIMEOUT_MILLIS
+            unlocked = true
             repository.save(
                 current.copy(
                     accessProtection = current.accessProtection.copy(
@@ -296,22 +297,15 @@ class OnboardingSettingsManager @Inject constructor(
                 ),
             ),
         )
-        unlockedUntilElapsedMillis = now.elapsedRealtimeMillis + INACTIVITY_TIMEOUT_MILLIS
+        unlocked = true
         AccessResult.Unlocked
     }
 
-    fun isUnlocked(): Boolean =
-        timeProvider.snapshot().elapsedRealtimeMillis < unlockedUntilElapsedMillis
-
-    fun recordActivity() {
-        if (isUnlocked()) {
-            unlockedUntilElapsedMillis =
-                timeProvider.snapshot().elapsedRealtimeMillis + INACTIVITY_TIMEOUT_MILLIS
-        }
-    }
+    /** Unlocked for the rest of the app session; only an explicit lock or process death re-locks. */
+    fun isUnlocked(): Boolean = unlocked
 
     fun lock() {
-        unlockedUntilElapsedMillis = 0
+        unlocked = false
     }
 
     suspend fun requestModeSwitch(
@@ -337,7 +331,7 @@ class OnboardingSettingsManager @Inject constructor(
 
     suspend fun resetAll() {
         mutex.withLock {
-            unlockedUntilElapsedMillis = 0L
+            unlocked = false
             repository.save(ClaroPreferences())
         }
     }
@@ -362,6 +356,12 @@ class OnboardingSettingsManager @Inject constructor(
         it.copy(onboarding = it.onboarding.copy(handoverChecks = checks))
     }
 
+    suspend fun updateHomeTileCount(count: Int) = update {
+        it.copy(
+            onboarding = it.onboarding.copy(favoriteSlotsAssigned = count.coerceIn(0, HOME_SLOT_COUNT)),
+        )
+    }
+
     suspend fun updateSetupAssignments(
         favoriteSlotsAssigned: Int,
         speedDialOneAssigned: Boolean,
@@ -370,7 +370,7 @@ class OnboardingSettingsManager @Inject constructor(
     ) = update {
         it.copy(
             onboarding = it.onboarding.copy(
-                favoriteSlotsAssigned = favoriteSlotsAssigned.coerceIn(0, 4),
+                favoriteSlotsAssigned = favoriteSlotsAssigned.coerceIn(0, HOME_SLOT_COUNT),
                 speedDialOneAssigned = speedDialOneAssigned,
                 speedDialTwoAssigned = speedDialTwoAssigned,
                 sosRecipientAgreed = sosRecipientAgreed,
@@ -418,6 +418,5 @@ class OnboardingSettingsManager @Inject constructor(
         const val ATTEMPTS_BEFORE_COOLDOWN = 5
         const val BASE_COOLDOWN_MILLIS = 30_000L
         const val MAX_COOLDOWN_MILLIS = 30 * 60_000L
-        const val INACTIVITY_TIMEOUT_MILLIS = 2 * 60_000L
     }
 }

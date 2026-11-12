@@ -4,7 +4,6 @@
     <string name="touch_settings">הגדרות</string>
     <string name="touch_battery_percentage">%1$d%%</string>
     <string name="touch_return_to_call">חזרה לשיחה · %1$s</string>
-    <string name="touch_more_apps_below">יישומים נוספים למטה</string>
     <string name="touch_home_role_available">Claro עדיין אינה אפליקציית הבית שלך.</string>
     <string name="touch_home_role_unavailable">מכשיר זה אינו מאפשר להגדיר את Claro כאפליקציית הבית.</string>
     <string name="touch_home_role_unknown">מצב אפליקציית הבית אינו זמין.</string>
@@ -12,11 +11,6 @@
     <string name="touch_home_role_open_settings">פתיחת הגדרות מסך הבית</string>
     <string name="touch_add_person">הוספת איש קשר</string>
     <string name="touch_favorite_action_call">שיחה אל %1$s</string>
-    <string name="touch_favorite_action_repair">תיקון מועדף עבור %1$s</string>
-    <string name="touch_favorite_desc_ready">%1$s, איש קשר מועדף</string>
-    <string name="touch_favorite_desc_unassigned">מועדף לא משויך. בקשו מבן משפחה או מטפל להוסיף איש קשר</string>
-    <string name="touch_favorite_desc_contact_missing">%1$s, איש הקשר דורש תיקון</string>
-    <string name="touch_favorite_desc_photo_unavailable">%1$s, התמונה אינה זמינה</string>
     <string name="touch_signal_no_sim">אין SIM</string>
     <string name="touch_signal_no_signal">אין קליטה</string>
     <string name="touch_signal_airplane_mode">מצב טיסה</string>
@@ -199,4 +193,6 @@
     <string name="touch_msg_status_delivery_confirmed">המסירה אושרה על ידי המפעיל הסלולרי</string>
     <string name="touch_msg_status_carrier_unconfirmed">המפעיל לא אישר את התוצאה. ייתכן שההודעה כבר נשלחה.</string>
     <string name="touch_msg_status_duplicate_prompt">ייתכן שההודעה הזו כבר נשלחה. לשלוח אותה שוב?</string>
+    <string name="touch_home_empty">בקשו מהמטפל להוסיף אריחים למסך הבית בהגדרות</string>
+    <string name="touch_tile_alarm">שעון מעורר</string>
 </resources>

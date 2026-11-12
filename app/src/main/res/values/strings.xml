@@ -24,7 +24,6 @@
     <string name="app_home_settings_unavailable">Home settings are unavailable on this device.</string>
     <string name="app_missing_or_disabled_notice">This app is missing or disabled.</string>
     <string name="app_could_not_open_notice">This app could not be opened.</string>
-    <string name="app_ask_caregiver_add_person">Ask your caregiver to add a person.</string>
     <string name="app_contacts_permission_save">Contacts permission is needed to save.</string>
     <string name="app_contacts_permission_delete">Contacts permission is needed to delete.</string>
     <string name="app_contact_account_read_only">This contact account is read-only.</string>
@@ -57,23 +56,12 @@
     <string name="app_badge_new_count" tools:ignore="PluralsCandidate">%1$d new</string>
     <string name="app_badge_unknown">Access needed · count unknown</string>
 
-    <string name="app_home_and_apps">Home &amp; apps</string>
-    <string name="app_edit_apps">Edit apps</string>
     <string name="app_apps_hiding_convenience_notice">Hiding apps here is a menu convenience only. It does not lock the device or block Android settings.</string>
     <string name="app_no_eligible_apps">No eligible apps found on this device.</string>
     <string name="app_no_apps_match_search">No apps match your search.</string>
     <string name="app_no_allowed_apps_yet">No allowed apps yet.</string>
-    <string name="app_no_allowed_apps_on_home">No allowed apps on Home yet.</string>
-    <string name="app_unavailable_review_edit_apps">%1$s is missing or disabled. Ask a caregiver to review Edit apps.</string>
-    <string name="app_tab_all_allowed">All allowed</string>
-    <string name="app_tab_on_home">On home</string>
-    <string name="app_subtitle_on_home_external">On Home · opens outside Claro</string>
-    <string name="app_subtitle_opens_external">Opens outside Claro</string>
     <string name="app_is_missing_or_disabled">App is missing or disabled</string>
-    <string name="app_show_on_home">Show on Home</string>
 
-    <string name="app_people_and_speed_dial">People &amp; speed dial</string>
-    <string name="app_favorite_slot">Slot %1$d</string>
     <string name="app_not_set">Not set</string>
     <string name="app_speed_dial_hold_slot">Hold %1$s · %2$s</string>
     <string name="app_speed_dial_immediate_notice">Holding 1 or 2 calls immediately, without confirmation.</string>
@@ -132,4 +120,13 @@
     <string name="app_gallery_access_needed">Allow Claro to show your pictures. If Android no longer asks, open settings and allow Photos.</string>
     <string name="app_gallery_partial_access">Android is sharing only some pictures. Allow all pictures to see them all.</string>
     <string name="app_picture_position">Picture %1$d of %2$d</string>
+    <string name="app_apps_and_menu">Apps &amp; menu</string>
+    <string name="app_home_slot">Tile %1$d</string>
+    <string name="app_alarm_clock">Alarm clock</string>
+    <string name="app_section_shortcuts">Shortcuts</string>
+    <string name="app_section_apps">Apps</string>
+    <string name="app_section_contacts">Contacts</string>
+    <string name="app_home_tiles_and_speed_dial">Home tiles &amp; speed dial</string>
+    <string name="app_show_in_menu">Show in Menu</string>
+    <string name="app_unavailable_review_in_settings">%1$s is missing or disabled. Ask a caregiver to review it in Settings.</string>
 </resources>

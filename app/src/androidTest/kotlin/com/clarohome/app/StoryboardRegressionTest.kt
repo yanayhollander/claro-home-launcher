@@ -30,7 +30,6 @@ import com.clarohome.core.model.CapabilityStatus
 import com.clarohome.core.model.CellularAvailability
 import com.clarohome.core.model.CellularStatus
 import com.clarohome.core.model.ClaroPreferences
-import com.clarohome.core.model.FavoritePerson
 import com.clarohome.core.model.HandoverCheck
 import com.clarohome.core.model.HomeRoleState
 import com.clarohome.core.model.HomeSnapshot
@@ -174,7 +173,6 @@ class StoryboardRegressionTest {
                     home = storyboardHome(),
                     onUseClassicMode = {},
                     onTileSelected = {},
-                    onFavoriteSelected = {},
                     onRepairHomeRole = {},
                     onReturnToCall = {},
                 )
@@ -201,7 +199,6 @@ class StoryboardRegressionTest {
                     home = storyboardHome(),
                     onOpenMenu = {},
                     onTileSelected = {},
-                    onFavoriteSelected = {},
                     onRepairHomeRole = {},
                     onReturnToCall = {},
                     onDigitSelected = {},
@@ -458,7 +455,6 @@ class StoryboardRegressionTest {
                         home = storyboardHome(),
                         onOpenMenu = {},
                         onTileSelected = {},
-                        onFavoriteSelected = {},
                         onRepairHomeRole = {},
                         onReturnToCall = {},
                         onDigitSelected = {},
@@ -470,7 +466,6 @@ class StoryboardRegressionTest {
                         home = storyboardHome(),
                         onUseClassicMode = {},
                         onTileSelected = {},
-                        onFavoriteSelected = {},
                         onRepairHomeRole = {},
                         onReturnToCall = {},
                     )
@@ -564,9 +559,20 @@ private fun storyboardHome() = HomeSnapshot(
     time = "9:41",
     battery = BatteryStatus(82, false),
     cellular = CellularStatus(CellularAvailability.AVAILABLE, 4),
-    favorites = listOf("Mira", "Daniel", "Leah", "Noah").mapIndexed { index, name ->
-        FavoritePerson(index.toString(), name, "20255501$index")
-    },
+    homeSlots = listOf(
+        HomeTile("slot-0", "Mira", TileAccent.BLUE, HomeTileKind.CONTACT, phoneNumber = "202555010"),
+        HomeTile("slot-1", "Daniel", TileAccent.BLUE, HomeTileKind.CONTACT, phoneNumber = "202555011"),
+        HomeTile("slot-2", "Leah", TileAccent.BLUE, HomeTileKind.CONTACT, phoneNumber = "202555012"),
+        HomeTile("slot-3", "Noah", TileAccent.BLUE, HomeTileKind.CONTACT, phoneNumber = "202555013"),
+        HomeTile("slot-4", "Phone", TileAccent.GREEN, HomeTileKind.PHONE, BadgeValue.Known(1)),
+        HomeTile("slot-5", "Messages", TileAccent.BLUE, HomeTileKind.MESSAGES, BadgeValue.Known(1)),
+        HomeTile("slot-6", "Camera", TileAccent.ORANGE, HomeTileKind.CAMERA),
+        HomeTile("slot-7", "Gallery", TileAccent.VIOLET, HomeTileKind.GALLERY),
+        HomeTile("slot-8", "SOS", TileAccent.RED, HomeTileKind.SOS),
+        HomeTile("slot-9", "Apps", TileAccent.BLUE, HomeTileKind.APPS),
+        null,
+        null,
+    ),
     tiles = listOf(
         HomeTile("phone", "Phone", TileAccent.GREEN, HomeTileKind.PHONE, BadgeValue.Known(1)),
         HomeTile("messages", "Messages", TileAccent.BLUE, HomeTileKind.MESSAGES, BadgeValue.Known(1)),

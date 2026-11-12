@@ -26,8 +26,6 @@
     <string name="classic_badge_no_new">%1$s, sin elementos nuevos</string>
     <string name="classic_badge_new_count">%1$s, %2$d nuevos</string>
     <string name="classic_badge_unknown">%1$s, recuento no disponible, requiere reparación</string>
-    <string name="classic_favorite_slot_unassigned">Añadir persona, espacio favorito %1$d</string>
-    <string name="classic_favorite_person">%1$s, persona favorita</string>
 
     <string name="classic_mode_letters">Letras</string>
     <string name="classic_mode_numbers">Números</string>
@@ -165,4 +163,8 @@
     <string name="classic_msg_sent_delivery_unconfirmed">Enviado. La entrega no está confirmada.</string>
     <string name="classic_msg_delivery_confirmed_carrier">Entrega confirmada por el operador</string>
     <string name="classic_msg_sending_status">Enviando mensaje</string>
+    <string name="classic_tile_camera">Cámara</string>
+    <string name="classic_tile_gallery">Galería</string>
+    <string name="classic_tile_apps">Apps</string>
+    <string name="classic_tile_alarm">Alarma</string>
 </resources>

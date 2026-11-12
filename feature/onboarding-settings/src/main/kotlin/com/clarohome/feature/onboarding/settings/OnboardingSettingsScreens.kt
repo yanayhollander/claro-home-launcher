@@ -347,6 +347,7 @@ fun SettingsHubScreen(
     onPeople: () -> Unit,
     onSafety: () -> Unit,
     onMembershipPrivacy: () -> Unit,
+    onDone: () -> Unit,
     onLockAndExit: () -> Unit,
     onResetClaro: () -> Unit = {},
 ) {
@@ -355,7 +356,11 @@ fun SettingsHubScreen(
         modifier = Modifier.testTag("onboarding-screen"),
         dock = {
             ClaroPrimaryButton(
-                label = stringResource(R.string.onb_done_lock),
+                label = stringResource(R.string.onb_done_settings),
+                onClick = onDone,
+            )
+            ClaroSecondaryButton(
+                label = stringResource(R.string.onb_lock_settings),
                 icon = ClaroIconKind.LOCK,
                 onClick = onLockAndExit,
             )
@@ -979,9 +984,7 @@ private fun PeopleSetupStep(
                 onClick = onOpenPeopleSetup,
             )
             ClaroSecondaryButton(
-                label = stringResource(
-                    if (assigned > 0) R.string.onb_continue else R.string.onb_continue_setup_incomplete,
-                ),
+                label = stringResource(R.string.onb_continue),
                 onClick = onContinue,
             )
         },
@@ -992,37 +995,6 @@ private fun PeopleSetupStep(
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.padding(horizontal = 4.dp),
         )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(ClaroColors.RowSurface, RoundedCornerShape(6.dp))
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            repeat(4) { index ->
-                val isAssigned = index < assigned
-                Column(
-                    modifier = Modifier.weight(1f),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    ClaroAvatar(
-                        name = if (isAssigned) (index + 1).toString() else null,
-                        size = 48.dp,
-                        paletteSeed = index,
-                        isUnassigned = !isAssigned,
-                    )
-                    Text(
-                        text = stringResource(
-                            if (isAssigned) R.string.onb_slot_set else R.string.onb_slot_open,
-                        ),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (isAssigned) ClaroColors.Green else ClaroColors.Muted,
-                    )
-                }
-            }
-        }
         val speedOneStatus = stringResource(
             if (speedOne) R.string.onb_speed_dial_assigned else R.string.onb_speed_dial_not_set,
         )
@@ -1030,21 +1002,13 @@ private fun PeopleSetupStep(
             if (speedTwo) R.string.onb_speed_dial_assigned else R.string.onb_speed_dial_not_set,
         )
         ClaroInfoCard(
-            text = if (assigned > 0) {
-                stringResource(
-                    R.string.onb_people_setup_status_configured,
-                    assigned,
-                    speedOneStatus,
-                    speedTwoStatus,
-                )
-            } else {
-                stringResource(
-                    R.string.onb_people_setup_status_empty,
-                    speedOneStatus,
-                    speedTwoStatus,
-                )
-            },
-            tone = if (assigned == 4) ClaroBannerTone.SUCCESS else ClaroBannerTone.INFO,
+            text = stringResource(
+                R.string.onb_people_setup_status_configured,
+                assigned,
+                speedOneStatus,
+                speedTwoStatus,
+            ),
+            tone = ClaroBannerTone.INFO,
         )
         Text(
             text = stringResource(R.string.onb_people_setup_hold_note),

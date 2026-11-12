@@ -109,7 +109,8 @@ private fun HomeTile.localizedLabel(): String = when (kind) {
     HomeTileKind.GALLERY -> stringResource(R.string.app_gallery)
     HomeTileKind.SOS -> stringResource(R.string.app_sos)
     HomeTileKind.APPS -> stringResource(R.string.app_apps)
-    HomeTileKind.INSTALLED_APP -> if (label == "Settings") {
+    HomeTileKind.ALARM -> stringResource(R.string.app_alarm_clock)
+    HomeTileKind.CONTACT, HomeTileKind.INSTALLED_APP -> if (label == "Settings") {
         stringResource(R.string.app_settings)
     } else {
         label
@@ -124,6 +125,8 @@ private fun HomeTileKind.toClaroIconKind(): ClaroIconKind = when (this) {
     HomeTileKind.SOS -> ClaroIconKind.SOS
     HomeTileKind.APPS -> ClaroIconKind.APPS
     HomeTileKind.INSTALLED_APP -> ClaroIconKind.APPS
+    HomeTileKind.CONTACT -> ClaroIconKind.CONTACT
+    HomeTileKind.ALARM -> ClaroIconKind.CLOCK
 }
 
 private fun HomeTileKind.toClaroIconTint(): Color = when (this) {
@@ -133,7 +136,8 @@ private fun HomeTileKind.toClaroIconTint(): Color = when (this) {
     HomeTileKind.GALLERY -> ClaroColors.Violet
     HomeTileKind.SOS -> ClaroColors.Red
     HomeTileKind.APPS -> ClaroColors.Blue
-    HomeTileKind.INSTALLED_APP -> ClaroColors.Blue
+    HomeTileKind.INSTALLED_APP, HomeTileKind.CONTACT -> ClaroColors.Blue
+    HomeTileKind.ALARM -> ClaroColors.Orange
 }
 
 @Composable

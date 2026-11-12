@@ -109,13 +109,32 @@ Delete-character/Cancel; the failed-send screen keeps its PRD Cancel. A
 successful send clears the draft and recipient query, and leaving Messages
 resets the inbox search. Call history rows show only the time plus a trailing
 incoming/outgoing/missed direction icon and read the system `CallLog`.
-Onboarding offers Classic first (left) and preselected, and Favorites persist.
+Onboarding offers Classic first (left) and preselected.
+
+Home is a configurable 12-slot grid (`HomeSnapshot.homeSlots`, `HOME_SLOT_COUNT`)
+persisted by `HomeSlotStore` (`claro_home_slots`; the legacy `claro_favorites`
+list is migrated). Each slot is optional and may hold a contact (direct call),
+an allowed installed app, or a built-in shortcut (Phone, Messages, Camera,
+Gallery, SOS, Apps, Alarm clock via `AlarmClock.ACTION_SHOW_ALARMS`); built-in
+shortcuts are unique, contacts/apps may repeat. Defaults seed Phone, Camera,
+Gallery, SOS and Apps (no Messages). Slots are edited only in the protected
+"Home tiles & speed dial" settings screen. `HomeSnapshot.tiles` is the Classic
+Menu list; the `isOnHome` app flag now means "Show in Menu". The Apps screen
+lists allowed apps only (no search or edit entry); app allow-listing, Menu
+visibility and search live in protected settings. The setup counter
+`favoriteSlotsAssigned` follows the number of configured slots.
+
+Settings unlock is session-long: once the Date/PIN gate is answered, protected
+settings stay unlocked until the user taps "Lock settings" or the process is
+recreated. This intentionally deviates from the PRD's two-minute inactivity
+and screen-lock proposal at the user's request; "Done" leaves settings
+without locking.
 
 Protected settings are the only route to phone-style changes, allowed-app/Home
 customization, contact creation/editing/deletion, SOS recipient configuration
 and caregiver test calls, local Claro reset, membership, and diagnostics. Senior
 SOS never exposes recipient inputs or test controls; tapping `Settings` from
-SOS, `Edit apps` from Apps, or `Add person`/`Edit`/`Delete` from Contacts routes
+SOS, or `Add person`/`Edit`/`Delete` from Contacts routes
 through the configured Date (`dd/MM/YYYY`) or 6-digit Caregiver PIN gate and
 continues directly to the intended destination after unlock. Mode switching
 preserves the shared repositories, defers while a call, SOS countdown/call or

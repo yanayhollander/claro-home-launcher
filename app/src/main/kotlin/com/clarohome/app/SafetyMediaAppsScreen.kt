@@ -152,12 +152,11 @@ fun SafetyMediaAppsScreen(
             )
             SafetyMediaAppsDestination.APPS -> AppsMenuScreen(
                 apps = uiState.home?.installedApps.orEmpty(),
-                allowCustomization = viewModel.isSettingsUnlocked(),
+                allowCustomization = false,
                 onBack = onBack,
                 onLaunch = { viewModel.launchAllowedApp(it.packageName) },
                 onSetAllowed = { app, allowed -> viewModel.setAppAllowed(app.packageName, allowed) },
                 onSetOnHome = { app, onHome -> viewModel.setAppOnHome(app.packageName, onHome) },
-                onRequestCustomize = onOpenProtectedSosSettings,
             )
         }
     }

@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.AlarmClock
 import android.provider.Settings
 import android.view.KeyEvent
 import android.widget.Toast
@@ -209,13 +210,6 @@ class MainActivity : ComponentActivity() {
                 onRequestCapability = ::requestCapability,
             )
         }
-    }
-
-    override fun onStop() {
-        super.onStop()
-        runCatching { ViewModelProvider(this)[MainViewModel::class.java] }
-            .getOrNull()
-            ?.lockSettings()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -438,6 +432,15 @@ private fun ClaroApp(
             } catch (_: ActivityNotFoundException) {
                 platformNotice = localizedContext.getString(R.string.app_could_not_open_notice)
             }
+        }
+    }
+    val openAlarms = {
+        try {
+            context.startActivity(
+                Intent(AlarmClock.ACTION_SHOW_ALARMS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        } catch (_: ActivityNotFoundException) {
+            platformNotice = localizedContext.getString(R.string.app_could_not_open_notice)
         }
     }
     val projectedHome = state.home?.withCommunicationProjections(communication, messaging)
@@ -689,21 +692,14 @@ private fun ClaroApp(
                                         },
                                         openSettings = { navController.openSettings(viewModel) },
                                         launchApp = launchPackage,
+                                        callContact = { contact ->
+                                            communicationViewModel.requestCall(
+                                                CallerIdentity(contact.label, contact.phoneNumber),
+                                            )
+                                            navController.navigate(PhoneRoute)
+                                        },
+                                        openAlarms = openAlarms,
                                     )
-                                },
-                                onFavoriteSelected = { favorite ->
-                                    platformNotice = if (favorite.phoneNumber == null) {
-                                        localizedContext.getString(R.string.app_ask_caregiver_add_person)
-                                    } else {
-                                        communicationViewModel.requestCall(
-                                            CallerIdentity(
-                                                displayName = favorite.displayName,
-                                                number = favorite.phoneNumber,
-                                            ),
-                                        )
-                                        navController.navigate(PhoneRoute)
-                                        null
-                                    }
                                 },
                                 onRepairHomeRole = launchHomeRole,
                                 onReturnToCall = {
@@ -732,19 +728,14 @@ private fun ClaroApp(
                                         },
                                         openSettings = { navController.openSettings(viewModel) },
                                         launchApp = launchPackage,
+                                        callContact = { contact ->
+                                            communicationViewModel.requestCall(
+                                                CallerIdentity(contact.label, contact.phoneNumber),
+                                            )
+                                            navController.navigate(PhoneRoute)
+                                        },
+                                        openAlarms = openAlarms,
                                     )
-                                },
-                                onFavoriteSelected = { favorite ->
-                                    favorite.phoneNumber?.let { number ->
-                                        communicationViewModel.requestCall(
-                                            CallerIdentity(favorite.displayName, number),
-                                        )
-                                        navController.navigate(PhoneRoute)
-                                    } ?: run {
-                                        platformNotice = localizedContext.getString(
-                                            R.string.app_ask_caregiver_add_person,
-                                        )
-                                    }
                                 },
                                 onRepairHomeRole = launchHomeRole,
                                 onReturnToCall = {
@@ -773,16 +764,12 @@ private fun ClaroApp(
                                 onBack = navController::popBackStack,
                                 onLaunch = { launchPackage(it.packageName) },
                                 onSetAllowed = { app, allowed ->
-                                    viewModel.recordSettingsActivity()
                                     viewModel.setAppAllowed(app.packageName, allowed)
                                 },
                                 onSetOnHome = { app, onHome ->
-                                    viewModel.recordSettingsActivity()
                                     viewModel.setAppOnHome(app.packageName, onHome)
                                 },
-                                onRequestCustomize = {
-                                    navController.openProtected(viewModel, TARGET_APPS_CUSTOMIZE)
-                                },
+                                useGrid = state.preferences.visualMode == VisualMode.TOUCH,
                             )
                         }
                     }
@@ -832,7 +819,6 @@ private fun ClaroApp(
                                 navController.navigate(MessagesRoute)
                             },
                             onSaveContact = { lookupKey, name, primary, secondary ->
-                                viewModel.recordSettingsActivity()
                                 communicationViewModel.saveContact(lookupKey, name, primary, secondary) { result ->
                                     platformNotice = when (result) {
                                         is ContactWriteResult.Saved -> null
@@ -846,7 +832,6 @@ private fun ClaroApp(
                                 }
                             },
                             onDeleteContact = { lookupKey ->
-                                viewModel.recordSettingsActivity()
                                 communicationViewModel.deleteSelectedContact(lookupKey) { result ->
                                     platformNotice = when (result) {
                                         is ContactWriteResult.Saved -> null
@@ -923,22 +908,15 @@ private fun ClaroApp(
                             ProtectedSessionMonitor(viewModel, navController)
                         }
                         PeopleSettingsScreen(
-                            favorites = state.home?.favorites.orEmpty(),
+                            homeSlots = state.home?.homeSlots.orEmpty(),
+                            installedApps = state.home?.installedApps.orEmpty(),
                             contacts = communication.contacts,
                             assignments = communication.assignments,
                             onLoadContacts = {
                                 onRequestCapability(ReadinessCapability.CONTACTS)
                             },
-                            onSetFavorite = { slot, contact, number ->
-                                viewModel.setFavorite(
-                                    slot = slot,
-                                    id = contact.lookupKey,
-                                    name = contact.displayName,
-                                    number = number.value,
-                                    photoUri = contact.photoUri,
-                                )
-                            },
-                            onClearFavorite = viewModel::clearFavorite,
+                            onSetSlot = viewModel::setHomeSlot,
+                            onClearSlot = viewModel::clearHomeSlot,
                             onSetKey = { slot, contact, number ->
                                 communicationViewModel.saveAssignment(slot, contact, number)
                                 viewModel.setSpeedDialConfigured(slot, configured = true)
@@ -994,32 +972,25 @@ private fun ClaroApp(
                         SettingsHubScreen(
                             preferences = state.preferences,
                             onPhoneStyle = {
-                                viewModel.recordSettingsActivity()
                                 navController.navigate(PhoneStyleRoute)
                             },
                             onDisplayLanguage = {
-                                viewModel.recordSettingsActivity()
                                 navController.navigate(DisplayLanguageRoute)
                             },
                             onAccessMethod = {
-                                viewModel.recordSettingsActivity()
                                 navController.navigate(AccessMethodRoute)
                             },
                             onReadiness = {
-                                viewModel.recordSettingsActivity()
                                 navController.navigate(ReadinessRoute)
                             },
                             onHomeAndApps = {
-                                viewModel.recordSettingsActivity()
                                 navController.navigate(AppsRoute(customize = true))
                             },
                             onPeople = {
-                                viewModel.recordSettingsActivity()
                                 communicationViewModel.openContacts()
                                 navController.navigate(PeopleSettingsRoute(requiresAuth = true))
                             },
                             onSafety = {
-                                viewModel.recordSettingsActivity()
                                 communicationViewModel.openContacts()
                                 navController.navigate(
                                     SafetyRoute(
@@ -1029,15 +1000,14 @@ private fun ClaroApp(
                                 )
                             },
                             onMembershipPrivacy = {
-                                viewModel.recordSettingsActivity()
                                 navController.navigate(MembershipRoute)
                             },
+                            onDone = { navController.goHome(state.preferences.visualMode) },
                             onLockAndExit = {
                                 viewModel.lockSettings()
                                 navController.goHome(state.preferences.visualMode)
                             },
                             onResetClaro = {
-                                viewModel.recordSettingsActivity()
                                 navController.navigate(ResetRoute)
                             },
                         )
@@ -1049,7 +1019,6 @@ private fun ClaroApp(
                             pending = state.preferences.pendingVisualMode,
                             message = state.message,
                             onApply = { mode ->
-                                viewModel.recordSettingsActivity()
                                 viewModel.applyVisualMode(mode, runtimeBlockers) {
                                     navController.goHome(mode)
                                 }
@@ -1065,13 +1034,11 @@ private fun ClaroApp(
                         DisplayLanguageSettingsScreen(
                             preferences = state.preferences,
                             onApply = { language, size, contrast ->
-                                viewModel.recordSettingsActivity()
                                 viewModel.saveLanguageDisplay(language, size, contrast)
                                 navController.popBackStack()
                             },
                             onCancel = navController::popBackStack,
                             onApplyWithHaptics = { language, size, contrast, haptics ->
-                                viewModel.recordSettingsActivity()
                                 viewModel.saveLanguageDisplay(language, size, contrast, haptics)
                                 navController.popBackStack()
                             },
@@ -1083,11 +1050,9 @@ private fun ClaroApp(
                             accessMode = state.preferences.accessProtection.mode,
                             message = state.message,
                             onUseDateQuestion = {
-                                viewModel.recordSettingsActivity()
                                 viewModel.useDateQuestionForSettings(navController::popBackStack)
                             },
                             onConfigurePin = { pin, confirmation, recovery ->
-                                viewModel.recordSettingsActivity()
                                 viewModel.configurePinForSettings(
                                     pin,
                                     confirmation,
@@ -1106,7 +1071,6 @@ private fun ClaroApp(
                         ReadinessSettingsScreen(
                             readiness = state.preferences.onboarding.readiness,
                             onRequest = { capability ->
-                                viewModel.recordSettingsActivity()
                                 onRequestCapability(capability)
                             },
                             onBack = navController::popBackStack,
@@ -1341,6 +1305,8 @@ private fun handleTile(
     openSafetyFeature: (SafetyMediaAppsDestination) -> Unit,
     openSettings: () -> Unit,
     launchApp: (String) -> Unit,
+    callContact: (HomeTile) -> Unit = {},
+    openAlarms: () -> Unit = {},
 ) {
     when (tile.kind) {
         HomeTileKind.PHONE -> openPhone()
@@ -1350,6 +1316,8 @@ private fun handleTile(
         HomeTileKind.SOS -> openSafetyFeature(SafetyMediaAppsDestination.SOS)
         HomeTileKind.APPS -> openApps()
         HomeTileKind.INSTALLED_APP -> tile.packageName?.let(launchApp)
+        HomeTileKind.CONTACT -> if (tile.phoneNumber != null) callContact(tile)
+        HomeTileKind.ALARM -> openAlarms()
     }
     if (tile.label == "Settings") openSettings()
 }

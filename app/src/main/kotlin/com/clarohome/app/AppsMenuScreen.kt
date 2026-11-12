@@ -2,6 +2,13 @@ package com.clarohome.app
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -57,48 +64,32 @@ fun AppsMenuScreen(
     onLaunch: (InstalledApp) -> Unit,
     onSetAllowed: (InstalledApp, Boolean) -> Unit,
     onSetOnHome: (InstalledApp, Boolean) -> Unit,
-    onRequestCustomize: () -> Unit = {},
+    useGrid: Boolean = false,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
-    var customize by rememberSaveable(allowCustomization) { mutableStateOf(allowCustomization) }
-    var onHomeOnly by rememberSaveable { mutableStateOf(false) }
     var unavailableAppLabel by remember { mutableStateOf<String?>(null) }
 
-    val editing = allowCustomization && customize
+    val editing = allowCustomization
     val allowedApps = HomeCustomizationPolicy.allowedApps(apps)
     val visible = if (editing) {
-        HomeCustomizationPolicy.orderedApps(apps)
+        HomeCustomizationPolicy.orderedApps(apps).filter {
+            query.isBlank() || it.label.contains(query.trim(), ignoreCase = true)
+        }
     } else {
-        allowedApps.filter { !onHomeOnly || it.isOnHome }
-    }.filter {
-        query.isBlank() || it.label.contains(query.trim(), ignoreCase = true)
+        allowedApps
     }
 
     BackHandler(onBack = onBack)
 
     ClaroScreenScaffold(
-        title = if (editing) stringResource(R.string.app_home_and_apps) else stringResource(R.string.app_apps),
+        title = if (editing) stringResource(R.string.app_apps_and_menu) else stringResource(R.string.app_apps),
         scrollable = false,
         dock = {
             if (editing) {
                 ClaroPrimaryButton(
                     label = stringResource(R.string.app_done),
-                    onClick = {
-                        customize = false
-                        onBack()
-                    },
+                    onClick = onBack,
                     containerColor = ClaroColors.Blue,
-                )
-            } else {
-                ClaroSecondaryButton(
-                    label = stringResource(R.string.app_edit_apps),
-                    onClick = {
-                        if (allowCustomization) {
-                            customize = true
-                        } else {
-                            onRequestCustomize()
-                        }
-                    },
                 )
             }
         },
@@ -146,38 +137,38 @@ fun AppsMenuScreen(
                 }
             }
         } else {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.app_search)) },
-                singleLine = true,
-            )
-            AppsTabStrip(
-                onHomeOnly = onHomeOnly,
-                onSelectAllAllowed = { onHomeOnly = false },
-                onSelectOnHome = { onHomeOnly = true },
-            )
             unavailableAppLabel?.let { label ->
                 ClaroInfoCard(
-                    text = stringResource(R.string.app_unavailable_review_edit_apps, label),
+                    text = stringResource(R.string.app_unavailable_review_in_settings, label),
                     tone = ClaroBannerTone.ERROR,
                 )
             }
-            if (allowedApps.isEmpty()) {
+            val launch = { app: InstalledApp ->
+                if (app.isAvailable) {
+                    unavailableAppLabel = null
+                    onLaunch(app)
+                } else {
+                    unavailableAppLabel = app.label
+                }
+            }
+            if (visible.isEmpty()) {
                 ClaroInfoCard(
                     text = stringResource(R.string.app_no_allowed_apps_yet),
                     tone = ClaroBannerTone.INFO,
                 )
-            } else if (visible.isEmpty()) {
-                ClaroInfoCard(
-                    text = if (query.isNotBlank()) {
-                        stringResource(R.string.app_no_apps_match_search)
-                    } else {
-                        stringResource(R.string.app_no_allowed_apps_on_home)
-                    },
-                    tone = ClaroBannerTone.INFO,
-                )
+            } else if (useGrid) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
+                    verticalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
+                ) {
+                    items(visible, key = { it.packageName }) { app ->
+                        AppCard(app = app, onLaunch = { launch(app) })
+                    }
+                }
             } else {
                 LazyColumn(
                     modifier = Modifier
@@ -185,17 +176,7 @@ fun AppsMenuScreen(
                         .fillMaxWidth(),
                 ) {
                     items(visible, key = { it.packageName }) { app ->
-                        SeniorAppRow(
-                            app = app,
-                            onLaunch = {
-                                if (app.isAvailable) {
-                                    unavailableAppLabel = null
-                                    onLaunch(app)
-                                } else {
-                                    unavailableAppLabel = app.label
-                                }
-                            },
-                        )
+                        SeniorAppRow(app = app, onLaunch = { launch(app) })
                     }
                 }
             }
@@ -204,55 +185,46 @@ fun AppsMenuScreen(
 }
 
 @Composable
-private fun AppsTabStrip(
-    onHomeOnly: Boolean,
-    onSelectAllAllowed: () -> Unit,
-    onSelectOnHome: () -> Unit,
+private fun AppCard(
+    app: InstalledApp,
+    onLaunch: () -> Unit,
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(ClaroColors.Charcoal),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+            .heightIn(min = 136.dp)
+            .clip(RoundedCornerShape(3.dp))
+            .background(if (app.isAvailable) ClaroColors.Surface else ClaroColors.ErrorBg)
+            .border(1.dp, ClaroColors.Border, RoundedCornerShape(3.dp))
+            .clickable(role = Role.Button, onClick = onLaunch)
+            .padding(horizontal = 8.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
     ) {
-        AppsTabButton(
-            label = stringResource(R.string.app_tab_all_allowed),
-            selected = !onHomeOnly,
-            onClick = onSelectAllAllowed,
-            modifier = Modifier.weight(1f),
+        ClaroAppIcon(
+            packageName = app.packageName,
+            size = 64.dp,
+            fallbackTint = if (app.isAvailable) ClaroColors.Blue else ClaroColors.Muted,
         )
-        AppsTabButton(
-            label = stringResource(R.string.app_tab_on_home),
-            selected = onHomeOnly,
-            onClick = onSelectOnHome,
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-@Composable
-private fun AppsTabButton(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Button(
-        onClick = onClick,
-        modifier = modifier.heightIn(min = 52.dp),
-        shape = RectangleShape,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (selected) ClaroColors.Blue else Color(0xFFE6EAF0),
-            contentColor = if (selected) Color.White else Color(0xFF26364E),
-        ),
-        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
-    ) {
         Text(
-            text = label,
+            text = app.label,
+            color = if (app.isAvailable) ClaroColors.Ink else ClaroColors.Muted,
             fontSize = 20.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+            lineHeight = 24.sp,
+            fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
+        if (!app.isAvailable) {
+            Text(
+                text = stringResource(R.string.app_is_missing_or_disabled),
+                color = ClaroColors.ErrorInk,
+                fontSize = 15.sp,
+                lineHeight = 18.sp,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 
@@ -264,13 +236,8 @@ private fun SeniorAppRow(
     if (app.isAvailable) {
         ClaroRowButton(
             title = app.label,
-            subtitle = if (app.isOnHome) {
-                stringResource(R.string.app_subtitle_on_home_external)
-            } else {
-                stringResource(R.string.app_subtitle_opens_external)
-            },
             leading = {
-                ClaroAppIcon(packageName = app.packageName, size = 44.dp)
+                ClaroAppIcon(packageName = app.packageName, size = 52.dp)
             },
             onClick = onLaunch,
         )
@@ -377,7 +344,7 @@ private fun CaregiverAppRow(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
-                text = stringResource(R.string.app_show_on_home),
+                text = stringResource(R.string.app_show_in_menu),
                 color = if (canAddToHome) ClaroColors.Ink else ClaroColors.Muted,
                 fontSize = 19.sp,
                 lineHeight = 24.sp,

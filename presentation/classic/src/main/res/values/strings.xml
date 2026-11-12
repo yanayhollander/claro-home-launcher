@@ -41,8 +41,6 @@
     <string name="classic_badge_no_new">%1$s, no new items</string>
     <string name="classic_badge_new_count" tools:ignore="PluralsCandidate">%1$s, %2$d new</string>
     <string name="classic_badge_unknown">%1$s, count unavailable, repair required</string>
-    <string name="classic_favorite_slot_unassigned">Add person, favorite slot %1$d</string>
-    <string name="classic_favorite_person">%1$s, favorite person</string>
 
     <string name="classic_mode_letters">Letters</string>
     <string name="classic_mode_numbers">Numbers</string>
@@ -180,4 +178,8 @@
     <string name="classic_msg_sent_delivery_unconfirmed">Sent. Delivery is not confirmed.</string>
     <string name="classic_msg_delivery_confirmed_carrier">Delivery confirmed by the carrier</string>
     <string name="classic_msg_sending_status">Sending message</string>
+    <string name="classic_tile_camera">Camera</string>
+    <string name="classic_tile_gallery">Gallery</string>
+    <string name="classic_tile_apps">Apps</string>
+    <string name="classic_tile_alarm">Alarm</string>
 </resources>

@@ -117,20 +117,19 @@ class OnboardingSettingsManagerTest {
     }
 
     @Test
-    fun inactivityLockDoesNotPersistAnUnlockedSessionAcrossProcessRecreation() = runTest {
+    fun unlockLastsForTheSessionUntilExplicitLockAndNotAcrossProcessRecreation() = runTest {
         val repository = FakePreferencesRepository()
         val time = FakeTimeProvider()
         var manager = manager(repository, time)
 
         assertThat(manager.unlock("11/11/2026")).isEqualTo(AccessResult.Unlocked)
+        time.elapsedMillis += 60 * 60_000
         assertThat(manager.isUnlocked()).isTrue()
-        time.elapsedMillis += 119_000
-        manager.recordActivity()
-        time.elapsedMillis += 119_000
-        assertThat(manager.isUnlocked()).isTrue()
-        time.elapsedMillis += 2_000
+
+        manager.lock()
         assertThat(manager.isUnlocked()).isFalse()
 
+        assertThat(manager.unlock("11/11/2026")).isEqualTo(AccessResult.Unlocked)
         manager = manager(repository, time)
         assertThat(manager.isUnlocked()).isFalse()
     }
