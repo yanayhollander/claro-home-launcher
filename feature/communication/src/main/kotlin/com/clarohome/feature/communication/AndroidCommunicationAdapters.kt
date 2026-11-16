@@ -28,7 +28,9 @@ import android.telecom.DisconnectCause
 import android.telecom.InCallService
 import android.telecom.TelecomManager
 import android.telephony.TelephonyManager
+import android.util.Log
 import androidx.core.content.ContextCompat
+import androidx.annotation.VisibleForTesting
 import androidx.core.content.edit
 import androidx.core.app.NotificationCompat
 import dagger.Binds
@@ -43,10 +45,18 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
+import com.clarohome.core.domain.ClaroPreferencesRepository
+import kotlinx.coroutines.withContext
 
 @Singleton
 class AndroidDialerRoleGateway @Inject constructor(
@@ -80,10 +90,14 @@ class AndroidDialerRoleGateway @Inject constructor(
         val telephonySupported = context.packageManager.hasSystemFeature(
             PackageManager.FEATURE_TELEPHONY,
         ) && telephonyManager?.phoneType != TelephonyManager.PHONE_TYPE_NONE
+        var phoneStatePermissionGranted = context.hasPermission(Manifest.permission.READ_PHONE_STATE)
         val hasCallingAccount =
-            context.hasPermission(Manifest.permission.READ_PHONE_STATE) &&
+            phoneStatePermissionGranted &&
                 runCatching {
                     telecomManager?.callCapablePhoneAccounts?.isNotEmpty() == true
+                }.onFailure {
+                    if (it is SecurityException) phoneStatePermissionGranted = false
+                    Log.w("ClaroTelecom", "Calling-account inspection failed: ${it.javaClass.simpleName}")
                 }.getOrDefault(false)
         return DialerQualification(
             roleAvailable = roleAvailable,
@@ -92,6 +106,7 @@ class AndroidDialerRoleGateway @Inject constructor(
             callPermissionGranted = context.hasPermission(Manifest.permission.CALL_PHONE),
             callLogPermissionGranted = context.hasPermission(Manifest.permission.READ_CALL_LOG),
             hasUsableCallingAccount = hasCallingAccount,
+            phoneStatePermissionGranted = phoneStatePermissionGranted,
         )
     }
 }
@@ -102,11 +117,21 @@ class AndroidTelecomGateway @Inject constructor(
 ) : TelecomGateway {
     private val telecomManager = context.getSystemService(TelecomManager::class.java)
     private val telephonyManager = context.getSystemService(TelephonyManager::class.java)
-    private val mutableEvents = MutableStateFlow<TelecomEvent?>(null)
-    override val events: StateFlow<TelecomEvent?> = mutableEvents.asStateFlow()
+    private val eventScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val eventChannel = Channel<TelecomEvent>(Channel.UNLIMITED)
+    override val events: SharedFlow<TelecomEvent> = eventChannel.receiveAsFlow()
+        .shareIn(eventScope, SharingStarted.Eagerly, replay = 1)
     private val calls = ConcurrentHashMap<String, Call>()
     private val connectedAt = ConcurrentHashMap<String, Long>()
+    private val callerIdentities = ConcurrentHashMap<String, CallerIdentity>()
+    private val requestedCallerNumbers = ConcurrentHashMap<String, String>()
+    private var foregroundCallId: String? = null
     private var service: InCallService? = null
+    private val automaticAudio = AutomaticCallAudio(context) { route ->
+        service?.setAudioRoute(
+            if (route == AudioRoute.SPEAKER) CallAudioState.ROUTE_SPEAKER else CallAudioState.ROUTE_EARPIECE,
+        )
+    }
 
     @SuppressLint("MissingPermission")
     override suspend fun placeCall(number: String): CallPlacementResult {
@@ -118,7 +143,12 @@ class AndroidTelecomGateway @Inject constructor(
         }
         val accountsAvailable = runCatching {
             telecomManager?.callCapablePhoneAccounts?.isNotEmpty() == true
-        }.getOrDefault(false)
+        }.getOrElse {
+            Log.w("ClaroTelecom", "Calling-account inspection failed: ${it.javaClass.simpleName}")
+            return CallPlacementResult.Rejected(
+                if (it is SecurityException) CallFailure.PERMISSION_DENIED else CallFailure.UNKNOWN,
+            )
+        }
         if (!accountsAvailable) {
             return CallPlacementResult.Rejected(CallFailure.ACCOUNT_UNAVAILABLE)
         }
@@ -170,6 +200,7 @@ class AndroidTelecomGateway @Inject constructor(
 
     @Suppress("DEPRECATION")
     override suspend fun setAudioRoute(route: AudioRoute) {
+        automaticAudio.manualOverride()
         val platformRoute = when (route) {
             AudioRoute.EARPIECE -> CallAudioState.ROUTE_EARPIECE
             AudioRoute.SPEAKER -> CallAudioState.ROUTE_SPEAKER
@@ -205,7 +236,25 @@ class AndroidTelecomGateway @Inject constructor(
     }
 
     fun detach(service: InCallService) {
-        if (this.service === service) this.service = null
+        if (this.service === service) {
+            automaticAudio.detach()
+            this.service = null
+        }
+    }
+
+    fun configureCallAudio(easyCallAudio: Boolean, maximumSpeakerVolume: Boolean) {
+        automaticAudio.configure(easyCallAudio, maximumSpeakerVolume)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun updateAutomaticAudio(audioState: CallAudioState? = service?.callAudioState) {
+        automaticAudio.update(
+            state = audioState,
+            hasCall = calls.values.any {
+                it.state !in setOf(Call.STATE_RINGING, Call.STATE_DISCONNECTED, Call.STATE_DISCONNECTING)
+            },
+            connected = calls.values.any { it.state == Call.STATE_ACTIVE },
+        )
     }
 
     fun addCall(call: Call) {
@@ -217,44 +266,98 @@ class AndroidTelecomGateway @Inject constructor(
             }
 
             override fun onDetailsChanged(changedCall: Call, details: Call.Details) {
-                publishState(changedCall, changedCall.state)
+                publishState(changedCall, changedCall.state, foreground = false)
+                resolveCaller(changedCall)
             }
         })
         if (call.state == Call.STATE_RINGING) {
+            foregroundCallId = callId
             showIncomingNotification(call)
-            mutableEvents.value = TelecomEvent.Incoming(
-                callId = callId,
-                identity = call.identity(),
-                capabilities = call.capabilities(),
+            publishEvent(
+                TelecomEvent.Incoming(
+                    callId = callId,
+                    identity = call.callerIdentity(),
+                    capabilities = call.capabilities(),
+                ),
             )
         } else {
             publishState(call, call.state)
         }
+        resolveCaller(call)
     }
 
+    private fun resolveCaller(call: Call) {
+        val callId = call.id()
+        val identity = call.identity()
+        val number = identity.number
+        if (calls[callId] === call && !identity.isPrivate && !number.isNullOrBlank() &&
+            requestedCallerNumbers.put(callId, number) != number
+        ) {
+            eventScope.launch {
+                val resolved = withContext(Dispatchers.IO) {
+                    val resolver = PhoneNumberNameResolver(context)
+                    identity.copy(
+                        displayName = resolver.resolve(number) ?: identity.displayName,
+                        photoUri = resolver.resolvePhotoUri(number),
+                    )
+                }
+                if (calls[callId] === call && call.identity().number == number) {
+                    callerIdentities[callId] = resolved
+                    publishState(call, call.state, foreground = false)
+                }
+            }
+        }
+    }
+
+    @Suppress("DEPRECATION")
     fun removeCall(call: Call) {
         val id = call.id()
         notificationManager().cancel(id.hashCode())
-        val identity = call.identity()
+        val identity = call.callerIdentity()
         val direction = call.direction()
         val connected = connectedAt[id]
         val cause = call.details.disconnectCause
-        mutableEvents.value = TelecomEvent.Disconnected(
-            callId = id,
-            direction = direction,
-            identity = identity,
-            outcome = outcome(direction, connected != null, cause),
-            failure = failure(cause),
-            connectedAtElapsedMillis = connected,
-            disconnectedAtElapsedMillis = SystemClock.elapsedRealtime(),
-        )
         calls.remove(id)
+        updateAutomaticAudio()
         connectedAt.remove(id)
+        callerIdentities.remove(id)
+        requestedCallerNumbers.remove(id)
+        val remainingCalls = calls.values.mapNotNull { remaining ->
+            val phase = remaining.state.toCallPhase()
+            if (phase == CallPhase.DISCONNECTED) null else CallSession(
+                id = remaining.id(),
+                direction = remaining.direction(),
+                identity = remaining.callerIdentity(),
+                phase = phase,
+                capabilities = remaining.capabilities(),
+                audioRoute = service?.callAudioState?.route.toAudioRoute(),
+                isMuted = service?.callAudioState?.isMuted == true,
+                connectedAtElapsedMillis = connectedAt[remaining.id()],
+            )
+        }
+        if (remainingCalls.none { it.id == foregroundCallId }) {
+            foregroundCallId = remainingCalls.firstOrNull { it.phase == CallPhase.INCOMING }?.id
+                ?: remainingCalls.firstOrNull { it.phase == CallPhase.CONNECTED }?.id
+                ?: remainingCalls.firstOrNull()?.id
+        }
+        publishEvent(
+            TelecomEvent.Disconnected(
+                callId = id,
+                direction = direction,
+                identity = identity,
+                outcome = outcome(direction, connected != null, cause),
+                failure = failure(cause),
+                connectedAtElapsedMillis = connected,
+                disconnectedAtElapsedMillis = SystemClock.elapsedRealtime(),
+                remainingCalls = remainingCalls,
+            ),
+        )
     }
 
     fun updateAudioState(audioState: CallAudioState) {
+        updateAutomaticAudio(audioState)
         val active = calls.values.firstOrNull { it.state == Call.STATE_ACTIVE } ?: return
-        publishState(active, active.state, audioState)
+        publishState(active, active.state, audioState, foreground = false)
     }
 
     @Suppress("DEPRECATION")
@@ -262,21 +365,56 @@ class AndroidTelecomGateway @Inject constructor(
         call: Call,
         state: Int,
         audioState: CallAudioState? = service?.callAudioState,
+        foreground: Boolean = true,
     ) {
         val callId = call.id()
         val phase = state.toCallPhase()
+        updateAutomaticAudio(audioState)
+        if (phase == CallPhase.DISCONNECTED) {
+            notificationManager().cancel(callId.hashCode())
+            return
+        }
         if (phase == CallPhase.CONNECTED) {
             connectedAt.putIfAbsent(callId, SystemClock.elapsedRealtime())
         }
-        mutableEvents.value = TelecomEvent.StateChanged(
-            callId = callId,
-            direction = call.direction(),
-            identity = call.identity(),
-            phase = phase,
-            capabilities = call.capabilities(),
-            audioRoute = audioState?.route.toAudioRoute(),
-            isMuted = audioState?.isMuted == true,
-            connectedAtElapsedMillis = connectedAt[callId],
+        if (foreground || foregroundCallId == null || foregroundCallId == callId) {
+            foregroundCallId = callId
+            publishEvent(
+                TelecomEvent.StateChanged(
+                    callId = callId,
+                    direction = call.direction(),
+                    identity = call.callerIdentity(),
+                    phase = phase,
+                    capabilities = call.capabilities(),
+                    audioRoute = audioState?.route.toAudioRoute(),
+                    isMuted = audioState?.isMuted == true,
+                    connectedAtElapsedMillis = connectedAt[callId],
+                    foreground = foreground,
+                ),
+            )
+        }
+        when (phase) {
+            CallPhase.DIALING,
+            CallPhase.RINGING,
+            CallPhase.CONNECTED,
+            CallPhase.ON_HOLD,
+            -> showOngoingNotification(call)
+            CallPhase.INCOMING -> showIncomingNotification(call)
+            CallPhase.DISCONNECTED -> notificationManager().cancel(callId.hashCode())
+            else -> Unit
+        }
+    }
+
+    private fun publishEvent(event: TelecomEvent) {
+        eventChannel.trySend(event).getOrThrow()
+    }
+
+    private fun Call.callerIdentity(): CallerIdentity {
+        val identity = identity()
+        val resolved = callerIdentities[id()]?.takeIf { it.number == identity.number }
+        return identity.copy(
+            displayName = resolved?.displayName ?: identity.displayName,
+            photoUri = resolved?.photoUri,
         )
     }
 
@@ -305,7 +443,7 @@ class AndroidTelecomGateway @Inject constructor(
 
     private fun showIncomingNotification(call: Call) {
         val callId = call.id()
-        val identity = call.identity()
+        val identity = call.callerIdentity()
         val manager = notificationManager()
         manager.createNotificationChannel(
             NotificationChannel(
@@ -318,16 +456,9 @@ class AndroidTelecomGateway @Inject constructor(
                 lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
             },
         )
-        val contentIntent = PendingIntent.getActivity(
-            context,
-            callId.hashCode(),
-            Intent().setClassName(context.packageName, "com.clarohome.app.MainActivity").apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val answerIntent = incomingActionIntent(callId, ACTION_ANSWER)
-        val declineIntent = incomingActionIntent(callId, ACTION_DECLINE)
+        val contentIntent = callContentIntent(callId)
+        val answerIntent = callActionIntent(callId, ACTION_ANSWER)
+        val declineIntent = callActionIntent(callId, ACTION_DECLINE)
         val notification = NotificationCompat.Builder(context, INCOMING_CALL_CHANNEL)
             .setSmallIcon(android.R.drawable.sym_action_call)
             .setContentTitle(identity.localizedTitle(context))
@@ -337,6 +468,7 @@ class AndroidTelecomGateway @Inject constructor(
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .setAutoCancel(false)
+            .setOnlyAlertOnce(true)
             .setContentIntent(contentIntent)
             .setFullScreenIntent(contentIntent, true)
             .addAction(
@@ -353,7 +485,52 @@ class AndroidTelecomGateway @Inject constructor(
         manager.notify(callId.hashCode(), notification)
     }
 
-    private fun incomingActionIntent(callId: String, action: String): PendingIntent =
+    private fun showOngoingNotification(call: Call) {
+        val manager = notificationManager()
+        manager.createNotificationChannel(
+            NotificationChannel(
+                ONGOING_CALL_CHANNEL,
+                context.getString(R.string.comm_channel_ongoing_calls_name),
+                NotificationManager.IMPORTANCE_LOW,
+            ).apply {
+                description = context.getString(R.string.comm_channel_ongoing_calls_description)
+                setSound(null, null)
+            },
+        )
+        val callId = call.id()
+        manager.notify(callId.hashCode(), ongoingCallNotification(callId, call.callerIdentity()))
+    }
+
+    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+    fun ongoingCallNotification(callId: String, identity: CallerIdentity): android.app.Notification =
+        NotificationCompat.Builder(context, ONGOING_CALL_CHANNEL)
+            .setSmallIcon(android.R.drawable.sym_action_call)
+            .setContentTitle(identity.localizedTitle(context))
+            .setContentText(context.getString(R.string.comm_notification_return_to_call))
+            .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .setOnlyAlertOnce(true)
+            .setContentIntent(callContentIntent(callId))
+            .addAction(
+                android.R.drawable.ic_menu_close_clear_cancel,
+                context.getString(R.string.comm_notification_action_end),
+                callActionIntent(callId, ACTION_END),
+            )
+            .build()
+
+    private fun callContentIntent(callId: String): PendingIntent = PendingIntent.getActivity(
+        context,
+        callId.hashCode(),
+        Intent(ACTION_RETURN_TO_CALL)
+            .setClassName(context.packageName, "com.clarohome.app.MainActivity")
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+
+    private fun callActionIntent(callId: String, action: String): PendingIntent =
         PendingIntent.getBroadcast(
             context,
             (callId + action).hashCode(),
@@ -370,21 +547,32 @@ class AndroidTelecomGateway @Inject constructor(
     companion object {
         const val ACTION_ANSWER = "com.clarohome.action.ANSWER_CALL"
         const val ACTION_DECLINE = "com.clarohome.action.DECLINE_CALL"
+        const val ACTION_END = "com.clarohome.action.END_CALL"
+        const val ACTION_RETURN_TO_CALL = "com.clarohome.action.RETURN_TO_CALL"
         const val EXTRA_CALL_ID = "call_id"
         private const val INCOMING_CALL_CHANNEL = "incoming_calls"
+        private const val ONGOING_CALL_CHANNEL = "ongoing_calls"
     }
 }
 
 @AndroidEntryPoint
 class ClaroInCallService : InCallService() {
     @Inject lateinit var gateway: AndroidTelecomGateway
+    @Inject lateinit var preferences: ClaroPreferencesRepository
+    private val preferenceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     override fun onCreate() {
         super.onCreate()
         gateway.attach(this)
+        preferenceScope.launch {
+            preferences.preferences.collect {
+                gateway.configureCallAudio(it.easyCallAudio, it.maximumSpeakerVolume)
+            }
+        }
     }
 
     override fun onDestroy() {
+        preferenceScope.cancel()
         gateway.detach(this)
         super.onDestroy()
     }
@@ -417,6 +605,7 @@ class IncomingCallActionReceiver : BroadcastReceiver() {
                 when (intent.action) {
                     AndroidTelecomGateway.ACTION_ANSWER -> gateway.answer(callId)
                     AndroidTelecomGateway.ACTION_DECLINE -> gateway.decline(callId)
+                    AndroidTelecomGateway.ACTION_END -> gateway.disconnect(callId)
                 }
             } finally {
                 pendingResult.finish()
@@ -430,6 +619,42 @@ class AndroidContactsGateway @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : ContactsGateway {
     private val resolver = context.contentResolver
+
+    override suspend fun matchingNumbers(digits: String, limit: Int): List<CallerIdentity> =
+        withContext(Dispatchers.IO) {
+            require(digits.isNotEmpty() && digits.all(Char::isDigit) && limit > 0)
+            if (!context.hasPermission(Manifest.permission.READ_CONTACTS)) {
+                throw SecurityException("Contacts permission is needed")
+            }
+            val compactNumber = listOf(" ", "-", "(", ")", ".", "\u00a0", "\u202f")
+                .fold(ContactsContract.CommonDataKinds.Phone.NUMBER) { column, separator ->
+                    "REPLACE($column, '$separator', '')"
+                }
+            val queryArgs = Bundle().apply {
+                putString(
+                    ContentResolverQuery.SELECTION,
+                    "$compactNumber LIKE ? OR ${ContactsContract.CommonDataKinds.Phone.NORMALIZED_NUMBER} LIKE ?",
+                )
+                putStringArray(ContentResolverQuery.SELECTION_ARGS, arrayOf("%$digits%", "%$digits%"))
+                putStringArray(
+                    ContentResolverQuery.SORT_COLUMNS,
+                    arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME_PRIMARY),
+                )
+                putInt(ContentResolverQuery.SORT_DIRECTION, ContentResolverQuery.SORT_ASCENDING)
+                putInt(ContentResolverQuery.LIMIT, limit)
+            }
+            resolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                PHONE_PROJECTION,
+                queryArgs,
+                null,
+            )?.use(::readContacts)
+                .orEmpty().flatMap { contact ->
+                    contact.numbers.map { number ->
+                        CallerIdentity(contact.displayName, number.value, photoUri = contact.photoUri)
+                    }
+                }.take(limit)
+        }
 
     override suspend fun page(query: String, offset: Int, limit: Int): ContactPage {
         if (!context.hasPermission(Manifest.permission.READ_CONTACTS)) {
@@ -890,6 +1115,7 @@ class SharedPreferencesCallHistoryStore @Inject constructor(
                             displayName = resolver.resolve(number) ?: cursor.getString(2)?.ifBlank { null },
                             number = number,
                             isPrivate = isPrivate,
+                            photoUri = resolver.resolvePhotoUri(number).takeUnless { isPrivate },
                         ),
                         direction = direction,
                         outcome = outcome,
@@ -921,6 +1147,7 @@ class SharedPreferencesCallHistoryStore @Inject constructor(
                         entry.timestampMillis.toString(),
                         entry.connectedDurationMillis?.toString().orEmpty(),
                         entry.isOpened.toString(),
+                        entry.identity.photoUri.orEmpty(),
                     ).joinToString(SEPARATOR) { Uri.encode(it) }
                 },
             )
@@ -930,7 +1157,7 @@ class SharedPreferencesCallHistoryStore @Inject constructor(
     private fun readLocal(): List<CallHistoryEntry> =
         preferences.getStringSet(KEY_HISTORY, emptySet()).orEmpty().mapNotNull { encoded ->
             val values = encoded.split(SEPARATOR).map(Uri::decode)
-            if (values.size != 9) return@mapNotNull null
+            if (values.size !in 9..10) return@mapNotNull null
             runCatching {
                 CallHistoryEntry(
                     id = values[0],
@@ -938,6 +1165,7 @@ class SharedPreferencesCallHistoryStore @Inject constructor(
                         displayName = values[1].ifBlank { null },
                         number = values[2].ifBlank { null },
                         isPrivate = values[3].toBoolean(),
+                        photoUri = values.getOrNull(9)?.ifBlank { null },
                     ),
                     direction = CallDirection.valueOf(values[4]),
                     outcome = CallOutcome.valueOf(values[5]),

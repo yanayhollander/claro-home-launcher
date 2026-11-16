@@ -10,6 +10,9 @@ import android.app.role.RoleManager
 import android.content.BroadcastReceiver
 import android.content.ContentValues
 import android.content.Context
+import android.content.ContentUris
+import android.database.sqlite.SQLiteException
+import android.util.Log
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
@@ -23,6 +26,8 @@ import android.telephony.TelephonyManager
 import android.util.Base64
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
+import androidx.annotation.VisibleForTesting
 import androidx.core.content.edit
 import dagger.Binds
 import dagger.Module
@@ -37,6 +42,8 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 
 @Singleton
 class AndroidSmsRoleGateway @Inject constructor(
@@ -168,6 +175,7 @@ class AndroidMessageRepository @Inject constructor(
             val dateIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.DATE)
             val readIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.READ)
             val statusIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.STATUS)
+            val sentDateIndex = cursor.getColumnIndexOrThrow(Telephony.Sms.DATE_SENT)
             while (cursor.moveToNext()) {
                 val providerId = cursor.getLong(idIndex)
                 val message = ClaroMessage(
@@ -183,7 +191,8 @@ class AndroidMessageRepository @Inject constructor(
                     body = cursor.getString(bodyIndex).orEmpty(),
                     timestampMillis = cursor.getLong(dateIndex),
                     isRead = cursor.getInt(readIndex) != 0,
-                    deliveryState = cursor.getInt(statusIndex).toDeliveryState(),
+                    deliveryState = smsDeliveryState(cursor.getInt(typeIndex), cursor.getInt(statusIndex)),
+                    sentTimestampMillis = cursor.getLong(sentDateIndex).takeIf { it > 0 },
                 )
                 messages["sms:$providerId"] = message
             }
@@ -201,6 +210,10 @@ class AndroidMessageRepository @Inject constructor(
             "${Telephony.Sms.THREAD_ID}=? AND ${Telephony.Sms.READ}=0",
             arrayOf(conversationId.toString()),
         )
+        context.getSystemService(NotificationManager::class.java).cancel(
+            messageNotificationTag(conversationId),
+            NEW_MESSAGE_NOTIFICATION,
+        )
         val mmsValues = ContentValues().apply { put(Telephony.Mms.READ, 1) }
         context.contentResolver.update(
             Telephony.Mms.CONTENT_URI,
@@ -209,6 +222,43 @@ class AndroidMessageRepository @Inject constructor(
             arrayOf(conversationId.toString()),
         )
     }
+
+    override suspend fun deleteConversation(conversationId: Long): ConversationDeleteResult =
+        withContext(Dispatchers.IO) {
+            require(conversationId > 0)
+            if (!context.isDefaultSmsApp() || !context.hasSmsPermission(Manifest.permission.READ_SMS)) {
+                return@withContext ConversationDeleteResult.NOT_ALLOWED
+            }
+            try {
+                context.contentResolver.delete(
+                    ContentUris.withAppendedId(Telephony.Threads.CONTENT_URI, conversationId),
+                    null,
+                    null,
+                )
+                val stillPresent = context.contentResolver.query(
+                    ContentUris.withAppendedId(Telephony.Threads.CONTENT_URI, conversationId),
+                    arrayOf(Telephony.Threads._ID),
+                    null, null, null,
+                )?.use { it.moveToFirst() }
+                if (stillPresent != false) {
+                    Log.w("ClaroMessages", "Conversation deletion could not be verified.")
+                    return@withContext ConversationDeleteResult.FAILED
+                }
+                context.getSystemService(NotificationManager::class.java).cancel(
+                    messageNotificationTag(conversationId), NEW_MESSAGE_NOTIFICATION,
+                )
+                ConversationDeleteResult.DELETED
+            } catch (_: SecurityException) {
+                Log.w("ClaroMessages", "Android denied deleting the message conversation.")
+                ConversationDeleteResult.NOT_ALLOWED
+            } catch (_: SQLiteException) {
+                Log.w("ClaroMessages", "The message provider failed to delete the conversation.")
+                ConversationDeleteResult.FAILED
+            } catch (_: IllegalArgumentException) {
+                Log.w("ClaroMessages", "The message provider rejected conversation deletion.")
+                ConversationDeleteResult.FAILED
+            }
+        }
 
     override suspend fun reconcileIncoming(messages: List<ClaroMessage>) {
         if (!context.isDefaultSmsApp()) return
@@ -221,6 +271,7 @@ class AndroidMessageRepository @Inject constructor(
                         put(Telephony.Sms.ADDRESS, message.senderOrRecipient)
                         put(Telephony.Sms.BODY, message.body)
                         put(Telephony.Sms.DATE, message.timestampMillis)
+                        message.sentTimestampMillis?.let { put(Telephony.Sms.DATE_SENT, it) }
                         put(Telephony.Sms.READ, if (message.isRead) 1 else 0)
                     },
                 )
@@ -333,15 +384,26 @@ class AndroidMessageRepository @Inject constructor(
     }
 
     private fun incomingExists(message: ClaroMessage): Boolean {
+        val dateSelection = if (message.sentTimestampMillis != null) {
+            "(${Telephony.Sms.DATE_SENT}=? OR ${Telephony.Sms.DATE}=?)"
+        } else {
+            "${Telephony.Sms.DATE}=?"
+        }
         context.contentResolver.query(
             Telephony.Sms.Inbox.CONTENT_URI,
             arrayOf(Telephony.Sms._ID),
-            "${Telephony.Sms.ADDRESS}=? AND ${Telephony.Sms.DATE}=? AND ${Telephony.Sms.BODY}=?",
-            arrayOf(
-                message.senderOrRecipient,
-                message.timestampMillis.toString(),
-                message.body,
-            ),
+            "${Telephony.Sms.ADDRESS}=? AND $dateSelection AND ${Telephony.Sms.BODY}=?",
+            buildList {
+                add(message.senderOrRecipient)
+                val sentDate = message.sentTimestampMillis
+                if (sentDate != null) {
+                    add(sentDate.toString())
+                    add(sentDate.toString())
+                } else {
+                    add(message.timestampMillis.toString())
+                }
+                add(message.body)
+            }.toTypedArray(),
             null,
         )?.use { return it.moveToFirst() }
         return false
@@ -376,6 +438,7 @@ class AndroidMessageRepository @Inject constructor(
             Telephony.Sms.BODY,
             Telephony.Sms.DATE,
             Telephony.Sms.READ,
+            Telephony.Sms.DATE_SENT,
         )
         private val SMS_PROJECTION_WITH_STATUS = SMS_PROJECTION + arrayOf(
             Telephony.Sms.TYPE,
@@ -559,7 +622,8 @@ class SmsDeliverReceiver : BroadcastReceiver() {
         val parts = Telephony.Sms.Intents.getMessagesFromIntent(intent)
         if (parts.isEmpty()) return
         val address = parts.first().originatingAddress.orEmpty()
-        val timestamp = parts.minOf { it.timestampMillis }
+        val sentTimestamp = parts.minOf { it.timestampMillis }
+        val receivedTimestamp = System.currentTimeMillis()
         val body = parts.joinToString(separator = "") { it.messageBody.orEmpty() }
         val repository = AndroidMessageRepository(context.applicationContext)
         val message = ClaroMessage(
@@ -569,18 +633,27 @@ class SmsDeliverReceiver : BroadcastReceiver() {
             direction = MessageDirection.INCOMING,
             senderOrRecipient = address,
             body = body,
-            timestampMillis = timestamp,
+            timestampMillis = receivedTimestamp,
             isRead = false,
             deliveryState = MessageDeliveryState.RECEIVED,
+            sentTimestampMillis = sentTimestamp,
         )
         val pendingResult = goAsync()
         Thread {
             try {
                 kotlinx.coroutines.runBlocking { repository.reconcileIncoming(listOf(message)) }
+                val conversationId = repository.conversations.value.firstOrNull {
+                    it.recipient.number == address
+                }?.id
+                if (conversationId == null) {
+                    android.util.Log.w("ClaroMessages", "Received SMS could not be linked to a conversation.")
+                }
                 showIncomingNotification(
                     context,
-                    context.getString(R.string.comm_notification_new_sms_title),
-                    context.getString(R.string.comm_notification_new_sms_text),
+                    PhoneNumberNameResolver(context).resolve(address)
+                        ?: address.ifBlank { context.getString(R.string.comm_notification_new_sms_title) },
+                    body,
+                    conversationId,
                 )
             } finally {
                 pendingResult.finish()
@@ -746,7 +819,12 @@ private object SmsEventHub {
     }
 }
 
-private fun showIncomingNotification(context: Context, title: String, text: String) {
+private fun showIncomingNotification(
+    context: Context,
+    title: String,
+    text: String,
+    conversationId: Long? = null,
+) {
     if (
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
         !context.hasSmsPermission(Manifest.permission.POST_NOTIFICATIONS)
@@ -763,25 +841,52 @@ private fun showIncomingNotification(context: Context, title: String, text: Stri
             description = context.getString(R.string.comm_channel_messages_description)
         },
     )
-    val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-    val pendingIntent = PendingIntent.getActivity(
-        context,
-        0,
-        launchIntent,
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-    )
     manager.notify(
+        messageNotificationTag(conversationId),
         NEW_MESSAGE_NOTIFICATION,
-        NotificationCompat.Builder(context, MESSAGE_CHANNEL)
-            .setSmallIcon(android.R.drawable.sym_action_chat)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setContentIntent(pendingIntent)
-            .setAutoCancel(true)
-            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-            .build(),
+        incomingMessageNotification(context, title, text, conversationId),
     )
 }
+
+@VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+fun messageNotificationIntent(context: Context, conversationId: Long?): Intent =
+    Intent(ACTION_OPEN_MESSAGES)
+        .setClassName(context.packageName, "com.clarohome.app.MainActivity")
+        .setData("clarohome://messages/${conversationId ?: "inbox"}".toUri())
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        .apply { if (conversationId != null) putExtra(EXTRA_CONVERSATION_ID, conversationId) }
+
+@VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+fun incomingMessageNotification(
+    context: Context,
+    title: String,
+    text: String,
+    conversationId: Long?,
+): android.app.Notification {
+    val pendingIntent = PendingIntent.getActivity(
+        context,
+        conversationId?.hashCode() ?: NEW_MESSAGE_NOTIFICATION,
+        messageNotificationIntent(context, conversationId),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+    val publicNotification = NotificationCompat.Builder(context, MESSAGE_CHANNEL)
+        .setSmallIcon(android.R.drawable.sym_action_chat)
+        .setContentTitle(context.getString(R.string.comm_notification_new_sms_title))
+        .build()
+    return NotificationCompat.Builder(context, MESSAGE_CHANNEL)
+        .setSmallIcon(android.R.drawable.sym_action_chat)
+        .setContentTitle(title)
+        .setContentText(text)
+        .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+        .setContentIntent(pendingIntent)
+        .setAutoCancel(true)
+        .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+        .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+        .setPublicVersion(publicNotification)
+        .build()
+}
+
+private fun messageNotificationTag(conversationId: Long?): String = "messages:${conversationId ?: "inbox"}"
 
 private fun Context.hasSmsPermission(permission: String): Boolean =
     ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
@@ -810,14 +915,23 @@ private fun String.base64Decode(): String = String(
     StandardCharsets.UTF_8,
 )
 
-private fun incomingFingerprint(message: ClaroMessage): Long =
-    listOf(message.senderOrRecipient, message.timestampMillis, message.body).hashCode().toLong()
+internal fun incomingFingerprint(message: ClaroMessage): Long =
+    listOf(
+        message.senderOrRecipient,
+        message.sentTimestampMillis ?: message.timestampMillis,
+        message.body,
+    ).hashCode().toLong()
 
-private fun Int.toDeliveryState(): MessageDeliveryState = when (this) {
-    Telephony.Sms.STATUS_COMPLETE -> MessageDeliveryState.DELIVERY_CONFIRMED
-    Telephony.Sms.STATUS_FAILED -> MessageDeliveryState.KNOWN_FAILURE
-    Telephony.Sms.STATUS_PENDING -> MessageDeliveryState.PENDING
-    else -> MessageDeliveryState.SENT
+internal fun smsDeliveryState(type: Int, status: Int): MessageDeliveryState = when (type) {
+    Telephony.Sms.MESSAGE_TYPE_INBOX -> MessageDeliveryState.RECEIVED
+    Telephony.Sms.MESSAGE_TYPE_DRAFT -> MessageDeliveryState.DRAFT
+    Telephony.Sms.MESSAGE_TYPE_FAILED -> MessageDeliveryState.KNOWN_FAILURE
+    Telephony.Sms.MESSAGE_TYPE_OUTBOX, Telephony.Sms.MESSAGE_TYPE_QUEUED -> MessageDeliveryState.PENDING
+    else -> when (status) {
+        Telephony.Sms.STATUS_COMPLETE -> MessageDeliveryState.DELIVERY_CONFIRMED
+        Telephony.Sms.STATUS_FAILED -> MessageDeliveryState.KNOWN_FAILURE
+        else -> MessageDeliveryState.SENT
+    }
 }
 
 private fun MessageDeliveryState.toProviderType(): Int = when (this) {
@@ -846,6 +960,8 @@ private fun Int.toMessageFailure(): MessageFailure = when (this) {
 
 internal const val ACTION_SMS_SENT = "com.clarohome.messaging.SMS_SENT"
 internal const val ACTION_SMS_DELIVERED = "com.clarohome.messaging.SMS_DELIVERED"
+const val ACTION_OPEN_MESSAGES = "com.clarohome.messaging.OPEN_MESSAGES"
+const val EXTRA_CONVERSATION_ID = "conversation_id"
 private const val EXTRA_CLIENT_ID = "client_message_id"
 private const val EXTRA_PROVIDER_ID = "provider_id"
 private const val EXTRA_PART_INDEX = "part_index"

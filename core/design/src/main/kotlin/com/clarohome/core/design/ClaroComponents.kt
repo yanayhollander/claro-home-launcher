@@ -90,6 +90,7 @@ fun ClaroHeader(
     title: String,
     modifier: Modifier = Modifier,
     centered: Boolean = false,
+    titleColor: Color = Color.White,
 ) {
     Box(
         modifier = modifier
@@ -100,7 +101,7 @@ fun ClaroHeader(
     ) {
         Text(
             text = title,
-            color = Color.White,
+            color = titleColor,
             fontSize = 29.sp,
             lineHeight = 34.sp,
             fontWeight = FontWeight.Bold,

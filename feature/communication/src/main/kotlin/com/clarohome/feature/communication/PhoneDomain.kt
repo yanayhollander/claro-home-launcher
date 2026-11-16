@@ -1,14 +1,21 @@
 package com.clarohome.feature.communication
 
 import android.content.Intent
+import android.database.sqlite.SQLiteException
+import android.util.Log
 import com.clarohome.core.model.VisualMode
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 enum class CommunicationRoute {
@@ -23,6 +30,16 @@ enum class CommunicationRoute {
     CALL_UNANSWERED,
     CALL_FAILED,
     EXTERNAL_HANDOFF,
+}
+
+private fun CommunicationRoute.restorableRoute(): CommunicationRoute = when (this) {
+    CommunicationRoute.CALL_CONFIRMATION,
+    CommunicationRoute.INCOMING_CALL,
+    CommunicationRoute.ACTIVE_CALL,
+    CommunicationRoute.CALL_ENDED,
+    CommunicationRoute.CALL_UNANSWERED,
+    -> CommunicationRoute.DIALER
+    else -> this
 }
 
 enum class CallDirection {
@@ -72,6 +89,7 @@ data class CallerIdentity(
     val displayName: String?,
     val number: String?,
     val isPrivate: Boolean = false,
+    val photoUri: String? = null,
 ) {
     val accessibleName: String
         get() = when {
@@ -178,12 +196,14 @@ data class DialerQualification(
     val callPermissionGranted: Boolean,
     val callLogPermissionGranted: Boolean,
     val hasUsableCallingAccount: Boolean,
+    val phoneStatePermissionGranted: Boolean,
 ) {
     val canOwnCalls: Boolean
         get() = roleAvailable &&
             roleHeld &&
             telephonySupported &&
             callPermissionGranted &&
+            phoneStatePermissionGranted &&
             hasUsableCallingAccount
 
     val needsRepair: Boolean
@@ -212,6 +232,7 @@ sealed interface TelecomEvent {
         val audioRoute: AudioRoute,
         val isMuted: Boolean,
         val connectedAtElapsedMillis: Long?,
+        val foreground: Boolean = true,
     ) : TelecomEvent
 
     data class Disconnected(
@@ -222,6 +243,7 @@ sealed interface TelecomEvent {
         val failure: CallFailure?,
         val connectedAtElapsedMillis: Long?,
         val disconnectedAtElapsedMillis: Long,
+        val remainingCalls: List<CallSession> = emptyList(),
     ) : TelecomEvent
 }
 
@@ -232,7 +254,7 @@ interface DialerRoleGateway {
 }
 
 interface TelecomGateway {
-    val events: StateFlow<TelecomEvent?>
+    val events: SharedFlow<TelecomEvent?>
     suspend fun placeCall(number: String): CallPlacementResult
     suspend fun handoffEmergency(number: String): CallPlacementResult
     fun isEmergencyNumber(number: String): Boolean
@@ -247,6 +269,7 @@ interface TelecomGateway {
 }
 
 interface ContactsGateway {
+    suspend fun matchingNumbers(digits: String, limit: Int): List<CallerIdentity>
     suspend fun page(query: String, offset: Int, limit: Int): ContactPage
     suspend fun get(lookupKey: String): ClaroContact?
     suspend fun add(mutation: ContactMutation): ContactWriteResult
@@ -294,6 +317,11 @@ data class CommunicationUiState(
     val history: List<CallHistoryEntry> = emptyList(),
     val failure: CallFailure? = null,
     val message: String? = null,
+    val awaitingOutgoingCall: Boolean = false,
+    val dialerMatches: List<CallerIdentity> = emptyList(),
+    val dialerMatchesLoading: Boolean = false,
+    val dialerSearchGeneration: Long = 0,
+    val showMissedCalls: Boolean = false,
 ) {
     val missedIncomingCount: Int?
         get() = if (!qualification.roleHeld || !qualification.callLogPermissionGranted) {
@@ -305,7 +333,7 @@ data class CommunicationUiState(
         }
 
     val hasActiveCall: Boolean
-        get() = call?.phase in setOf(
+        get() = awaitingOutgoingCall || call?.phase in setOf(
             CallPhase.DIALING,
             CallPhase.RINGING,
             CallPhase.INCOMING,
@@ -395,10 +423,13 @@ class PhoneContactsCoordinator(
     scope: CoroutineScope,
     savedState: PhoneSavedState = PhoneSavedState(),
 ) {
+    private val recentDialerMatches = LinkedHashMap<String, List<CallerIdentity>>()
     private val placingCall = AtomicBoolean(false)
+    private var pendingCallNumber: String? = null
+    private var cancelPendingCall = false
     private val mutableState = MutableStateFlow(
         CommunicationUiState(
-            route = savedState.route,
+            route = savedState.route.restorableRoute(),
             digits = savedState.digits,
             pendingIdentity = savedState.pendingIdentity,
             qualification = roleGateway.qualification.value,
@@ -422,9 +453,13 @@ class PhoneContactsCoordinator(
                 }
             }
         }
+        val previousDisconnect = telecomGateway.events.replayCache.lastOrNull() as? TelecomEvent.Disconnected
         scope.launch {
             telecomGateway.events.collect { event ->
-                event?.let(::onTelecomEvent)
+                // A retained disconnect is history, not a newly ended call.
+                event?.takeUnless {
+                    it === previousDisconnect && previousDisconnect?.remainingCalls.isNullOrEmpty()
+                }?.let(::onTelecomEvent)
             }
         }
         scope.launch {
@@ -437,6 +472,47 @@ class PhoneContactsCoordinator(
                 update { copy(history = history) }
             }
         }
+        scope.launch {
+            state.map {
+                it.dialerSearchGeneration to it.digits.takeIf { digits ->
+                    it.route == CommunicationRoute.DIALER && !it.hasActiveCall &&
+                        it.pendingIdentity == null && digits.isNotEmpty() && digits.all(Char::isDigit)
+                }
+            }.distinctUntilChanged().collectLatest { (generation, query) ->
+                if (query == null) {
+                    recentDialerMatches.clear()
+                    update { copy(dialerMatches = emptyList(), dialerMatchesLoading = false) }
+                    return@collectLatest
+                }
+                update { copy(dialerMatchesLoading = true) }
+                val digits = query ?: return@collectLatest
+                delay(100)
+                try {
+                    val matches = contactsGateway.matchingNumbers(digits, DIALER_MATCH_LIMIT)
+                    if (isCurrentDialerQuery(digits, generation)) {
+                        recentDialerMatches[digits] = matches
+                        if (recentDialerMatches.size > MAX_CACHED_DIALER_QUERIES) {
+                            recentDialerMatches.remove(recentDialerMatches.keys.first())
+                        }
+                        update { copy(dialerMatches = matches, dialerMatchesLoading = false) }
+                    }
+                } catch (_: SecurityException) {
+                    Log.w("ClaroDialer", "Contact access denied for number suggestions.")
+                    if (isCurrentDialerQuery(digits, generation)) {
+                        update {
+                            copy(dialerMatchesLoading = false, message = "Contacts permission is needed")
+                        }
+                    }
+                } catch (_: SQLiteException) {
+                    Log.w("ClaroDialer", "Contact lookup failed for number suggestions.")
+                    if (isCurrentDialerQuery(digits, generation)) {
+                        update {
+                            copy(dialerMatchesLoading = false, message = "Contacts could not be loaded")
+                        }
+                    }
+                }
+            }
+        }
         if (savedState.selectedContactLookupKey != null) {
             scope.launch { openContact(savedState.selectedContactLookupKey) }
         }
@@ -444,10 +520,7 @@ class PhoneContactsCoordinator(
 
     fun snapshot(): PhoneSavedState = PhoneSavedState(
         digits = state.value.digits,
-        route = when (state.value.route) {
-            CommunicationRoute.CALL_CONFIRMATION -> CommunicationRoute.DIALER
-            else -> state.value.route
-        },
+        route = state.value.route.restorableRoute(),
         pendingIdentity = state.value.pendingIdentity,
         contactQuery = state.value.contactQuery,
         selectedContactLookupKey = state.value.selectedContact?.lookupKey,
@@ -455,8 +528,40 @@ class PhoneContactsCoordinator(
 
     suspend fun refreshHistory() = historyStore.refresh()
 
-    fun openDialer() = update {
-        copy(route = CommunicationRoute.DIALER, failure = null, message = null)
+    private fun isCurrentDialerQuery(digits: String, generation: Long): Boolean =
+        state.value.let {
+            it.route == CommunicationRoute.DIALER && it.digits == digits &&
+                !it.hasActiveCall && it.pendingIdentity == null && it.dialerSearchGeneration == generation
+        }
+
+    private fun dialerMatchesFor(digits: String): List<CallerIdentity> {
+        if (digits.isEmpty() || !digits.all(Char::isDigit)) return emptyList()
+        // Cached rows are previews; each query is still revalidated against Contacts.
+        return recentDialerMatches[digits] ?: state.value.dialerMatches.filter {
+            normalizeDialString(it.number.orEmpty()).contains(digits)
+        }
+    }
+
+    fun openDialer(showMissedCalls: Boolean = false) {
+        if (state.value.hasActiveCall) {
+            returnToActiveCall()
+            return
+        }
+        recentDialerMatches.clear()
+        update {
+            copy(
+                route = CommunicationRoute.DIALER,
+                digits = "",
+                dialerSearchGeneration = dialerSearchGeneration + 1,
+                showMissedCalls = showMissedCalls,
+                pendingIdentity = null,
+                call = null,
+                failure = null,
+                message = null,
+                dialerMatches = emptyList(),
+                dialerMatchesLoading = false,
+            )
+        }
     }
 
     fun openContacts() {
@@ -480,6 +585,7 @@ class PhoneContactsCoordinator(
     fun inputDigit(digit: Char) {
         if (digit !in "0123456789*#") return
         val current = state.value
+        if (current.awaitingOutgoingCall) return
         val active = current.call
         if (active != null && active.phase in setOf(CallPhase.CONNECTED, CallPhase.ON_HOLD)) {
             if (active.capabilities.canSendDtmf) {
@@ -489,17 +595,48 @@ class PhoneContactsCoordinator(
         }
         if (active?.phase in setOf(CallPhase.INCOMING, CallPhase.DIALING, CallPhase.RINGING)) return
         update {
+            val nextDigits = (digits + digit).take(MAX_DIAL_LENGTH)
             copy(
                 route = CommunicationRoute.DIALER,
-                digits = (digits + digit).take(MAX_DIAL_LENGTH),
+                digits = nextDigits,
                 failure = null,
                 message = null,
+                pendingIdentity = null,
+                dialerMatches = dialerMatchesFor(nextDigits),
             )
         }
     }
 
     fun backspace() = update {
-        copy(digits = digits.dropLast(1), failure = null, message = null)
+        val nextDigits = digits.dropLast(1)
+        copy(
+            digits = nextDigits,
+            pendingIdentity = null,
+            dialerMatches = dialerMatchesFor(nextDigits),
+            failure = null,
+            message = null,
+        )
+    }
+
+    fun selectDialerContact(identity: CallerIdentity) {
+        if (state.value.hasActiveCall) return
+        val number = normalizeDialString(identity.number.orEmpty())
+        if (!identity.canReturnCall || number.isEmpty()) {
+            fail(CallFailure.INVALID_NUMBER, "This caller cannot be called back")
+            return
+        }
+        update {
+            copy(
+                route = CommunicationRoute.DIALER,
+                digits = number,
+                pendingIdentity = identity.copy(number = number),
+                call = null,
+                dialerMatches = emptyList(),
+                dialerMatchesLoading = false,
+                failure = null,
+                message = null,
+            )
+        }
     }
 
     fun requestEnteredNumberCall() {
@@ -508,7 +645,10 @@ class PhoneContactsCoordinator(
             fail(CallFailure.INVALID_NUMBER, "Enter a phone number")
             return
         }
-        requestCall(CallerIdentity(displayName = null, number = number))
+        val identity = state.value.pendingIdentity?.takeIf {
+            it.canReturnCall && normalizeDialString(it.number.orEmpty()) == number
+        } ?: CallerIdentity(displayName = null, number = number)
+        requestCall(identity)
     }
 
     fun requestCall(identity: CallerIdentity) {
@@ -517,14 +657,7 @@ class PhoneContactsCoordinator(
             fail(CallFailure.INVALID_NUMBER, "This caller cannot be called back")
             return
         }
-        update {
-            copy(
-                route = CommunicationRoute.CALL_CONFIRMATION,
-                pendingIdentity = identity.copy(number = number),
-                failure = null,
-                message = null,
-            )
-        }
+        submitCall(identity.copy(number = number), direct = false)
     }
 
     fun cancelConfirmation() = update {
@@ -560,13 +693,43 @@ class PhoneContactsCoordinator(
     }
 
     private fun submitCall(identity: CallerIdentity, direct: Boolean) {
+        if (state.value.hasActiveCall || state.value.route == CommunicationRoute.ACTIVE_CALL) return
         val number = normalizeDialString(identity.number.orEmpty())
         if (number.isEmpty()) {
             fail(CallFailure.INVALID_NUMBER, "Enter a valid phone number")
             return
         }
         if (!placingCall.compareAndSet(false, true)) return
+        pendingCallNumber = number
+        cancelPendingCall = false
+        update {
+            copy(
+                route = CommunicationRoute.ACTIVE_CALL,
+                call = null,
+                awaitingOutgoingCall = true,
+                pendingIdentity = identity.copy(number = number),
+                failure = null,
+                message = if (direct) {
+                    "Starting call to ${identity.accessibleName}"
+                } else {
+                    "Waiting for phone service"
+                },
+            )
+        }
         launchAction {
+            if (cancelPendingCall) {
+                placingCall.set(false)
+                clearPendingCall()
+                update {
+                    copy(
+                        route = CommunicationRoute.DIALER,
+                        awaitingOutgoingCall = false,
+                        pendingIdentity = null,
+                        message = "Call canceled",
+                    )
+                }
+                return@launchAction
+            }
             val result = try {
                 if (telecomGateway.isEmergencyNumber(number)) {
                     telecomGateway.handoffEmergency(number)
@@ -579,30 +742,25 @@ class PhoneContactsCoordinator(
                 placingCall.set(false)
             }
             when (result) {
-                CallPlacementResult.SubmittedToTelecom -> update {
-                    copy(
-                        route = CommunicationRoute.ACTIVE_CALL,
-                        pendingIdentity = identity,
-                        message = if (direct) {
-                            "Starting call to ${identity.accessibleName}"
-                        } else {
-                            "Waiting for phone service"
-                        },
-                    )
+                CallPlacementResult.SubmittedToTelecom -> Unit
+
+                CallPlacementResult.EmergencyHandoffStarted -> {
+                    clearPendingCall()
+                    update {
+                        copy(
+                            route = CommunicationRoute.EXTERNAL_HANDOFF,
+                            awaitingOutgoingCall = false,
+                            pendingIdentity = null,
+                            message = "Continue in the system emergency dialer",
+                        )
+                    }
                 }
 
-                CallPlacementResult.EmergencyHandoffStarted -> update {
-                    copy(
-                        route = CommunicationRoute.EXTERNAL_HANDOFF,
-                        pendingIdentity = null,
-                        message = "Continue in the system emergency dialer",
-                    )
+                is CallPlacementResult.Rejected -> {
+                    clearPendingCall()
+                    update { copy(awaitingOutgoingCall = false) }
+                    fail(result.failure, failureMessage(result.failure))
                 }
-
-                is CallPlacementResult.Rejected -> fail(
-                    result.failure,
-                    failureMessage(result.failure),
-                )
             }
         }
     }
@@ -709,7 +867,16 @@ class PhoneContactsCoordinator(
     }
 
     fun end() {
-        val call = state.value.call ?: return
+        val call = state.value.call
+        if (state.value.awaitingOutgoingCall) {
+            if (call?.direction != CallDirection.OUTGOING) {
+                cancelPendingCall = true
+                return
+            }
+            clearPendingCall()
+            update { copy(awaitingOutgoingCall = false) }
+        }
+        if (call == null) return
         launchAction { telecomGateway.disconnect(call.id) }
     }
 
@@ -747,9 +914,15 @@ class PhoneContactsCoordinator(
                 route = if (entry.outcome == CallOutcome.MISSED_INCOMING) {
                     CommunicationRoute.MISSED_CALL
                 } else {
-                    CommunicationRoute.CALL_ENDED
+                    CommunicationRoute.DIALER
                 },
+                digits = normalizeDialString(entry.identity.number.orEmpty()),
+                call = call.takeIf { hasActiveCall },
                 pendingIdentity = entry.identity,
+                dialerMatches = emptyList(),
+                dialerMatchesLoading = false,
+                failure = null,
+                message = null,
             )
         }
     }
@@ -770,35 +943,63 @@ class PhoneContactsCoordinator(
                 )
             }
 
-            is TelecomEvent.StateChanged -> update {
-                val connectedAt = event.connectedAtElapsedMillis
-                    ?: call?.connectedAtElapsedMillis
-                copy(
-                    route = if (event.phase == CallPhase.INCOMING) {
-                        CommunicationRoute.INCOMING_CALL
-                    } else {
-                        CommunicationRoute.ACTIVE_CALL
-                    },
-                    call = CallSession(
-                        id = event.callId,
-                        direction = event.direction,
-                        identity = event.identity,
-                        phase = event.phase,
-                        capabilities = event.capabilities,
-                        audioRoute = event.audioRoute,
-                        isMuted = event.isMuted,
-                        connectedAtElapsedMillis = connectedAt,
-                    ),
-                    pendingIdentity = null,
-                    failure = null,
-                )
+            is TelecomEvent.StateChanged -> {
+                if (!event.foreground && state.value.hasActiveCall && state.value.call?.id != event.callId) {
+                    return
+                }
+                val pendingOutgoing = matchesPendingCall(event.direction, event.identity)
+                val shouldCancel = pendingOutgoing && cancelPendingCall
+                if (pendingOutgoing) clearPendingCall()
+                update {
+                    val knownIdentity = call?.takeIf {
+                        it.id == event.callId && it.identity.number == event.identity.number
+                    }?.identity ?: pendingIdentity?.takeIf { pendingOutgoing }
+                    val connectedAt = event.connectedAtElapsedMillis
+                        ?: call?.takeIf { it.id == event.callId }?.connectedAtElapsedMillis
+                    copy(
+                        route = if (!event.foreground && call?.id == event.callId) {
+                            route
+                        } else if (event.phase == CallPhase.INCOMING) {
+                            CommunicationRoute.INCOMING_CALL
+                        } else {
+                            CommunicationRoute.ACTIVE_CALL
+                        },
+                        call = CallSession(
+                            id = event.callId,
+                            direction = event.direction,
+                            identity = event.identity.copy(
+                                displayName = event.identity.displayName ?: knownIdentity?.displayName,
+                                number = event.identity.number ?: knownIdentity?.number,
+                                photoUri = event.identity.photoUri ?: knownIdentity?.photoUri,
+                            ),
+                            phase = event.phase,
+                            capabilities = event.capabilities,
+                            audioRoute = event.audioRoute,
+                            isMuted = event.isMuted,
+                            connectedAtElapsedMillis = connectedAt,
+                        ),
+                        pendingIdentity = if (pendingOutgoing || !awaitingOutgoingCall) null else pendingIdentity,
+                        awaitingOutgoingCall = awaitingOutgoingCall && !pendingOutgoing,
+                        failure = null,
+                    )
+                }
+                if (shouldCancel) launchAction { telecomGateway.disconnect(event.callId) }
             }
 
             is TelecomEvent.Disconnected -> {
+                val pendingOutgoing = matchesPendingCall(event.direction, event.identity)
+                val knownIdentity = state.value.call?.takeIf {
+                    it.id == event.callId && it.identity.number == event.identity.number
+                }?.identity ?: state.value.pendingIdentity?.takeIf { pendingOutgoing }
+                val identity = event.identity.copy(
+                    displayName = event.identity.displayName ?: knownIdentity?.displayName,
+                    photoUri = event.identity.photoUri ?: knownIdentity?.photoUri,
+                )
+                if (pendingOutgoing) clearPendingCall()
                 val session = CallSession(
                     id = event.callId,
                     direction = event.direction,
-                    identity = event.identity,
+                    identity = identity,
                     phase = CallPhase.DISCONNECTED,
                     connectedAtElapsedMillis = event.connectedAtElapsedMillis,
                     disconnectedAtElapsedMillis = event.disconnectedAtElapsedMillis,
@@ -806,12 +1007,28 @@ class PhoneContactsCoordinator(
                     failure = event.failure,
                 )
                 update {
+                    val remaining = event.remainingCalls.firstOrNull { it.id == call?.id }
+                        ?: event.remainingCalls.firstOrNull { it.phase == CallPhase.INCOMING }
+                        ?: event.remainingCalls.firstOrNull { it.phase == CallPhase.CONNECTED }
+                        ?: event.remainingCalls.firstOrNull()
+                    val stillWaiting = awaitingOutgoingCall && !pendingOutgoing
                     copy(
-                        route = routeForOutcome(event.outcome),
-                        call = session,
-                        pendingIdentity = event.identity,
-                        failure = event.failure,
-                        message = if (event.failure != null) {
+                        route = when {
+                            remaining?.phase == CallPhase.INCOMING -> CommunicationRoute.INCOMING_CALL
+                            remaining != null || stillWaiting -> CommunicationRoute.ACTIVE_CALL
+                            else -> routeForOutcome(event.outcome)
+                        },
+                        call = remaining ?: session.takeUnless { stillWaiting },
+                        awaitingOutgoingCall = stillWaiting,
+                        pendingIdentity = when {
+                            stillWaiting -> pendingIdentity
+                            remaining != null -> null
+                            else -> identity
+                        },
+                        failure = event.failure.takeIf { remaining == null && !stillWaiting },
+                        message = if (remaining != null || stillWaiting) {
+                            null
+                        } else if (event.failure != null) {
                             failureMessage(event.failure)
                         } else {
                             null
@@ -822,7 +1039,7 @@ class PhoneContactsCoordinator(
                     historyStore.record(
                         CallHistoryEntry(
                             id = event.callId,
-                            identity = event.identity,
+                            identity = identity,
                             direction = event.direction,
                             outcome = event.outcome,
                             timestampMillis = System.currentTimeMillis(),
@@ -832,6 +1049,16 @@ class PhoneContactsCoordinator(
                 }
             }
         }
+    }
+
+    private fun matchesPendingCall(direction: CallDirection, identity: CallerIdentity): Boolean =
+        pendingCallNumber != null && direction == CallDirection.OUTGOING &&
+            (identity.number.isNullOrBlank() ||
+                normalizeDialString(identity.number) == pendingCallNumber)
+
+    private fun clearPendingCall() {
+        pendingCallNumber = null
+        cancelPendingCall = false
     }
 
     private fun routeForOutcome(outcome: CallOutcome): CommunicationRoute = when (outcome) {
@@ -861,6 +1088,8 @@ class PhoneContactsCoordinator(
 
     companion object {
         const val CONTACT_PAGE_SIZE = 50
+        const val DIALER_MATCH_LIMIT = 5
+        private const val MAX_CACHED_DIALER_QUERIES = 16
         const val MAX_DIAL_LENGTH = 64
 
         fun normalizeDialString(value: String): String = buildString {
@@ -874,7 +1103,8 @@ class PhoneContactsCoordinator(
 
         private fun qualificationFailure(qualification: DialerQualification): CallFailure = when {
             !qualification.roleHeld -> CallFailure.ROLE_LOST
-            !qualification.callPermissionGranted -> CallFailure.PERMISSION_DENIED
+            !qualification.callPermissionGranted || !qualification.phoneStatePermissionGranted ->
+                CallFailure.PERMISSION_DENIED
             !qualification.telephonySupported -> CallFailure.NO_SIM
             !qualification.hasUsableCallingAccount -> CallFailure.ACCOUNT_UNAVAILABLE
             else -> CallFailure.UNKNOWN

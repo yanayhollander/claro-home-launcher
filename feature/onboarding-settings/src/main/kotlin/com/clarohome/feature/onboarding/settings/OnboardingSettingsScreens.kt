@@ -5,6 +5,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,9 +26,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -68,6 +69,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.clarohome.core.design.ClaroAvatar
+import com.clarohome.core.design.ClaroAppIcon
 import com.clarohome.core.design.ClaroBannerTone
 import com.clarohome.core.design.ClaroColors
 import com.clarohome.core.design.ClaroDimensions
@@ -84,12 +86,17 @@ import com.clarohome.core.design.toLocale
 import com.clarohome.core.model.AppLanguage
 import com.clarohome.core.model.CapabilityStatus
 import com.clarohome.core.model.ClaroPreferences
-import com.clarohome.core.model.HandoverCheck
+import com.clarohome.core.model.HomeTileKind
+import com.clarohome.core.model.InstalledApp
 import com.clarohome.core.model.OnboardingStep
 import com.clarohome.core.model.ReadinessCapability
 import com.clarohome.core.model.SettingsAccessMode
 import com.clarohome.core.model.TextSize
 import com.clarohome.core.model.VisualMode
+import com.clarohome.core.model.flowIndex
+import com.clarohome.core.model.onboardingStepOrder
+import com.clarohome.core.model.optionalHomeTileKinds
+import com.clarohome.core.model.defaultAppsConfigured
 
 data class OnboardingCallbacks(
     val onContinue: (OnboardingStep) -> Unit,
@@ -100,10 +107,10 @@ data class OnboardingCallbacks(
     val onOpenPeopleSetup: () -> Unit,
     val onOpenSosSetup: () -> Unit,
     val onRequestCapability: (ReadinessCapability) -> Unit,
-    val onHandover: (HandoverCheck, Boolean) -> Unit,
-    val onOpenAppsSetup: () -> Unit = {},
-    val onOpenPlans: () -> Unit = {},
+    val onHomeTileVisibility: (HomeTileKind, Boolean) -> Unit,
     val onHapticFeedbackChange: (Boolean) -> Unit = {},
+    val onSetDefaultApps: () -> Unit = {},
+    val onInstalledAppVisibility: (String, Boolean) -> Unit = { _, _ -> },
 )
 
 @Composable
@@ -111,8 +118,23 @@ fun OnboardingFlow(
     preferences: ClaroPreferences,
     message: String?,
     callbacks: OnboardingCallbacks,
+    homeTileKinds: Set<HomeTileKind> = emptySet(),
+    defaultAppReadiness: Map<ReadinessCapability, CapabilityStatus> = preferences.onboarding.readiness,
+    installedApps: List<InstalledApp> = emptyList(),
+    homeAppPackages: Set<String> = emptySet(),
 ) {
-    when (preferences.onboarding.currentStep) {
+    val step = preferences.onboarding.currentStep
+    val previousStep = when (step) {
+        OnboardingStep.WELCOME, OnboardingStep.COMPLETE -> null
+        OnboardingStep.HANDOVER -> OnboardingStep.SOS_CONTACT
+        else -> onboardingStepOrder.getOrNull(step.flowIndex - 1)
+    }
+    val onBack: () -> Unit = {
+        previousStep?.let(callbacks.onContinue)
+    }
+    BackHandler(enabled = previousStep != null, onBack = onBack)
+
+    when (step) {
         OnboardingStep.WELCOME -> WelcomeStep(
             message = message,
             onContinue = { callbacks.onContinue(OnboardingStep.PHONE_STYLE) },
@@ -122,19 +144,42 @@ fun OnboardingFlow(
             message = message,
             onSelected = callbacks.onChooseMode,
             onContinue = { callbacks.onContinue(OnboardingStep.LANGUAGE_AND_DISPLAY) },
+            onBack = onBack,
         )
         OnboardingStep.LANGUAGE_AND_DISPLAY -> LanguageDisplayOnboardingStep(
             preferences = preferences,
             message = message,
+            onBack = onBack,
             onSave = { language, size, contrast, haptics ->
                 callbacks.onLanguageDisplay(language, size, contrast)
                 callbacks.onHapticFeedbackChange(haptics)
-                callbacks.onContinue(OnboardingStep.SETTINGS_ACCESS)
+                callbacks.onContinue(OnboardingStep.HOME_TILES)
             },
         )
+        OnboardingStep.HOME_TILES -> OnboardingStepScaffold(
+            title = OnboardingStep.HOME_TILES.title(),
+            stepIndex = OnboardingStep.HOME_TILES.flowIndex,
+            message = message,
+            onBack = onBack,
+            dock = {
+                ClaroPrimaryButton(
+                    label = stringResource(R.string.onb_continue),
+                    onClick = { callbacks.onContinue(OnboardingStep.SETTINGS_ACCESS) },
+                )
+            },
+        ) {
+            HomeTileVisibilityFields(
+                homeTileKinds = homeTileKinds,
+                onVisibilityChange = callbacks.onHomeTileVisibility,
+                installedApps = installedApps,
+                homeAppPackages = homeAppPackages,
+                onInstalledAppVisibility = callbacks.onInstalledAppVisibility,
+            )
+        }
         OnboardingStep.SETTINGS_ACCESS -> AccessSetupOnboardingStep(
             accessMode = preferences.accessProtection.mode,
             message = message,
+            onBack = onBack,
             onDateQuestion = {
                 callbacks.onUseDateQuestion()
                 callbacks.onContinue(OnboardingStep.PEOPLE_AND_SPEED_DIAL)
@@ -146,26 +191,23 @@ fun OnboardingFlow(
             message = message,
             onOpenPeopleSetup = callbacks.onOpenPeopleSetup,
             onContinue = { callbacks.onContinue(OnboardingStep.SOS_CONTACT) },
+            onBack = onBack,
         )
         OnboardingStep.SOS_CONTACT -> SosSetupStep(
             agreed = preferences.onboarding.sosRecipientAgreed,
             message = message,
             onOpenSosSetup = callbacks.onOpenSosSetup,
             onContinue = { callbacks.onContinue(OnboardingStep.ROLE_READINESS) },
+            onBack = onBack,
         )
-        OnboardingStep.ROLE_READINESS -> ReadinessChecklist(
+        OnboardingStep.ROLE_READINESS, OnboardingStep.HANDOVER -> ReadinessChecklist(
             readiness = preferences.onboarding.readiness,
             message = message,
             onRequest = callbacks.onRequestCapability,
-            onContinue = { callbacks.onContinue(OnboardingStep.HANDOVER) },
-        )
-        OnboardingStep.HANDOVER -> HandoverChecklist(
-            checked = preferences.onboarding.handoverChecks,
-            message = message,
-            onChecked = callbacks.onHandover,
-            onOpenAppsSetup = callbacks.onOpenAppsSetup,
-            onOpenPlans = callbacks.onOpenPlans,
-            onFinish = { callbacks.onContinue(OnboardingStep.COMPLETE) },
+            onContinue = { callbacks.onContinue(OnboardingStep.COMPLETE) },
+            onBack = onBack,
+            defaultAppReadiness = defaultAppReadiness,
+            onSetDefaultApps = callbacks.onSetDefaultApps,
         )
         OnboardingStep.COMPLETE -> OnboardingStepScaffold(
             title = OnboardingStep.COMPLETE.title(),
@@ -177,6 +219,61 @@ fun OnboardingFlow(
                 tone = ClaroBannerTone.SUCCESS,
             )
         }
+    }
+}
+
+@Composable
+fun CallAudioSettingsScreen(
+    preferences: ClaroPreferences,
+    onChange: (Boolean, Boolean) -> Unit,
+    onBack: () -> Unit,
+) {
+    var confirmMaximum by rememberSaveable { mutableStateOf(false) }
+    ClaroScreenScaffold(
+        title = stringResource(R.string.onb_call_audio_title),
+        dock = {
+            ClaroPrimaryButton(label = stringResource(R.string.onb_done_settings), onClick = onBack)
+        },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ClaroInfoCard(text = stringResource(R.string.onb_call_audio_summary))
+            ToggleRow(
+                label = stringResource(R.string.onb_easy_call_audio),
+                checked = preferences.easyCallAudio,
+                onChecked = { onChange(it, preferences.maximumSpeakerVolume && it) },
+            )
+            if (preferences.easyCallAudio) {
+                ToggleRow(
+                    label = stringResource(R.string.onb_maximum_speaker_volume),
+                    checked = preferences.maximumSpeakerVolume,
+                    onChecked = {
+                        if (it) confirmMaximum = true else onChange(true, false)
+                    },
+                )
+            }
+            ClaroInfoCard(
+                text = stringResource(R.string.onb_call_audio_sensor_note),
+                tone = ClaroBannerTone.WARNING,
+            )
+        }
+    }
+    if (confirmMaximum) {
+        AlertDialog(
+            onDismissRequest = { confirmMaximum = false },
+            title = { Text(stringResource(R.string.onb_maximum_speaker_volume)) },
+            text = { Text(stringResource(R.string.onb_maximum_speaker_warning)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmMaximum = false
+                    onChange(true, true)
+                }) { Text(stringResource(R.string.onb_enable_maximum_volume)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmMaximum = false }) {
+                    Text(stringResource(R.string.onb_back))
+                }
+            },
+        )
     }
 }
 
@@ -357,6 +454,7 @@ fun SettingsHubScreen(
     onLockAndExit: () -> Unit,
     onResetClaro: () -> Unit = {},
     onMenuOrder: (() -> Unit)? = null,
+    onCallAudio: (() -> Unit)? = null,
 ) {
     ClaroScreenScaffold(
         title = stringResource(R.string.settings),
@@ -375,6 +473,14 @@ fun SettingsHubScreen(
         },
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
+            if (onCallAudio != null) {
+                ClaroRowButton(
+                    title = stringResource(R.string.onb_call_audio_title),
+                    subtitle = stringResource(R.string.onb_call_audio_summary),
+                    leading = { ClaroIcon(ClaroIconKind.SPEAKER, tint = ClaroColors.Blue, size = 32.dp) },
+                    onClick = onCallAudio,
+                )
+            }
             ClaroRowButton(
                 title = stringResource(R.string.phone_style),
                 subtitle = preferences.visualMode.localizedDisplayName(),
@@ -828,20 +934,6 @@ private fun WelcomeStep(
                 label = stringResource(R.string.onb_set_up_claro),
                 onClick = onContinue,
             )
-            ClaroSecondaryButton(
-                label = stringResource(R.string.onb_continue_free),
-                onClick = onContinue,
-            )
-            Text(
-                text = stringResource(R.string.onb_welcome_no_trial_note),
-                color = Color(0xFFE2E8F0),
-                fontSize = 16.sp,
-                lineHeight = 20.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 6.dp, vertical = 4.dp),
-            )
         },
     ) {
         Column(
@@ -893,13 +985,23 @@ private fun PhoneStyleChoice(
     message: String?,
     onSelected: (VisualMode) -> Unit,
     onContinue: () -> Unit,
+    onBack: () -> Unit,
 ) {
-    var selected by rememberSaveable { mutableStateOf(VisualMode.CLASSIC) }
+    var selected by rememberSaveable {
+        mutableStateOf(
+            if (OnboardingStep.PHONE_STYLE in preferences.onboarding.completedSteps) {
+                preferences.visualMode
+            } else {
+                VisualMode.CLASSIC
+            },
+        )
+    }
 
     OnboardingStepScaffold(
         title = OnboardingStep.PHONE_STYLE.title(),
-        stepIndex = 1,
+        stepIndex = OnboardingStep.PHONE_STYLE.flowIndex,
         message = message,
+        onBack = onBack,
         dock = {
             ClaroPrimaryButton(
                 label = stringResource(R.string.onb_use_style, selected.localizedDisplayName()),
@@ -928,6 +1030,7 @@ private fun PhoneStyleChoice(
 private fun LanguageDisplayOnboardingStep(
     preferences: ClaroPreferences,
     message: String?,
+    onBack: () -> Unit,
     onSave: (AppLanguage, TextSize, Boolean, Boolean) -> Unit,
 ) {
     var language by rememberSaveable { mutableStateOf(preferences.language) }
@@ -950,11 +1053,12 @@ private fun LanguageDisplayOnboardingStep(
 
     OnboardingStepScaffold(
         title = OnboardingStep.LANGUAGE_AND_DISPLAY.title(),
-        stepIndex = 2,
+        stepIndex = OnboardingStep.LANGUAGE_AND_DISPLAY.flowIndex,
         message = message,
+        onBack = onBack,
         dock = {
             ClaroPrimaryButton(
-                label = stringResource(R.string.onb_save_and_continue),
+                label = stringResource(R.string.onb_continue),
                 onClick = { onSave(language, textSize, false, hapticFeedback) },
             )
         },
@@ -973,6 +1077,7 @@ private fun LanguageDisplayOnboardingStep(
 private fun AccessSetupOnboardingStep(
     accessMode: SettingsAccessMode,
     message: String?,
+    onBack: () -> Unit,
     onDateQuestion: () -> Unit,
     onPin: (String, String, String) -> Unit,
 ) {
@@ -983,8 +1088,9 @@ private fun AccessSetupOnboardingStep(
 
     OnboardingStepScaffold(
         title = OnboardingStep.SETTINGS_ACCESS.title(),
-        stepIndex = 3,
+        stepIndex = OnboardingStep.SETTINGS_ACCESS.flowIndex,
         message = message,
+        onBack = onBack,
         dock = {
             ClaroPrimaryButton(
                 label = stringResource(R.string.onb_save_access_method),
@@ -1017,6 +1123,7 @@ private fun PeopleSetupStep(
     message: String?,
     onOpenPeopleSetup: () -> Unit,
     onContinue: () -> Unit,
+    onBack: () -> Unit,
 ) {
     val assigned = preferences.onboarding.favoriteSlotsAssigned
     val speedOne = preferences.onboarding.speedDialOneAssigned
@@ -1024,8 +1131,9 @@ private fun PeopleSetupStep(
 
     OnboardingStepScaffold(
         title = OnboardingStep.PEOPLE_AND_SPEED_DIAL.title(),
-        stepIndex = 4,
+        stepIndex = OnboardingStep.PEOPLE_AND_SPEED_DIAL.flowIndex,
         message = message,
+        onBack = onBack,
         dock = {
             ClaroPrimaryButton(
                 label = stringResource(R.string.onb_open_contacts_and_speed_dial),
@@ -1075,11 +1183,13 @@ private fun SosSetupStep(
     message: String?,
     onOpenSosSetup: () -> Unit,
     onContinue: () -> Unit,
+    onBack: () -> Unit,
 ) {
     OnboardingStepScaffold(
         title = OnboardingStep.SOS_CONTACT.title(),
-        stepIndex = 5,
+        stepIndex = OnboardingStep.SOS_CONTACT.flowIndex,
         message = message,
+        onBack = onBack,
         dock = {
             ClaroPrimaryButton(
                 label = stringResource(R.string.onb_configure_trusted_person),
@@ -1139,119 +1249,44 @@ private fun ReadinessChecklist(
     message: String?,
     onRequest: (ReadinessCapability) -> Unit,
     onContinue: () -> Unit,
+    onBack: () -> Unit,
+    defaultAppReadiness: Map<ReadinessCapability, CapabilityStatus>,
+    onSetDefaultApps: () -> Unit,
 ) {
+    val defaultsReady = defaultAppsConfigured(defaultAppReadiness)
+    var defaultsRequested by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (!defaultsRequested && !defaultsReady) {
+            defaultsRequested = true
+            onSetDefaultApps()
+        }
+    }
     OnboardingStepScaffold(
         title = OnboardingStep.ROLE_READINESS.title(),
-        stepIndex = 6,
+        stepIndex = OnboardingStep.ROLE_READINESS.flowIndex,
         message = message,
+        onBack = onBack,
         dock = {
+            if (!defaultsReady) {
+                ClaroPrimaryButton(
+                    label = stringResource(R.string.onb_set_default_apps),
+                    onClick = onSetDefaultApps,
+                )
+            }
             ClaroPrimaryButton(
-                label = stringResource(R.string.onb_continue_to_handover),
+                label = stringResource(R.string.onb_finish_setup),
                 onClick = onContinue,
+                enabled = defaultsReady,
             )
         },
     ) {
         ReadinessRows(
-            readiness = readiness,
+            readiness = readiness + defaultAppReadiness,
             onRequest = onRequest,
         )
         ClaroInfoCard(
-            text = stringResource(R.string.onb_readiness_checklist_info),
+            text = stringResource(R.string.onb_default_apps_info),
             tone = ClaroBannerTone.INFO,
-        )
-    }
-}
-
-@Composable
-private fun HandoverChecklist(
-    checked: Set<HandoverCheck>,
-    message: String?,
-    onChecked: (HandoverCheck, Boolean) -> Unit,
-    onOpenAppsSetup: () -> Unit,
-    onOpenPlans: () -> Unit,
-    onFinish: () -> Unit,
-) {
-    val allChecked = checked.size == HandoverCheck.entries.size
-
-    OnboardingStepScaffold(
-        title = OnboardingStep.HANDOVER.title(),
-        stepIndex = 7,
-        message = message,
-        dock = {
-            ClaroSecondaryButton(
-                label = stringResource(R.string.onb_optional_plans),
-                onClick = onOpenPlans,
-            )
-            ClaroPrimaryButton(
-                label = stringResource(R.string.onb_finish_setup),
-                icon = ClaroIconKind.CHECK,
-                onClick = onFinish,
-            )
-        },
-    ) {
-        Text(
-            text = stringResource(R.string.onb_handover_body),
-            color = ClaroColors.Ink,
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.padding(horizontal = 4.dp),
-        )
-        ClaroInfoCard(
-            text = if (allChecked) {
-                stringResource(R.string.onb_handover_all_observed, HandoverCheck.entries.size)
-            } else {
-                stringResource(
-                    R.string.onb_handover_progress_observed,
-                    checked.size,
-                    HandoverCheck.entries.size,
-                )
-            },
-            tone = if (allChecked) ClaroBannerTone.SUCCESS else ClaroBannerTone.INFO,
-        )
-        Column(modifier = Modifier.fillMaxWidth()) {
-            HandoverCheck.entries.forEach { item ->
-                val isChecked = item in checked
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 60.dp)
-                        .background(ClaroColors.RowSurface)
-                        .toggleable(
-                            value = isChecked,
-                            role = Role.Checkbox,
-                            onValueChange = { onChecked(item, it) },
-                        )
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Checkbox(
-                        checked = isChecked,
-                        onCheckedChange = null,
-                        colors = CheckboxDefaults.colors(checkedColor = ClaroColors.Blue),
-                    )
-                    Text(
-                        text = item.displayName(),
-                        color = ClaroColors.Ink,
-                        fontSize = 21.sp,
-                        lineHeight = 26.sp,
-                        fontWeight = if (isChecked) FontWeight.Bold else FontWeight.Medium,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                HorizontalDivider(thickness = 1.dp, color = ClaroColors.Border)
-            }
-        }
-        ClaroRowButton(
-            title = stringResource(R.string.onb_allowed_apps_and_tiles_title),
-            subtitle = stringResource(R.string.onb_allowed_apps_and_tiles_subtitle),
-            leading = {
-                ClaroIcon(
-                    kind = ClaroIconKind.APPS,
-                    tint = ClaroColors.Blue,
-                    size = 30.dp,
-                )
-            },
-            onClick = onOpenAppsSetup,
         )
     }
 }
@@ -1261,6 +1296,7 @@ private fun OnboardingStepScaffold(
     title: String,
     stepIndex: Int?,
     message: String?,
+    onBack: (() -> Unit)? = null,
     dock: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -1269,15 +1305,68 @@ private fun OnboardingStepScaffold(
         modifier = Modifier.testTag("onboarding-screen"),
         bannerText = message,
         bannerTone = messageBannerTone(message),
-        dock = dock,
+        dock = {
+            dock?.invoke(this)
+            if (onBack != null) {
+                ClaroSecondaryButton(
+                    label = stringResource(R.string.onb_back),
+                    icon = ClaroIconKind.ARROW_LEFT,
+                    onClick = onBack,
+                )
+            }
+        },
     ) {
         if (stepIndex != null) {
             OnboardingProgressBar(
                 stepIndex = stepIndex,
-                totalSteps = 7,
+                totalSteps = onboardingStepOrder.size - 2,
             )
         }
         content()
+    }
+}
+
+@Composable
+fun HomeTileVisibilityFields(
+    homeTileKinds: Set<HomeTileKind>,
+    onVisibilityChange: (HomeTileKind, Boolean) -> Unit,
+    installedApps: List<InstalledApp> = emptyList(),
+    homeAppPackages: Set<String> = emptySet(),
+    onInstalledAppVisibility: (String, Boolean) -> Unit = { _, _ -> },
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ClaroInfoCard(text = stringResource(R.string.onb_home_tiles_body))
+        optionalHomeTileKinds.forEach { kind ->
+            val label = stringResource(
+                when (kind) {
+                    HomeTileKind.MESSAGES -> R.string.onb_show_messages_tile
+                    HomeTileKind.CAMERA -> R.string.onb_show_camera_tile
+                    HomeTileKind.GALLERY -> R.string.onb_show_gallery_tile
+                    HomeTileKind.APPS -> R.string.onb_show_apps_tile
+                    else -> error("Unsupported optional Home tile: $kind")
+                },
+            )
+            ToggleRow(
+                label = label,
+                checked = kind in homeTileKinds,
+                onChecked = { onVisibilityChange(kind, it) },
+            )
+        }
+        installedApps.filter {
+            it.isAvailable && it.packageName in setOf(
+                "com.whatsapp", "com.whatsapp.w4b", "com.facebook.katana", "com.facebook.lite",
+            )
+        }.forEach { app ->
+            ToggleRow(
+                label = stringResource(R.string.onb_show_app_on_home, app.label),
+                checked = app.packageName in homeAppPackages,
+                onChecked = { onInstalledAppVisibility(app.packageName, it) },
+                leading = { ClaroAppIcon(packageName = app.packageName, size = 32.dp) },
+            )
+        }
     }
 }
 
@@ -2090,6 +2179,11 @@ private fun ReadinessRows(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(ClaroColors.RowSurface)
+                .clickable(
+                    enabled = status != CapabilityStatus.READY,
+                    role = Role.Button,
+                    onClick = { onRequest(capability) },
+                )
                 .padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -2267,6 +2361,7 @@ private fun ToggleRow(
     label: String,
     checked: Boolean,
     onChecked: (Boolean) -> Unit,
+    leading: (@Composable () -> Unit)? = null,
 ) {
     val haptics = LocalClaroHaptics.current
     Row(
@@ -2288,6 +2383,8 @@ private fun ToggleRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        leading?.invoke()
+        if (leading != null) Spacer(Modifier.width(8.dp))
         Text(
             text = label,
             color = ClaroColors.Ink,
@@ -2464,11 +2561,11 @@ private fun OnboardingStep.title() = stringResource(
         OnboardingStep.WELCOME -> R.string.onboarding_welcome
         OnboardingStep.PHONE_STYLE -> R.string.onb_step_choose_phone_style
         OnboardingStep.LANGUAGE_AND_DISPLAY -> R.string.onb_language_and_display_title
+        OnboardingStep.HOME_TILES -> R.string.onb_home_tiles_title
         OnboardingStep.SETTINGS_ACCESS -> R.string.onb_settings_access
         OnboardingStep.PEOPLE_AND_SPEED_DIAL -> R.string.onb_step_people_and_speed_dial
         OnboardingStep.SOS_CONTACT -> R.string.onb_sos_contact_title
-        OnboardingStep.ROLE_READINESS -> R.string.onb_step_permissions_and_roles
-        OnboardingStep.HANDOVER -> R.string.onb_step_handover_checklist
+        OnboardingStep.ROLE_READINESS, OnboardingStep.HANDOVER -> R.string.onb_step_permissions_and_roles
         OnboardingStep.COMPLETE -> R.string.onb_step_setup_complete
     },
 )
@@ -2524,20 +2621,6 @@ private fun CapabilityStatus.displayName() = stringResource(
         CapabilityStatus.READY -> R.string.onb_capability_status_ready
         CapabilityStatus.NEEDS_ATTENTION -> R.string.onb_capability_status_needs_attention
         CapabilityStatus.UNAVAILABLE -> R.string.onb_capability_status_unavailable
-    },
-)
-
-@Composable
-private fun HandoverCheck.displayName() = stringResource(
-    when (this) {
-        HandoverCheck.OUTGOING_CALL -> R.string.onb_handover_outgoing_call
-        HandoverCheck.INCOMING_CALL -> R.string.onb_handover_incoming_call
-        HandoverCheck.SMS_SEND -> R.string.onb_handover_sms_send
-        HandoverCheck.SMS_RECEIVE -> R.string.onb_handover_sms_receive
-        HandoverCheck.DEFAULT_SIM -> R.string.onb_handover_default_sim
-        HandoverCheck.RINGTONE -> R.string.onb_handover_ringtone
-        HandoverCheck.HOME_RETURN -> R.string.onb_handover_home_return
-        HandoverCheck.SOS_TEST -> R.string.onb_handover_sos_test
     },
 )
 

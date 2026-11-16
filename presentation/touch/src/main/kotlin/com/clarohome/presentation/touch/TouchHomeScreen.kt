@@ -86,22 +86,24 @@ fun TouchHomeScreen(
 ) {
     val tiles = home.homeTiles
 
-    LazyColumn(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .testTag("touch-home")
             .background(ClaroColors.Charcoal),
         verticalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
     ) {
-        item {
-            TouchStatusHeader(home, onUseClassicMode)
-        }
-        if (home.homeRole != HomeRoleState.GRANTED) {
+        TouchStatusHeader(home, onUseClassicMode)
+        LazyColumn(
+            modifier = Modifier.weight(1f).fillMaxWidth().testTag("touch-home-tiles"),
+            verticalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
+        ) {
+            if (home.homeRole != HomeRoleState.GRANTED) {
             item {
                 RoleRepairCard(home.homeRole, onRepairHomeRole)
             }
-        }
-        home.activeCall?.let { activeCall ->
+            }
+            home.activeCall?.let { activeCall ->
             item {
                 Box(
                     modifier = Modifier
@@ -116,8 +118,8 @@ fun TouchHomeScreen(
                     )
                 }
             }
-        }
-        if (tiles.isEmpty()) {
+            }
+            if (tiles.isEmpty()) {
             item(key = "empty-home") {
                 Box(modifier = Modifier.padding(horizontal = ClaroDimensions.TileGap)) {
                     ClaroInfoCard(
@@ -126,9 +128,10 @@ fun TouchHomeScreen(
                     )
                 }
             }
-        }
-        items(tiles.chunked(HOME_COLUMNS), key = { row -> "row-${row.joinToString { it.id }}" }) { row ->
-            TileGridRow(row = row, onTileSelected = onTileSelected)
+            }
+            items(tiles.chunked(HOME_COLUMNS), key = { row -> "row-${row.joinToString { it.id }}" }) { row ->
+                TileGridRow(row = row, onTileSelected = onTileSelected)
+            }
         }
     }
 }
@@ -145,6 +148,7 @@ private fun TouchStatusHeader(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .testTag("touch-home-fixed-header")
             .heightIn(min = 112.dp)
             .background(ClaroColors.Charcoal)
             .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -360,7 +364,7 @@ private fun HomeTileCard(
                         size = 52.dp,
                         fallbackTint = tile.kind.tileIconTint(),
                     )
-                    HomeTileKind.CONTACT -> ClaroAvatar(name = tile.label, size = 52.dp)
+                    HomeTileKind.CONTACT -> ClaroAvatar(name = tile.label, size = 52.dp, photoUri = tile.photoUri)
                     else -> ClaroIcon(
                         kind = tile.kind.iconKind(),
                         tint = tile.kind.tileIconTint(),

@@ -5,6 +5,10 @@
     <string name="comm_notification_incoming_call_text">שיחה נכנסת</string>
     <string name="comm_notification_action_decline">דחייה</string>
     <string name="comm_notification_action_answer">מענה</string>
+    <string name="comm_notification_action_end">ניתוק</string>
+    <string name="comm_channel_ongoing_calls_name">שיחות פעילות</string>
+    <string name="comm_channel_ongoing_calls_description">שיחות פעילות ופקדים לחזרה לשיחה</string>
+    <string name="comm_notification_return_to_call">יש להקיש כדי לחזור לשיחה</string>
     <string name="comm_caller_private_number">מספר חסוי</string>
     <string name="comm_caller_unknown">מתקשר לא מזוהה</string>
     <string name="comm_contact_name_and_number_required">נדרשים שם ומספר טלפון</string>
@@ -15,7 +19,6 @@
     <string name="comm_channel_messages_name">הודעות</string>
     <string name="comm_channel_messages_description">הודעות טקסט ומולטימדיה נכנסות</string>
     <string name="comm_notification_new_sms_title">הודעה חדשה</string>
-    <string name="comm_notification_new_sms_text">יש לפתוח את Claro כדי לקרוא</string>
     <string name="comm_notification_new_mms_title">הודעת מולטימדיה חדשה</string>
     <string name="comm_notification_new_mms_text">יש לפתוח את Claro כדי להוריד או לבדוק את השגיאה</string>
     <string name="comm_mms_fallback_subject">הודעת מולטימדיה</string>

@@ -36,7 +36,22 @@ data class TrustedContact(
     val displayName: String,
     val destination: String,
     val recipientConsented: Boolean,
+    val photoUri: String? = null,
 )
+
+fun normalizeSosDestination(value: String): String? {
+    if (value.any { !it.isDigit() && !it.isWhitespace() && it !in "+-()." }) return null
+    val number = buildString {
+        value.forEach {
+            when {
+                it.isDigit() -> append('0' + Character.digit(it, 10))
+                it == '+' -> append(it)
+            }
+        }
+    }
+    val digits = number.removePrefix("+")
+    return number.takeIf { digits.length in 3..64 && digits.all { it in '0'..'9' } }
+}
 
 sealed interface SosReadiness {
     data object NotConfigured : SosReadiness
@@ -105,12 +120,14 @@ class SosCoordinator(
         private set
 
     fun configure(contact: TrustedContact?): SosReadiness {
+        val number = contact?.destination?.let(::normalizeSosDestination)
         state = when {
             contact == null -> SosState.Unset()
-            emergencyNumberDetector.isEmergencyNumber(contact.destination) ->
+            number == null ->
+                SosState.Unset("Enter a valid SOS phone number.")
+            emergencyNumberDetector.isEmergencyNumber(number) ->
                 SosState.Unset("Emergency numbers cannot be saved as trusted contacts.")
-            !contact.recipientConsented -> SosState.Armed(contact)
-            else -> SosState.Armed(contact)
+            else -> SosState.Armed(contact.copy(destination = number))
         }
         return readiness()
     }
@@ -132,6 +149,8 @@ class SosCoordinator(
             is SosState.Canceled -> current.contact
             is SosState.Failed -> current.contact
             is SosState.Interrupted -> current.contact
+            is SosState.Calling -> current.contact.takeIf { current.outcome == SosCallOutcome.ENDED }
+                ?: return false
             else -> return false
         }
         if (!contact.recipientConsented || emergencyNumberDetector.isEmergencyNumber(contact.destination)) {
@@ -174,6 +193,8 @@ class SosCoordinator(
         requestedActivationId = null
         state = when {
             persisted.contact == null -> SosState.Unset()
+            normalizeSosDestination(persisted.contact.destination) == null ->
+                SosState.Unset("Enter a valid SOS phone number.")
             persisted.countdownDeadlineElapsedMillis != null -> SosState.Interrupted(
                 contact = persisted.contact,
                 activationId = persisted.activationId,

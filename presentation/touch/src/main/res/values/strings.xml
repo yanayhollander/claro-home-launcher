@@ -37,7 +37,7 @@
     <string name="touch_action_delete">Delete</string>
     <string name="touch_action_try_again">Try again</string>
     <string name="touch_contacts">Contacts</string>
-    <string name="touch_emergency_call">Emergency call</string>
+    <string name="touch_emergency_call">Emergency services</string>
     <string name="touch_emergency_dialer_title">Emergency dialer</string>
     <string name="touch_emergency_handoff_message">Continue in the system emergency dialer.</string>
     <string name="touch_calling_unavailable_device">Calling is not available on this device.</string>
@@ -136,7 +136,6 @@
     <string name="touch_phone_starting_call">Starting call to %1$s</string>
 
     <string name="touch_write_message">Write a message</string>
-    <string name="touch_action_review">Review</string>
     <string name="touch_messages_unavailable_device">Messages are not available on this device.</string>
     <string name="touch_message_access_repair">Message access needs repair.</string>
     <string name="touch_repair_message_access">Repair message access</string>
@@ -147,8 +146,7 @@
     <string name="touch_mms_group_label" tools:ignore="PluralsCandidate">MMS · %1$d people</string>
     <string name="touch_field_to">To</string>
     <string name="touch_message_placeholder">Write here…</string>
-    <string name="touch_sms_length_standard">%1$d · ~%2$d SMS · carrier charges may apply</string>
-    <string name="touch_sms_length_unicode">%1$d · ~%2$d SMS · Unicode · carrier charges may apply</string>
+    <string name="touch_message_time_unknown">Date and time unavailable</string>
     <string name="touch_sms_sending_unavailable_device">SMS sending is not available on this device.</string>
     <string name="touch_sending_messages_repair">Sending messages needs repair.</string>
     <string name="touch_choose_recipient_title">Choose recipient</string>
@@ -157,6 +155,10 @@
     <string name="touch_conversation_title">Conversation</string>
     <string name="touch_conversation_empty">No messages in this conversation yet.</string>
     <string name="touch_delivery_confirmed">Delivered</string>
+    <string name="touch_matching_contacts">Matching contacts</string>
+    <string name="touch_contacts_permission_needed">Contacts permission is needed for number suggestions.</string>
+    <string name="touch_contacts_load_failed">Contacts could not be loaded.</string>
+    <string name="touch_conversation_unavailable">This conversation is no longer available.</string>
     <string name="touch_delivery_unknown">Delivery unknown</string>
     <string name="touch_delivery_failed">Failed</string>
     <string name="touch_delivery_sending">Sending</string>

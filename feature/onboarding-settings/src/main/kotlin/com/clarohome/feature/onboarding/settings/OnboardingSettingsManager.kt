@@ -13,6 +13,8 @@ import com.clarohome.core.model.CooldownState
 import com.clarohome.core.model.CriticalActivity
 import com.clarohome.core.model.HandoverCheck
 import com.clarohome.core.model.OnboardingStep
+import com.clarohome.core.model.flowIndex
+import com.clarohome.core.model.defaultAppsConfigured
 import com.clarohome.core.model.ReadinessCapability
 import com.clarohome.core.model.SecretVerifier
 import com.clarohome.core.model.SettingsAccessMode
@@ -133,13 +135,24 @@ class OnboardingSettingsManager @Inject constructor(
     private val mutex = Mutex()
     @Volatile private var unlocked = false
 
-    suspend fun advanceOnboarding(next: OnboardingStep) = update { current ->
-        current.copy(
-            onboarding = current.onboarding.copy(
-                currentStep = next,
-                completedSteps = current.onboarding.completedSteps + current.onboarding.currentStep,
-            ),
-        )
+    suspend fun advanceOnboarding(
+        next: OnboardingStep,
+        defaultApps: Map<ReadinessCapability, CapabilityStatus> = emptyMap(),
+    ): Boolean {
+        if (next == OnboardingStep.COMPLETE && !defaultAppsConfigured(defaultApps)) return false
+        update { current ->
+            current.copy(
+                onboarding = current.onboarding.copy(
+                    currentStep = next,
+                    completedSteps = if (next.flowIndex > current.onboarding.currentStep.flowIndex) {
+                        current.onboarding.completedSteps + current.onboarding.currentStep
+                    } else {
+                        current.onboarding.completedSteps
+                    },
+                ),
+            )
+        }
+        return true
     }
 
     suspend fun chooseVisualMode(mode: VisualMode) = update {
@@ -162,6 +175,10 @@ class OnboardingSettingsManager @Inject constructor(
 
     suspend fun setHapticFeedback(enabled: Boolean) = update {
         it.copy(hapticFeedback = enabled)
+    }
+
+    suspend fun setCallAudio(easyCallAudio: Boolean, maximumSpeakerVolume: Boolean) = update {
+        it.copy(easyCallAudio = easyCallAudio, maximumSpeakerVolume = maximumSpeakerVolume)
     }
 
     suspend fun useDateQuestion() = update {
@@ -329,10 +346,10 @@ class OnboardingSettingsManager @Inject constructor(
 
     suspend fun cancelDeferredModeSwitch() = update { it.copy(pendingVisualMode = null) }
 
-    suspend fun resetAll() {
+    suspend fun resetAll(language: AppLanguage = AppLanguage.ENGLISH) {
         mutex.withLock {
             unlocked = false
-            repository.save(ClaroPreferences())
+            repository.save(ClaroPreferences(language = language))
         }
     }
 
@@ -345,6 +362,10 @@ class OnboardingSettingsManager @Inject constructor(
                 readiness = it.onboarding.readiness + (capability to status),
             ),
         )
+    }
+
+    suspend fun setSosRecipientAgreed(agreed: Boolean) = update {
+        it.copy(onboarding = it.onboarding.copy(sosRecipientAgreed = agreed))
     }
 
     suspend fun setHandoverCheck(check: HandoverCheck, checked: Boolean) = update {

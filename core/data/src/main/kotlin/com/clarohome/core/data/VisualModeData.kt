@@ -1,6 +1,7 @@
 package com.clarohome.core.data
 
 import android.content.Context
+import android.content.res.Resources
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.Serializer
 import androidx.datastore.dataStore
@@ -14,6 +15,7 @@ import com.clarohome.core.model.CooldownState
 import com.clarohome.core.model.HandoverCheck
 import com.clarohome.core.model.OnboardingProgress
 import com.clarohome.core.model.OnboardingStep
+import com.clarohome.core.model.flowIndex
 import com.clarohome.core.model.ReadinessCapability
 import com.clarohome.core.model.SecretVerifier
 import com.clarohome.core.model.SettingsAccessMode
@@ -59,6 +61,9 @@ data class ClaroSettings(
     val unlockCooldown: PersistedCooldown = PersistedCooldown(),
     val recoveryCooldown: PersistedCooldown = PersistedCooldown(),
     val hapticFeedback: Boolean = true,
+    val languageInitialized: Boolean = false,
+    val easyCallAudio: Boolean = true,
+    val maximumSpeakerVolume: Boolean = false,
 )
 
 @Serializable
@@ -75,14 +80,27 @@ data class PersistedCooldown(
     val bootId: String = "",
 )
 
-fun ClaroSettings.toPreferences() = ClaroPreferences(
+fun ClaroSettings.toPreferences(defaultLanguage: AppLanguage = AppLanguage.ENGLISH) = ClaroPreferences(
     visualMode = visualMode,
     pendingVisualMode = pendingVisualMode,
-    language = language,
+    language = if (
+        languageInitialized ||
+        language != AppLanguage.ENGLISH ||
+        OnboardingStep.LANGUAGE_AND_DISPLAY in completedOnboardingSteps ||
+        onboardingStep.flowIndex > OnboardingStep.LANGUAGE_AND_DISPLAY.flowIndex
+    ) {
+        language
+    } else {
+        defaultLanguage
+    },
     textSize = textSize,
     highContrast = highContrast,
     onboarding = OnboardingProgress(
-        currentStep = onboardingStep,
+        currentStep = if (onboardingStep == OnboardingStep.HANDOVER) {
+            OnboardingStep.ROLE_READINESS
+        } else {
+            onboardingStep
+        },
         completedSteps = completedOnboardingSteps,
         favoriteSlotsAssigned = favoriteSlotsAssigned,
         speedDialOneAssigned = speedDialOneAssigned,
@@ -101,7 +119,24 @@ fun ClaroSettings.toPreferences() = ClaroPreferences(
         recoveryCooldown = recoveryCooldown.toModel(),
     ),
     hapticFeedback = hapticFeedback,
+    easyCallAudio = easyCallAudio,
+    maximumSpeakerVolume = maximumSpeakerVolume,
 )
+
+fun deviceAppLanguage(): AppLanguage {
+    val locales = Resources.getSystem().configuration.locales
+    return appLanguageFor(List(locales.size()) { locales[it].language })
+}
+
+internal fun appLanguageFor(languageCodes: List<String>): AppLanguage =
+    languageCodes.firstNotNullOfOrNull {
+        when (it) {
+            "en" -> AppLanguage.ENGLISH
+            "es" -> AppLanguage.SPANISH
+            "he", "iw" -> AppLanguage.HEBREW
+            else -> null
+        }
+    } ?: AppLanguage.ENGLISH
 
 fun ClaroPreferences.toSettings() = ClaroSettings(
     visualMode = visualMode,
@@ -125,6 +160,9 @@ fun ClaroPreferences.toSettings() = ClaroSettings(
     unlockCooldown = accessProtection.unlockCooldown.toPersisted(),
     recoveryCooldown = accessProtection.recoveryCooldown.toPersisted(),
     hapticFeedback = hapticFeedback,
+    languageInitialized = true,
+    easyCallAudio = easyCallAudio,
+    maximumSpeakerVolume = maximumSpeakerVolume,
 )
 
 private fun PersistedSecretVerifier.toModel() = SecretVerifier(saltBase64, hashBase64, iterations)
@@ -161,7 +199,7 @@ class ProtoVisualModeRepository @Inject constructor(
 
     override val preferences: Flow<ClaroPreferences> = context.claroSettings.data
         .catch { emit(ClaroSettings()) }
-        .map(ClaroSettings::toPreferences)
+        .map { it.toPreferences(defaultLanguage = deviceAppLanguage()) }
 
     override suspend fun setVisualMode(mode: VisualMode) {
         context.claroSettings.updateData { it.copy(visualMode = mode) }

@@ -37,7 +37,7 @@
     <string name="touch_action_delete">מחיקה</string>
     <string name="touch_action_try_again">ניסיון חוזר</string>
     <string name="touch_contacts">אנשי קשר</string>
-    <string name="touch_emergency_call">שיחת חירום</string>
+    <string name="touch_emergency_call">שירותי חירום</string>
     <string name="touch_emergency_dialer_title">חייגן חירום</string>
     <string name="touch_emergency_handoff_message">המשיכו בחייגן החירום של המערכת.</string>
     <string name="touch_calling_unavailable_device">שיחות אינן זמינות במכשיר זה.</string>
@@ -136,7 +136,6 @@
     <string name="touch_phone_starting_call">מתחיל שיחה אל %1$s</string>
 
     <string name="touch_write_message">כתיבת הודעה</string>
-    <string name="touch_action_review">בדיקה</string>
     <string name="touch_messages_unavailable_device">הודעות אינן זמינות במכשיר זה.</string>
     <string name="touch_message_access_repair">הגישה להודעות דורשת תיקון.</string>
     <string name="touch_repair_message_access">תיקון הגישה להודעות</string>
@@ -147,8 +146,7 @@
     <string name="touch_mms_group_label">MMS · %1$d משתתפים</string>
     <string name="touch_field_to">אל</string>
     <string name="touch_message_placeholder">כתבו כאן…</string>
-    <string name="touch_sms_length_standard">%1$d · ~%2$d SMS · ייתכנו חיובי מפעיל</string>
-    <string name="touch_sms_length_unicode">%1$d · ~%2$d SMS · יוניקוד · ייתכנו חיובי מפעיל</string>
+    <string name="touch_message_time_unknown">התאריך והשעה אינם זמינים</string>
     <string name="touch_sms_sending_unavailable_device">שליחת הודעות SMS אינה זמינה במכשיר זה.</string>
     <string name="touch_sending_messages_repair">שליחת הודעות דורשת תיקון.</string>
     <string name="touch_choose_recipient_title">בחירת נמען</string>
@@ -157,6 +155,10 @@
     <string name="touch_conversation_title">התכתבות</string>
     <string name="touch_conversation_empty">אין הודעות בהתכתבות זו עדיין.</string>
     <string name="touch_delivery_confirmed">נמסר</string>
+    <string name="touch_matching_contacts">אנשי קשר תואמים</string>
+    <string name="touch_contacts_permission_needed">נדרשת הרשאה לאנשי קשר להצעות מספרים.</string>
+    <string name="touch_contacts_load_failed">לא ניתן לטעון אנשי קשר.</string>
+    <string name="touch_conversation_unavailable">השיחה הזו אינה זמינה עוד.</string>
     <string name="touch_delivery_unknown">מצב מסירה לא ידוע</string>
     <string name="touch_delivery_failed">נכשל</string>
     <string name="touch_delivery_sending">שולח</string>

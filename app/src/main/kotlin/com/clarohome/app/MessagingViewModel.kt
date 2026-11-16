@@ -5,6 +5,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clarohome.feature.communication.ClaroContact
+import com.clarohome.feature.communication.ACTION_OPEN_MESSAGES
+import com.clarohome.feature.communication.EXTRA_CONVERSATION_ID
 import com.clarohome.feature.communication.ContactNumber
 import com.clarohome.feature.communication.ContactsGateway
 import com.clarohome.feature.communication.MessageDraftStore
@@ -20,6 +22,8 @@ import com.clarohome.feature.communication.SmsTransport
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 @HiltViewModel
@@ -45,6 +49,11 @@ class MessagingViewModel @Inject constructor(
         savedState = restoredState(),
     )
     val state: StateFlow<MessagingUiState> = coordinator.state
+    private var externalNavigationRequested = false
+    private val mutableOpenMessageRequests = MutableStateFlow(
+        savedStateHandle.get<Long>(KEY_OPEN_REQUESTS) ?: 0L,
+    )
+    val openMessageRequests: StateFlow<Long> = mutableOpenMessageRequests.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -52,7 +61,7 @@ class MessagingViewModel @Inject constructor(
         }
         viewModelScope.launch {
             roleGateway.refresh()
-            coordinator.openInbox()
+            if (!externalNavigationRequested) coordinator.openInbox()
         }
     }
 
@@ -64,6 +73,7 @@ class MessagingViewModel @Inject constructor(
     fun openInbox() = coordinator.openInbox()
     fun searchInbox(query: String) = coordinator.searchInbox(query)
     fun openConversation(id: Long) = coordinator.openConversation(id)
+    fun deleteConversation(id: Long) = coordinator.deleteConversation(id)
     fun startNewMessage() = coordinator.startNewMessage()
     fun openRecipientPicker() = coordinator.openRecipientPicker()
     fun cancelRecipientPicker() = coordinator.cancelRecipientPicker()
@@ -76,7 +86,7 @@ class MessagingViewModel @Inject constructor(
 
     fun enterManualRecipient(number: String) = coordinator.enterManualRecipient(number)
     fun updateBody(body: String) = coordinator.updateBody(body)
-    fun review() = coordinator.review()
+    fun sendDraft() = coordinator.send()
     fun editAfterReview() = coordinator.editAfterReview()
     fun send() = coordinator.send()
     fun retry() = coordinator.retry()
@@ -84,11 +94,30 @@ class MessagingViewModel @Inject constructor(
     fun cancelFailure() = coordinator.cancelFailure()
 
     fun handleSendToIntent(intent: Intent?) {
+        if (intent?.action == ACTION_OPEN_MESSAGES) {
+            externalNavigationRequested = true
+            val conversationId = intent.getLongExtra(EXTRA_CONVERSATION_ID, -1L)
+            if (conversationId > 0) {
+                coordinator.openConversation(conversationId, refreshBeforeOpen = true)
+            } else {
+                coordinator.openInbox()
+            }
+            requestOpenMessages()
+            return
+        }
         if (intent?.action != Intent.ACTION_SENDTO) return
+        externalNavigationRequested = true
         val number = intent.data?.schemeSpecificPart.orEmpty()
         coordinator.startNewMessage()
         coordinator.enterManualRecipient(number)
         intent.getStringExtra(Intent.EXTRA_TEXT)?.let(coordinator::updateBody)
+        requestOpenMessages()
+    }
+
+    private fun requestOpenMessages() {
+        val next = mutableOpenMessageRequests.value + 1
+        savedStateHandle[KEY_OPEN_REQUESTS] = next
+        mutableOpenMessageRequests.value = next
     }
 
     private fun restoredState(): MessagingSavedState = MessagingSavedState(
@@ -112,5 +141,6 @@ class MessagingViewModel @Inject constructor(
         private const val KEY_CONVERSATION = "messaging.conversation"
         private const val KEY_DRAFT = "messaging.draft"
         private const val KEY_SEARCH = "messaging.search"
+        private const val KEY_OPEN_REQUESTS = "messaging.open.requests"
     }
 }

@@ -1,5 +1,6 @@
 package com.clarohome.presentation.classic
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -8,13 +9,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -24,9 +30,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -40,7 +49,12 @@ import androidx.compose.ui.unit.sp
 import com.clarohome.core.design.ClaroAvatar
 import com.clarohome.core.design.ClaroBannerTone
 import com.clarohome.core.design.ClaroColors
+import com.clarohome.core.design.ClassicMultiTapState
+import com.clarohome.core.design.applyClassicKeypadInput
 import com.clarohome.core.design.ClaroIconKind
+import com.clarohome.core.design.ClaroIcon
+import com.clarohome.core.design.LocalClaroDeleteText
+import com.clarohome.core.design.LocalClaroHaptics
 import com.clarohome.core.design.ClaroInfoCard
 import com.clarohome.core.model.BatteryStatus
 import com.clarohome.core.model.CellularStatus
@@ -54,7 +68,7 @@ import com.clarohome.feature.communication.MessageKind
 import com.clarohome.feature.communication.MessageRecipient
 import com.clarohome.feature.communication.MessagingRoute
 import com.clarohome.feature.communication.MessagingUiState
-import com.clarohome.feature.communication.SmsEncoding
+import com.clarohome.feature.communication.formatMessageTimestamp
 import com.clarohome.presentation.classic.R
 
 private enum class ClassicComposeTarget {
@@ -88,9 +102,39 @@ fun ClassicMessagingScreen(
     onOpenRecipients: () -> Unit = {},
     onCancelRecipients: () -> Unit = onEdit,
     onRecipientInputChange: (String) -> Unit = onManualRecipient,
+    onOpenInbox: () -> Unit = onHome,
+    onDeleteConversation: (Long) -> Unit = {},
 ) {
     val displayScrollState = rememberScrollState()
     var optionsOpen by rememberSaveable(state.route) { mutableStateOf(false) }
+    var replying by rememberSaveable(state.route, state.selectedConversation?.id) { mutableStateOf(false) }
+    var confirmDelete by rememberSaveable(state.route, state.selectedConversation?.id) { mutableStateOf(false) }
+    val conversation = state.selectedConversation
+    if (confirmDelete && conversation != null) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(stringResource(R.string.classic_delete_conversation)) },
+            text = { Text(stringResource(R.string.classic_delete_conversation_confirm, conversation.recipient.accessibleName)) },
+            confirmButton = {
+                TextButton(
+                    enabled = !state.deletingConversation,
+                    onClick = {
+                        confirmDelete = false
+                        onDeleteConversation(conversation.id)
+                    },
+                ) { Text(stringResource(R.string.classic_delete_conversation_action), color = ClaroColors.Red) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) {
+                    Text(stringResource(R.string.classic_action_cancel))
+                }
+            },
+        )
+    }
+    LaunchedEffect(state.route) {
+        displayScrollState.scrollTo(0)
+        if (state.route == MessagingRoute.INBOX && state.searchQuery.isNotEmpty()) onSearchInbox("")
+    }
     var numericMode by rememberSaveable(state.route) { mutableStateOf(false) }
     var multiTapState by remember(state.route) { mutableStateOf<ClassicMultiTapState?>(null) }
     var composeTarget by rememberSaveable(state.route, state.draft.id) {
@@ -101,12 +145,10 @@ fun ClassicMessagingScreen(
         state.draft.recipient?.number.orEmpty()
     }
 
-    val isEditingRoute = !optionsOpen && state.route in setOf(
-        MessagingRoute.INBOX,
+    val isEditingRoute = !optionsOpen && !confirmDelete && (state.route in setOf(
         MessagingRoute.RECIPIENTS,
         MessagingRoute.COMPOSE,
-        MessagingRoute.CONVERSATION,
-    )
+    ) || state.route == MessagingRoute.CONVERSATION && replying)
 
     val activeModeLabel: String? = when {
         !isEditingRoute -> null
@@ -123,10 +165,6 @@ fun ClassicMessagingScreen(
         recipientFieldValue = recipientFieldValue,
         onNewMessage = onNewMessage,
         onOpenRecipients = onOpenRecipients,
-        onSearchInbox = {
-            multiTapState = null
-            onSearchInbox(it)
-        },
         onSearchRecipients = {
             multiTapState = null
             onSearchRecipients(it)
@@ -142,16 +180,32 @@ fun ClassicMessagingScreen(
         onEdit = onEdit,
         onRepair = onRepair,
         onHome = onHome,
-    )
+        replying = replying,
+        onReply = { replying = true },
+    ) + if (state.route == MessagingRoute.CONVERSATION && state.selectedConversation != null) {
+        listOf(
+            ClassicOptionAction(
+                label = stringResource(R.string.classic_delete_conversation),
+                enabled = !state.deletingConversation,
+                onSelect = { confirmDelete = true },
+            ),
+        )
+    } else {
+        emptyList()
+    }
 
     val backAction: () -> Unit = {
         val editingRecipientPhone = state.route == MessagingRoute.COMPOSE &&
             composeTarget == ClassicComposeTarget.RECIPIENT
         when {
             optionsOpen -> optionsOpen = false
-            state.route == MessagingRoute.INBOX && state.searchQuery.isNotEmpty() -> {
-                multiTapState = null
-                onSearchInbox(state.searchQuery.dropLast(1))
+            state.route == MessagingRoute.CONVERSATION -> {
+                if (replying) {
+                    replying = false
+                    multiTapState = null
+                } else {
+                    onOpenInbox()
+                }
             }
             state.route == MessagingRoute.RECIPIENTS && state.recipientQuery.isNotEmpty() -> {
                 multiTapState = null
@@ -161,7 +215,7 @@ fun ClassicMessagingScreen(
                 multiTapState = null
                 onRecipientInputChange(recipientFieldValue.dropLast(1))
             }
-            (state.route == MessagingRoute.COMPOSE || state.route == MessagingRoute.CONVERSATION) &&
+            state.route == MessagingRoute.COMPOSE &&
                 !editingRecipientPhone && state.draft.body.isNotEmpty() -> {
                 multiTapState = null
                 onBodyChange(state.draft.body.dropLast(1))
@@ -175,6 +229,9 @@ fun ClassicMessagingScreen(
         }
     }
 
+    BackHandler(enabled = state.route != MessagingRoute.INBOX || optionsOpen, onBack = backAction)
+    LaunchedEffect(replying) { displayScrollState.scrollTo(0) }
+
     val greenAction: (() -> Unit)? = if (optionsOpen) {
         null
     } else {
@@ -183,9 +240,8 @@ fun ClassicMessagingScreen(
             MessagingRoute.RECIPIENTS -> state.recipientQuery
                 .takeIf { it.isNotBlank() }
                 ?.let { query -> { onManualRecipient(query) } }
-            MessagingRoute.COMPOSE,
-            MessagingRoute.CONVERSATION,
-            -> onReview
+            MessagingRoute.COMPOSE -> onReview
+            MessagingRoute.CONVERSATION -> if (replying) onReview else { { replying = true } }
             MessagingRoute.CONFIRMATION -> onSend
             MessagingRoute.FAILED -> if (state.duplicateRiskConfirmationRequired) {
                 onConfirmDuplicateRisk
@@ -207,18 +263,6 @@ fun ClassicMessagingScreen(
                 multiTapState = null
             } else {
                 when (state.route) {
-                    MessagingRoute.INBOX -> {
-                        val (updated, nextTap) = applyClassicKeypadInput(
-                            currentValue = state.searchQuery,
-                            digit = digit,
-                            fieldKey = "inbox-search",
-                            numericMode = numericMode,
-                            previousTap = multiTapState,
-                        )
-                        multiTapState = nextTap
-                        onSearchInbox(updated)
-                    }
-
                     MessagingRoute.RECIPIENTS -> {
                         val (updated, nextTap) = applyClassicKeypadInput(
                             currentValue = state.recipientQuery,
@@ -301,6 +345,17 @@ fun ClassicMessagingScreen(
                     MessagingRoute.SENDING,
                     MessagingRoute.FAILED,
                 ),
+                action = if (!optionsOpen && state.route == MessagingRoute.INBOX) {
+                    {
+                        ClassicHeaderAction(
+                            label = stringResource(R.string.classic_new_message),
+                            icon = ClaroIconKind.COMPOSE_MESSAGE,
+                            onClick = onNewMessage,
+                        )
+                    }
+                } else {
+                    null
+                },
             )
             Column(
                 modifier = Modifier
@@ -323,12 +378,8 @@ fun ClassicMessagingScreen(
                                 multiTapState = null
                             }
                         },
-                        onSearchInbox = {
-                            multiTapState = null
-                            onSearchInbox(it)
-                        },
+                        replying = replying,
                         onOpenConversation = onOpenConversation,
-                        onNewMessage = onNewMessage,
                         onOpenRecipients = onOpenRecipients,
                         onSearchRecipients = {
                             multiTapState = null
@@ -360,9 +411,12 @@ fun ClassicMessagingScreen(
             greenLabel = when (state.route) {
                 MessagingRoute.INBOX -> "＋ ${stringResource(R.string.classic_deck_new)}"
                 MessagingRoute.RECIPIENTS -> "✓ ${stringResource(R.string.classic_deck_choose)}"
-                MessagingRoute.COMPOSE,
-                MessagingRoute.CONVERSATION,
-                -> "✓ ${stringResource(R.string.classic_review)}"
+                MessagingRoute.COMPOSE -> "✉ ${stringResource(R.string.classic_send)}"
+                MessagingRoute.CONVERSATION -> if (replying) {
+                    "✉ ${stringResource(R.string.classic_send)}"
+                } else {
+                    "✉ ${stringResource(R.string.classic_reply)}"
+                }
                 MessagingRoute.CONFIRMATION -> "✉ ${stringResource(R.string.classic_send)}"
                 MessagingRoute.FAILED -> if (state.duplicateRiskConfirmationRequired) {
                     "✉ ${stringResource(R.string.classic_send)}"
@@ -385,8 +439,10 @@ fun ClassicMessagingScreen(
             },
             scrollState = displayScrollState,
         )
-        ClassicModeStatusStrip(modeLabel = activeModeLabel)
-        ClassicNumericKeypad(onDigitSelected = keypadAction)
+        if (isEditingRoute) {
+            ClassicModeStatusStrip(modeLabel = activeModeLabel)
+            ClassicNumericKeypad(onDigitSelected = keypadAction)
+        }
     }
 }
 
@@ -397,13 +453,14 @@ private fun buildClassicMessagingOptions(
     recipientFieldValue: String,
     onNewMessage: () -> Unit,
     onOpenRecipients: () -> Unit,
-    onSearchInbox: (String) -> Unit,
     onSearchRecipients: (String) -> Unit,
     onRecipientInputChange: (String) -> Unit,
     onBodyChange: (String) -> Unit,
     onEdit: () -> Unit,
     onRepair: () -> Unit,
     onHome: () -> Unit,
+    replying: Boolean,
+    onReply: () -> Unit,
 ): List<ClassicOptionAction> {
     val newMessageLabel = stringResource(R.string.classic_new_message)
     val contactsLabel = stringResource(R.string.classic_contacts)
@@ -416,26 +473,23 @@ private fun buildClassicMessagingOptions(
             MessagingRoute.INBOX -> {
                 add(ClassicOptionAction(label = newMessageLabel, onSelect = onNewMessage))
                 add(ClassicOptionAction(label = contactsLabel, onSelect = onOpenRecipients))
-                add(
-                    ClassicOptionAction(
-                        label = clearTextLabel,
-                        enabled = state.searchQuery.isNotEmpty(),
-                        onSelect = { onSearchInbox("") },
-                    ),
-                )
                 if (!state.qualification.canRead && state.qualification.telephonySupported) {
                     add(ClassicOptionAction(label = repairMessagesLabel, onSelect = onRepair))
                 }
             }
 
             MessagingRoute.CONVERSATION -> {
-                add(
-                    ClassicOptionAction(
-                        label = clearTextLabel,
-                        enabled = state.draft.body.isNotEmpty(),
-                        onSelect = { onBodyChange("") },
-                    ),
-                )
+                if (!replying) {
+                    add(ClassicOptionAction(label = stringResource(R.string.classic_reply), onSelect = onReply))
+                } else {
+                    add(
+                        ClassicOptionAction(
+                            label = clearTextLabel,
+                            enabled = state.draft.body.isNotEmpty(),
+                            onSelect = { onBodyChange("") },
+                        ),
+                    )
+                }
                 add(ClassicOptionAction(label = newMessageLabel, onSelect = onNewMessage))
                 add(ClassicOptionAction(label = contactsLabel, onSelect = onOpenRecipients))
             }
@@ -494,9 +548,8 @@ private fun ClassicMessageDisplay(
     state: MessagingUiState,
     recipientFieldValue: String,
     onComposeTargetChange: (ClassicComposeTarget) -> Unit,
-    onSearchInbox: (String) -> Unit,
+    replying: Boolean,
     onOpenConversation: (Long) -> Unit,
-    onNewMessage: () -> Unit,
     onOpenRecipients: () -> Unit,
     onSearchRecipients: (String) -> Unit,
     onManualRecipient: (String) -> Unit,
@@ -511,6 +564,7 @@ private fun ClassicMessageDisplay(
     onCancelFailure: () -> Unit,
     onRepair: () -> Unit,
 ) {
+    val messageLocale = LocalConfiguration.current.locales[0]
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -519,24 +573,6 @@ private fun ClassicMessageDisplay(
     ) {
         when (state.route) {
             MessagingRoute.INBOX -> {
-                val searchLabel = stringResource(R.string.classic_search_name_or_number)
-                Text(
-                    text = searchLabel,
-                    color = ClassicInk,
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 3.dp),
-                )
-                OutlinedTextField(
-                    value = state.searchQuery,
-                    onValueChange = onSearchInbox,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .semantics { contentDescription = searchLabel },
-                    singleLine = true,
-                    textStyle = TextStyle(fontSize = 23.sp),
-                    shape = RectangleShape,
-                )
                 if (!state.qualification.canRead) {
                     ClaroInfoCard(
                         text = if (!state.qualification.telephonySupported) {
@@ -584,7 +620,11 @@ private fun ClassicMessageDisplay(
                     }
                     ClassicRowItem(
                         title = title,
-                        subtitle = subtitle,
+                        subtitle = listOf(
+                            subtitle,
+                            formatMessageTimestamp(conversation.timestampMillis, messageLocale)
+                                ?: stringResource(R.string.classic_message_time_unknown),
+                        ).filter(String::isNotBlank).joinToString("\n"),
                         unreadDot = hasUnread,
                         onClick = { onOpenConversation(conversation.id) },
                         leading = {
@@ -597,21 +637,14 @@ private fun ClassicMessageDisplay(
                         },
                     )
                 }
-                ClassicLightButton(
-                    label = stringResource(R.string.classic_write_message),
-                    onClick = onNewMessage,
-                    color = ClaroColors.Blue,
-                    textColor = Color.White,
-                    borderColor = ClaroColors.Blue,
-                    leadingIcon = ClaroIconKind.MESSAGES,
-                )
             }
 
             MessagingRoute.CONVERSATION -> {
                 MessageRecipientHeader(recipient = state.selectedConversation?.recipient)
+                if (!replying) {
                 state.messages.forEach { message ->
                     val incoming = message.direction == MessageDirection.INCOMING
-                    val deliveryNote = when (message.deliveryState) {
+                    val deliveryNote = if (incoming) null else when (message.deliveryState) {
                         MessageDeliveryState.DELIVERY_CONFIRMED ->
                             stringResource(R.string.classic_delivery_confirmed)
                         MessageDeliveryState.DELIVERY_UNKNOWN ->
@@ -657,6 +690,14 @@ private fun ClassicMessageDisplay(
                             fontSize = 22.sp,
                             lineHeight = 29.sp,
                         )
+                        Text(
+                            text = formatMessageTimestamp(message.timestampMillis, messageLocale)
+                                ?: stringResource(R.string.classic_message_time_unknown),
+                            color = Color(0xFF4B5565),
+                            fontSize = 17.sp,
+                            lineHeight = 22.sp,
+                            modifier = Modifier.testTag("message-time-${message.providerId}"),
+                        )
                         deliveryNote?.let { note ->
                             Text(
                                 text = note,
@@ -678,7 +719,12 @@ private fun ClassicMessageDisplay(
                         }
                     }
                 }
+                } else {
                 val replyLabel = stringResource(R.string.classic_reply)
+                val replyFocus = remember { FocusRequester() }
+                val deleteText = LocalClaroDeleteText.current
+                val haptics = LocalClaroHaptics.current
+                LaunchedEffect(Unit) { replyFocus.requestFocus() }
                 Text(
                     text = replyLabel,
                     color = ClassicInk,
@@ -692,6 +738,7 @@ private fun ClassicMessageDisplay(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 84.dp)
+                        .focusRequester(replyFocus)
                         .semantics { contentDescription = replyLabel },
                     placeholder = {
                         Text(
@@ -701,8 +748,29 @@ private fun ClassicMessageDisplay(
                     },
                     textStyle = TextStyle(fontSize = 22.sp, lineHeight = 28.sp),
                     shape = RectangleShape,
+                    trailingIcon = {
+                        IconButton(
+                            onClick = {
+                                haptics.keyClick()
+                                if (deleteText != null) {
+                                    deleteText()
+                                } else if (state.draft.body.isNotEmpty()) {
+                                    onBodyChange(state.draft.body.dropLast(1))
+                                }
+                            },
+                            enabled = state.draft.body.isNotEmpty(),
+                            modifier = Modifier.size(48.dp),
+                        ) {
+                            ClaroIcon(
+                                kind = ClaroIconKind.BACKSPACE,
+                                tint = ClassicInk,
+                                size = 24.dp,
+                                contentDescription = stringResource(R.string.classic_delete_character),
+                            )
+                        }
+                    },
                 )
-                SmsCounterLine(state)
+                }
                 if (!state.qualification.canSend && state.qualification.telephonySupported) {
                     ClassicLightButton(
                         label = stringResource(R.string.classic_repair_messages_access),
@@ -778,6 +846,7 @@ private fun ClassicMessageDisplay(
                                     name = contact.displayName,
                                     size = 44.dp,
                                     paletteSeed = index,
+                                    photoUri = contact.photoUri,
                                 )
                             },
                         )
@@ -850,7 +919,6 @@ private fun ClassicMessageDisplay(
                     textStyle = TextStyle(fontSize = 22.sp, lineHeight = 28.sp),
                     shape = RectangleShape,
                 )
-                SmsCounterLine(state)
                 if (!state.qualification.canSend && state.qualification.telephonySupported) {
                     ClassicLightButton(
                         label = stringResource(R.string.classic_repair_messages_access),
@@ -861,7 +929,7 @@ private fun ClassicMessageDisplay(
                     )
                 }
                 ClassicLightButton(
-                    label = stringResource(R.string.classic_review),
+                    label = stringResource(R.string.classic_send),
                     onClick = onReview,
                     color = ClaroColors.Blue,
                     textColor = Color.White,
@@ -989,31 +1057,6 @@ private fun ClassicMessageDisplay(
 }
 
 @Composable
-private fun SmsCounterLine(state: MessagingUiState) {
-    val encoding = state.encoding
-    val text = if (encoding.encoding == SmsEncoding.UNICODE) {
-        stringResource(
-            R.string.classic_sms_counter_unicode,
-            state.draft.body.length,
-            encoding.segments,
-        )
-    } else {
-        stringResource(
-            R.string.classic_sms_counter_gsm,
-            state.draft.body.length,
-            encoding.segments,
-        )
-    }
-    Text(
-        text = text,
-        color = Color(0xFF4B5565),
-        fontSize = 16.sp,
-        lineHeight = 21.sp,
-        modifier = Modifier.padding(horizontal = 3.dp),
-    )
-}
-
-@Composable
 private fun MessageRecipientHeader(recipient: MessageRecipient?) {
     val name = recipient?.accessibleName.orEmpty()
         .ifBlank { stringResource(R.string.classic_recipient) }
@@ -1122,6 +1165,12 @@ private fun localizeMessagingStatus(
     rawStatus: String,
     failure: MessageFailure?,
 ): String = when (rawStatus) {
+    "Set Claro as default SMS app to delete conversations" ->
+        stringResource(R.string.classic_delete_conversation_permission)
+    "Conversation could not be deleted" ->
+        stringResource(R.string.classic_delete_conversation_failed)
+    "Message conversation is no longer available" ->
+        stringResource(R.string.classic_conversation_unavailable)
     "Enter a valid phone number" -> stringResource(R.string.classic_call_failure_invalid_number)
     "Choose a default SMS account in Android. Your draft is saved." ->
         stringResource(R.string.classic_msg_choose_default_sms_account)

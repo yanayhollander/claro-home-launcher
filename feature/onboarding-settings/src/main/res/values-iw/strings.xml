@@ -8,24 +8,35 @@
     <string name="unlock">פתיחה</string>
 
     <string name="onb_cancel">ביטול</string>
+    <string name="onb_back">חזרה</string>
     <string name="onb_continue">המשך</string>
     <string name="onb_save">שמירה</string>
-    <string name="onb_save_and_continue">שמירה והמשך</string>
 
     <string name="onb_step_choose_phone_style">בחירת סגנון הטלפון</string>
     <string name="onb_language_and_display_title">שפה ותצוגה</string>
+    <string name="onb_call_audio_title">שמע בשיחות</string>
+    <string name="onb_call_audio_summary">הרמקול פועל כשהטלפון רחוק, והאפרכסת כשהוא קרוב. Bluetooth ואוזניות נשארים ללא שינוי. בחירה ידנית של שמע מקבלת עדיפות באותה שיחה.</string>
+    <string name="onb_easy_call_audio">רמקול ואפרכסת אוטומטיים</string>
+    <string name="onb_maximum_speaker_volume">עוצמת רמקול מרבית</string>
+    <string name="onb_call_audio_sensor_note">המעבר האוטומטי דורש חיישן קרבה תקין. החיישן מזהה עצמים קרובים, לא בהכרח את האוזן. ללא קריאת חיישן, Claro משתמש באפרכסת.</string>
+    <string name="onb_maximum_speaker_warning">עוצמת רמקול מרבית יכולה להיות חזקה מאוד. הרחיקו את הרמקול מהאוזן. אין להסתמך על החיישן להגנה על השמיעה. העוצמה הקודמת משוחזרת בעת מעבר לאפרכסת או סיום השיחה.</string>
+    <string name="onb_enable_maximum_volume">הפעלת עוצמת רמקול מרבית</string>
+    <string name="onb_home_tiles_title">בחירת אריחי מסך הבית</string>
+    <string name="onb_home_tiles_body">בחרו אילו קיצורי דרך יוצגו במסך הבית. הסרת אריח אינה משביתה את התכונה.</string>
+    <string name="onb_show_messages_tile">הצגת הודעות במסך הבית</string>
+    <string name="onb_show_camera_tile">הצגת מצלמה במסך הבית</string>
+    <string name="onb_show_gallery_tile">הצגת גלריה במסך הבית</string>
+    <string name="onb_show_apps_tile">הצגת יישומים במסך הבית</string>
+    <string name="onb_show_app_on_home">הצגת %1$s במסך הבית</string>
     <string name="onb_settings_access">גישה להגדרות</string>
     <string name="onb_step_people_and_speed_dial">אריחי מסך בית וחיוג מהיר</string>
     <string name="onb_sos_contact_title">איש קשר לחירום (SOS)</string>
     <string name="onb_step_permissions_and_roles">הרשאות וברירות מחדל</string>
-    <string name="onb_step_handover_checklist">רשימת בדיקה למסירה</string>
     <string name="onb_step_setup_complete">ההגדרה הושלמה</string>
     <string name="onb_setup_complete_body">ההגדרה הושלמה. מסך הבית שלכם מוכן.</string>
     <string name="onb_setup_step_progress">שלב הגדרה %1$d מתוך %2$d</string>
 
     <string name="onb_set_up_claro">הגדרת Claro</string>
-    <string name="onb_continue_free">המשך בחינם</string>
-    <string name="onb_welcome_no_trial_note">התקנת Claro אינה מתחילה תקופת ניסיון ואינה כרוכה בתשלום.</string>
     <string name="onb_welcome_tagline">האנשים הקרובים אליכם. בנגיעה אחת.</string>
     <string name="onb_welcome_subtitle">מסך בית, טלפון והודעות פשוטים וברורים יותר — להגדרה עצמית או יחד עם אדם קרוב.</string>
     <string name="onb_welcome_permissions_sos_note">Android מבקשת בנפרד גישה למסך הבית, לטלפון, ל-SMS ולמצלמה בעת הצורך. לחצן SOS מתקשר לאיש קשר אחד שבחרתם — זה אינו מוקד חירום מאויש.</string>
@@ -33,11 +44,11 @@
     <string name="onb_use_style">בחירת %1$s</string>
     <string name="onb_apply">החל</string>
     <string name="onb_apply_style">החלת %1$s</string>
-    <string name="onb_phone_style_choice_body">בחרו איך Claro ייראה. שני הסגנונות חולקים את אותם אנשי קשר, הודעות והגדרות.</string>
+    <string name="onb_phone_style_choice_body">בחרו את התצוגה שהכי נוחה לכם.</string>
     <string name="onb_phone_style_settings_body">אפשר להתרשם משני הסגנונות. המעבר משנה רק את התצוגה — אנשי הקשר, ההודעות וההגדרות נשמרים במלואם.</string>
     <string name="onb_phone_style_pending_switch">המעבר אל %1$s ממתין לסיום הפעולה הנוכחית.</string>
-    <string name="onb_touch_mode_card_summary">אנשי קשר עם תמונה וכפתורים ב-2 עמודות</string>
-    <string name="onb_classic_mode_card_summary">מקשים קבועים, חיצים וכפתורי שיחה/בית</string>
+    <string name="onb_touch_mode_card_summary">כפתורי מגע גדולים ואנשי קשר עם תמונה</string>
+    <string name="onb_classic_mode_card_summary">מקשי מספרים וכפתורי טלפון מוכרים</string>
     <string name="onb_mode_selected">✓ נבחר</string>
     <string name="onb_tap_to_choose">הקישו לבחירה</string>
     <string name="onb_classic_preview_date">ד׳ 11</string>
@@ -85,13 +96,11 @@
     <string name="onb_people_setup_hold_note">לחיצה ארוכה על 1 או 2 מוציאה שיחה מיד, ללא מסך אישור נוסף.</string>
 
     <string name="onb_configure_trusted_person">הגדרת איש קשר מהימן</string>
-    <string name="onb_continue_sos_incomplete">המשך ללא השלמת SOS</string>
+    <string name="onb_continue_sos_incomplete">דילוג על SOS כרגע</string>
     <string name="onb_sos_setup_body">לחצן SOS מתקשר לאיש קשר מהימן אחד לאחר ספירה לאחור של 5 שניות. זה אינו מוקד מצוקה או שירות חירום, ולא נשלחים בו SMS או מיקום.</string>
     <string name="onb_sos_setup_agreed_info">איש הקשר המהימן נשמר בהסכמתו. מומלץ לבצע שיחת בדיקה מתואמת בנפרד.</string>
     <string name="onb_sos_setup_unconfigured_warning">לחצן SOS אינו מוגדר. לא ניתן להתחיל שיחת SOS עד שאיש קשר אמיתי יאשר זאת.</string>
 
-    <string name="onb_continue_to_handover">המשך לבדיקת המסירה</string>
-    <string name="onb_readiness_checklist_info">כל הרשאה או ברירת מחדל ב-Android מתבקשת בנפרד. אם חסרה גישה, הפעולות הרגילות של המכשיר יישארו זמינות.</string>
     <string name="onb_back_to_settings">חזרה להגדרות</string>
     <string name="onb_readiness_settings_info">הסימון מאושר מציין ש-Android העניקה הרשאה — אך אינו מוודא ששיחה, הודעת SMS או בדיקת SOS אכן הצליחו בפועל.</string>
     <string name="onb_allow_or_repair">אישור או תיקון</string>
@@ -107,21 +116,9 @@
     <string name="onb_capability_status_unavailable">לא זמין במכשיר זה</string>
     <string name="onb_readiness_summary">%1$d מתוך %2$d אושרו</string>
 
-    <string name="onb_optional_plans">תוכניות רשות</string>
     <string name="onb_finish_setup">סיום ההגדרה</string>
-    <string name="onb_handover_body">בדקו יחד שהשירותים פועלים בפועל. סעיפים שלא יסומנו יישארו מסומנים בכנות ככאלה שטרם נבדקו.</string>
-    <string name="onb_handover_all_observed">כל %1$d בדיקות המסירה בוצעו.</string>
-    <string name="onb_handover_progress_observed">בוצעו %1$d מתוך %2$d בדיקות מסירה.</string>
-    <string name="onb_handover_outgoing_call">שיחה יוצאת נבדקה</string>
-    <string name="onb_handover_incoming_call">שיחה נכנסת נבדקה</string>
-    <string name="onb_handover_sms_send">שליחת SMS נבדקה</string>
-    <string name="onb_handover_sms_receive">קבלת SMS נבדקה</string>
-    <string name="onb_handover_default_sim">כרטיס SIM ברירת מחדל נבדק</string>
-    <string name="onb_handover_ringtone">עוצמת הצלצול נבדקה</string>
-    <string name="onb_handover_home_return">חזרה למסך הבית נבדקה</string>
-    <string name="onb_handover_sos_test">בדיקת SOS מתואמת בוצעה</string>
-    <string name="onb_allowed_apps_and_tiles_title">יישומים מורשים וכפתורים במסך הבית</string>
-    <string name="onb_allowed_apps_and_tiles_subtitle">בחירת יישומים נוספים למסך הבית</string>
+    <string name="onb_set_default_apps">הגדרת Claro כברירת מחדל</string>
+    <string name="onb_default_apps_info">בחרו ב-Claro בבקשות של Android עבור מסך הבית, הטלפון וה-SMS. ניתן לסיים את ההגדרה רק לאחר אישור ברירות המחדל. אפשר להגדיר הרשאות אחרות בנפרד.</string>
 
     <string name="onb_done_settings">סיום</string>
     <string name="onb_lock_settings">נעילת ההגדרות</string>

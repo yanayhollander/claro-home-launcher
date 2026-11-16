@@ -30,9 +30,29 @@ enum class OnboardingStep {
     PEOPLE_AND_SPEED_DIAL,
     SOS_CONTACT,
     ROLE_READINESS,
+    // Retained for persisted enum compatibility; old progress resumes at role readiness.
     HANDOVER,
     COMPLETE,
+    // Append persisted steps; display order is defined separately below.
+    HOME_TILES,
 }
+
+val onboardingStepOrder = listOf(
+    OnboardingStep.WELCOME,
+    OnboardingStep.PHONE_STYLE,
+    OnboardingStep.LANGUAGE_AND_DISPLAY,
+    OnboardingStep.HOME_TILES,
+    OnboardingStep.SETTINGS_ACCESS,
+    OnboardingStep.PEOPLE_AND_SPEED_DIAL,
+    OnboardingStep.SOS_CONTACT,
+    OnboardingStep.ROLE_READINESS,
+    OnboardingStep.COMPLETE,
+)
+
+val OnboardingStep.flowIndex: Int
+    get() = onboardingStepOrder.indexOf(
+        if (this == OnboardingStep.HANDOVER) OnboardingStep.ROLE_READINESS else this,
+    )
 
 enum class ReadinessCapability {
     HOME,
@@ -42,6 +62,17 @@ enum class ReadinessCapability {
     NOTIFICATIONS,
     MEDIA,
 }
+
+val defaultAppCapabilities = listOf(
+    ReadinessCapability.HOME,
+    ReadinessCapability.PHONE,
+    ReadinessCapability.MESSAGES,
+)
+
+fun defaultAppsConfigured(readiness: Map<ReadinessCapability, CapabilityStatus>): Boolean =
+    defaultAppCapabilities.all {
+        readiness[it] == CapabilityStatus.READY || readiness[it] == CapabilityStatus.UNAVAILABLE
+    }
 
 enum class HandoverCheck {
     OUTGOING_CALL,
@@ -105,6 +136,8 @@ data class ClaroPreferences(
     val onboarding: OnboardingProgress = OnboardingProgress(),
     val accessProtection: AccessProtection = AccessProtection(),
     val hapticFeedback: Boolean = true,
+    val easyCallAudio: Boolean = true,
+    val maximumSpeakerVolume: Boolean = false,
 )
 
 const val HOME_SLOT_COUNT = 12
@@ -132,6 +165,13 @@ enum class HomeTileKind {
     CONTACT,
     ALARM,
 }
+
+val optionalHomeTileKinds = setOf(
+    HomeTileKind.MESSAGES,
+    HomeTileKind.CAMERA,
+    HomeTileKind.GALLERY,
+    HomeTileKind.APPS,
+)
 
 enum class TileAccent {
     GREEN,

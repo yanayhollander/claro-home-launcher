@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="classic_open_keyboard">פתיחת מקלדת</string>
+    <string name="classic_hold_for_keyboard">החזקה: מקלדת</string>
     <string name="classic_ok">OK</string>
     <string name="classic_call">התקשר</string>
     <string name="classic_home">בית</string>
@@ -8,8 +10,6 @@
     <string name="classic_options">אפשרויות</string>
     <string name="classic_navigate_up">ניווט למעלה</string>
     <string name="classic_navigate_down">ניווט למטה</string>
-    <string name="classic_navigate_left">ניווט שמאלה</string>
-    <string name="classic_navigate_right">ניווט ימינה</string>
     <string name="classic_keypad_space">רווח</string>
     <string name="classic_keypad_key_description">%1$s, %2$s</string>
     <string name="classic_keypad_key_speed_dial">%1$s, %2$s. לחיצה ארוכה לחיוג מהיר</string>
@@ -32,6 +32,28 @@
     <string name="classic_delete_character">מחיקת תו</string>
     <string name="classic_clear_text">ניקוי טקסט</string>
     <string name="classic_contacts">אנשי קשר</string>
+    <string name="classic_matching_contacts">אנשי קשר תואמים</string>
+    <string name="classic_contacts_permission_needed">נדרשת הרשאה לאנשי קשר להצעות מספרים.</string>
+    <string name="classic_contacts_load_failed">לא ניתן לטעון אנשי קשר.</string>
+    <string name="classic_show_keypad">מקשי מספרים</string>
+    <string name="classic_hide_keypad">הסתרת מקשי מספרים</string>
+    <string name="classic_conversation_unavailable">השיחה הזו אינה זמינה עוד.</string>
+    <string name="classic_delete_conversation">מחיקת שיחה</string>
+    <string name="classic_delete_conversation_action">מחיקה</string>
+    <string name="classic_delete_conversation_confirm">למחוק את כל ההודעות וטיוטת התשובה בשיחה עם %1$s? לא ניתן לבטל פעולה זו.</string>
+    <string name="classic_delete_conversation_permission">הגדירו את Claro כיישום ה-SMS המוגדר כברירת מחדל כדי למחוק שיחות.</string>
+    <string name="classic_delete_conversation_failed">לא ניתן למחוק את השיחה. ההודעות לא סומנו כמחוקות.</string>
+    <string name="classic_add_contact">הוספת איש קשר</string>
+    <string name="classic_edit_contact">עריכת איש קשר</string>
+    <string name="classic_delete_contact">מחיקת איש קשר</string>
+    <string name="classic_action_save">שמירה</string>
+    <string name="classic_action_cancel">ביטול</string>
+    <string name="classic_contact_name">שם</string>
+    <string name="classic_contact_primary">מספר טלפון</string>
+    <string name="classic_contact_secondary">מספר נוסף (לא חובה)</string>
+    <string name="classic_contact_invalid">הזינו שם ומספר טלפון תקין. גם המספר הנוסף חייב להיות תקין.</string>
+    <string name="classic_delete_contact_confirm">למחוק את %1$s? יהיה צורך להגדיר מחדש קיצורי חיוג מהיר מקושרים. לא ניתן לבטל פעולה זו.</string>
+    <string name="classic_delete_contact_sos_blocked">%1$s מוגדר כאיש קשר לחירום. החליפו את איש הקשר לחירום בהגדרות לפני המחיקה.</string>
     <string name="classic_search_name_or_number">חיפוש שם או מספר</string>
     <string name="classic_loading_contacts">טוען אנשי קשר…</string>
 
@@ -48,7 +70,7 @@
     <string name="classic_decline">דחה</string>
     <string name="classic_end">סיים</string>
     <string name="classic_repair_phone_access">תיקון גישה לטלפון</string>
-    <string name="classic_emergency_call">שיחת חירום</string>
+    <string name="classic_emergency_call">שירותי חירום</string>
     <string name="classic_earpiece">אפרכסת</string>
     <string name="classic_speaker">רמקול</string>
     <string name="classic_mute">השתק</string>
@@ -107,8 +129,7 @@
     <string name="classic_message_not_sent">ההודעה לא נשלחה</string>
     <string name="classic_deck_new">חדש</string>
     <string name="classic_deck_choose">בחר</string>
-    <string name="classic_review">בדיקה</string>
-    <string name="classic_send">שלח</string>
+    <string name="classic_send">שליחה</string>
     <string name="classic_deck_retry">נסה שוב</string>
     <string name="classic_sending_ellipsis">שולח…</string>
     <string name="classic_new_message">הודעה חדשה</string>
@@ -147,8 +168,7 @@
     <string name="classic_send_again">שלח שוב</string>
     <string name="classic_do_not_resend">אל תשלח שוב</string>
     <string name="classic_try_again">נסה שוב</string>
-    <string name="classic_sms_counter_gsm">%1$d · ~%2$d SMS · ייתכנו חיובי מפעיל</string>
-    <string name="classic_sms_counter_unicode">%1$d · ~%2$d SMS · Unicode · ייתכנו חיובי מפעיל</string>
+    <string name="classic_message_time_unknown">התאריך והשעה אינם זמינים</string>
     <string name="classic_recipient">נמען</string>
     <string name="classic_msg_failure_invalid_recipient">הזן נמען תקין</string>
     <string name="classic_msg_failure_empty_content">כתוב הודעה לפני השליחה</string>

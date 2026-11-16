@@ -1,5 +1,9 @@
 package com.clarohome.feature.communication
 
+import android.provider.Telephony
+import java.time.Instant
+import java.time.ZoneId
+import java.util.Locale
 import com.clarohome.core.model.VisualMode
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -11,6 +15,168 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MessagingCoordinatorTest {
+    @Test
+    fun sendFromEditorSubmitsDirectlyAndRepeatedTapsDoNotDuplicate() = runTest {
+        val fixture = fixture()
+        fixture.coordinator.startNewMessage()
+        fixture.coordinator.enterManualRecipient("+15550101")
+        fixture.coordinator.updateBody("Hello")
+        fixture.coordinator.send()
+        assertThat(fixture.coordinator.state.value.route).isEqualTo(MessagingRoute.SENDING)
+        fixture.coordinator.send()
+        runCurrent()
+        assertThat(fixture.transport.submissions).isEqualTo(1)
+        assertThat(fixture.transport.sentBodies).containsExactly("Hello")
+    }
+
+    @Test
+    fun directSendReportsMissingRecipientOrEmptyBodyWithoutLosingDraft() = runTest {
+        val fixture = fixture()
+        fixture.coordinator.startNewMessage()
+        fixture.coordinator.updateBody("Keep this draft")
+        fixture.coordinator.send()
+        runCurrent()
+        assertThat(fixture.coordinator.state.value.sendFailure).isEqualTo(MessageFailure.INVALID_RECIPIENT)
+        assertThat(fixture.coordinator.state.value.route).isEqualTo(MessagingRoute.COMPOSE)
+        assertThat(fixture.coordinator.state.value.draft.body).isEqualTo("Keep this draft")
+        fixture.coordinator.enterManualRecipient("+15550101")
+        fixture.coordinator.updateBody("")
+        fixture.coordinator.send()
+        runCurrent()
+        assertThat(fixture.coordinator.state.value.sendFailure).isEqualTo(MessageFailure.EMPTY_CONTENT)
+        assertThat(fixture.transport.submissions).isEqualTo(0)
+    }
+
+    @Test
+    fun deletingConversationRemovesOnlyItsMessagesAndDraftAndReturnsToInbox() = runTest {
+        val conversations = listOf(7L, 8L).map {
+            MessageConversation(it, MessageRecipient("202555010$it"), "Hello", 1_000, 1)
+        }
+        val repository = FakeMessageRepository(initialConversations = conversations)
+        val drafts = FakeMessageDraftStore(
+            listOf(
+                MessageDraft("conversation-7", conversationId = 7, body = "Delete this"),
+                MessageDraft("conversation-8", conversationId = 8, body = "Keep this"),
+            ),
+        )
+        val fixture = fixture(repository = repository, drafts = drafts)
+        fixture.coordinator.openConversation(7)
+        runCurrent()
+        fixture.coordinator.deleteConversation(7)
+        fixture.coordinator.deleteConversation(7)
+        runCurrent()
+
+        assertThat(repository.deletionRequests).containsExactly(7L)
+        assertThat(fixture.coordinator.state.value.route).isEqualTo(MessagingRoute.INBOX)
+        assertThat(repository.conversations.value.map { it.id }).containsExactly(8L)
+        assertThat(drafts.drafts).doesNotContainKey("conversation-7")
+        assertThat(drafts.drafts["conversation-8"]?.body).isEqualTo("Keep this")
+        assertThat(fixture.coordinator.state.value.deletingConversation).isFalse()
+    }
+
+    @Test
+    fun failedDeletionKeepsConversationAndReplyDraftAndReportsFailure() = runTest {
+        val repository = FakeMessageRepository(
+            initialConversations = listOf(MessageConversation(7, MessageRecipient("2025550101"), "Hello", 1_000, 1)),
+        ).apply { deletionResult = ConversationDeleteResult.NOT_ALLOWED }
+        val drafts = FakeMessageDraftStore(listOf(MessageDraft("conversation-7", conversationId = 7, body = "Keep")))
+        val fixture = fixture(repository = repository, drafts = drafts)
+        fixture.coordinator.openConversation(7)
+        runCurrent()
+        fixture.coordinator.deleteConversation(8)
+        assertThat(repository.deletionRequests).isEmpty()
+        fixture.coordinator.deleteConversation(7)
+        runCurrent()
+        assertThat(fixture.coordinator.state.value.route).isEqualTo(MessagingRoute.CONVERSATION)
+        assertThat(fixture.coordinator.state.value.statusMessage)
+            .isEqualTo("Set Claro as default SMS app to delete conversations")
+        assertThat(drafts.drafts["conversation-7"]?.body).isEqualTo("Keep")
+        assertThat(repository.conversations.value).hasSize(1)
+    }
+
+    @Test
+    fun messageTimestampIncludesDateTimeAndUsesTheLocalTimeZone() {
+        val timestamp = Instant.parse("2026-11-15T11:40:00Z").toEpochMilli()
+        val english = formatMessageTimestamp(timestamp, Locale.US, ZoneId.of("UTC"))
+        assertThat(english).contains("Nov 15")
+        assertThat(english).contains("2026")
+        assertThat(english).contains("11:40")
+        val hebrew = formatMessageTimestamp(timestamp, Locale.forLanguageTag("he"), ZoneId.of("Asia/Jerusalem"))
+        assertThat(hebrew).contains("2026")
+        assertThat(hebrew).contains("13:40")
+        assertThat(formatMessageTimestamp(0, Locale.US)).isNull()
+    }
+
+    @Test
+    fun incomingSmsDuplicateIdentityUsesSenderTimeNotChangingArrivalTime() {
+        val message = ClaroMessage(
+            providerId = 0,
+            conversationId = 7,
+            clientMessageId = null,
+            direction = MessageDirection.INCOMING,
+            senderOrRecipient = "+15550101",
+            body = "Hello",
+            timestampMillis = 20_000,
+            isRead = false,
+            deliveryState = MessageDeliveryState.RECEIVED,
+            sentTimestampMillis = 10_000,
+        )
+        assertThat(incomingFingerprint(message.copy(timestampMillis = 30_000)))
+            .isEqualTo(incomingFingerprint(message))
+        assertThat(incomingFingerprint(message.copy(sentTimestampMillis = 11_000)))
+            .isNotEqualTo(incomingFingerprint(message))
+    }
+
+    @Test
+    fun inboxSmsIsReceivedRegardlessOfOutgoingDeliveryStatus() {
+        assertThat(smsDeliveryState(Telephony.Sms.MESSAGE_TYPE_INBOX, Telephony.Sms.STATUS_NONE))
+            .isEqualTo(MessageDeliveryState.RECEIVED)
+        assertThat(smsDeliveryState(Telephony.Sms.MESSAGE_TYPE_INBOX, Telephony.Sms.STATUS_COMPLETE))
+            .isEqualTo(MessageDeliveryState.RECEIVED)
+        assertThat(smsDeliveryState(Telephony.Sms.MESSAGE_TYPE_SENT, Telephony.Sms.STATUS_NONE))
+            .isEqualTo(MessageDeliveryState.SENT)
+        assertThat(smsDeliveryState(Telephony.Sms.MESSAGE_TYPE_SENT, Telephony.Sms.STATUS_COMPLETE))
+            .isEqualTo(MessageDeliveryState.DELIVERY_CONFIRMED)
+        assertThat(smsDeliveryState(Telephony.Sms.MESSAGE_TYPE_OUTBOX, Telephony.Sms.STATUS_NONE))
+            .isEqualTo(MessageDeliveryState.PENDING)
+    }
+
+    @Test
+    fun notificationOpensConversationAfterLoadingAndReportsMissingThread() = runTest {
+        val message = ClaroMessage(
+            providerId = 42,
+            conversationId = 7,
+            clientMessageId = null,
+            direction = MessageDirection.INCOMING,
+            senderOrRecipient = "+15550101",
+            body = "Hello",
+            timestampMillis = 1_000,
+            isRead = false,
+            deliveryState = MessageDeliveryState.RECEIVED,
+        )
+        val repository = FakeMessageRepository(initialMessages = mapOf(7L to listOf(message))).apply {
+            conversationsOnRefresh = listOf(
+                MessageConversation(7, MessageRecipient("+15550101", "Mira"), "Hello", 1_000, 1),
+            )
+        }
+        val fixture = fixture(repository = repository)
+        fixture.coordinator.searchInbox("another sender")
+        fixture.coordinator.openConversation(7, refreshBeforeOpen = true)
+        runCurrent()
+        assertThat(fixture.coordinator.state.value.route).isEqualTo(MessagingRoute.CONVERSATION)
+        assertThat(fixture.coordinator.state.value.selectedConversation?.id).isEqualTo(7)
+        assertThat(fixture.coordinator.state.value.searchQuery).isEmpty()
+        assertThat(fixture.coordinator.state.value.messages).containsExactly(message)
+        assertThat(fixture.coordinator.state.value.selectedConversation?.unreadCount).isEqualTo(0)
+
+        fixture.coordinator.openConversation(8, refreshBeforeOpen = true)
+        runCurrent()
+        assertThat(fixture.coordinator.state.value.route).isEqualTo(MessagingRoute.INBOX)
+        assertThat(fixture.coordinator.state.value.statusMessage)
+            .isEqualTo("Message conversation is no longer available")
+        assertThat(fixture.transport.submissions).isEqualTo(0)
+    }
+
     @Test
     fun roleLossDisablesSendAndExposesRepairWithoutFalseUnreadZero() = runTest {
         val fixture = fixture()

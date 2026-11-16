@@ -21,24 +21,35 @@
     <string name="onb_bullet_item" translatable="false">• %1$s</string>
 
     <string name="onb_cancel">Cancel</string>
+    <string name="onb_back">Back</string>
     <string name="onb_continue">Continue</string>
     <string name="onb_save">Save</string>
-    <string name="onb_save_and_continue">Save and continue</string>
 
     <string name="onb_step_choose_phone_style">Choose phone style</string>
     <string name="onb_language_and_display_title">Language and display</string>
+    <string name="onb_call_audio_title">Call audio</string>
+    <string name="onb_call_audio_summary">Use the speaker when the phone is away, and the earpiece when it is nearby. Bluetooth and headphones are unchanged. Manual audio selection takes priority for that call.</string>
+    <string name="onb_easy_call_audio">Automatic speaker and earpiece</string>
+    <string name="onb_maximum_speaker_volume">Maximum speaker volume</string>
+    <string name="onb_call_audio_sensor_note">Automatic switching requires a working proximity sensor. It detects nearby objects, not specifically your ear. Without a sensor reading, Claro uses the earpiece.</string>
+    <string name="onb_maximum_speaker_warning">Maximum speaker volume can be very loud. Keep the loudspeaker away from your ear. Do not rely on the proximity sensor as hearing protection. Your previous volume is restored when switching to the earpiece or ending the call.</string>
+    <string name="onb_enable_maximum_volume">Enable maximum speaker volume</string>
+    <string name="onb_home_tiles_title">Choose Home tiles</string>
+    <string name="onb_home_tiles_body">Choose the shortcuts shown on Home. Turning a tile off does not disable the feature.</string>
+    <string name="onb_show_messages_tile">Show Messages on Home</string>
+    <string name="onb_show_camera_tile">Show Camera on Home</string>
+    <string name="onb_show_gallery_tile">Show Gallery on Home</string>
+    <string name="onb_show_apps_tile">Show Apps on Home</string>
+    <string name="onb_show_app_on_home">Show %1$s on Home</string>
     <string name="onb_settings_access">Settings access</string>
     <string name="onb_step_people_and_speed_dial">Home tiles and speed dial</string>
     <string name="onb_sos_contact_title">SOS contact</string>
     <string name="onb_step_permissions_and_roles">Permissions and roles</string>
-    <string name="onb_step_handover_checklist">Handover checklist</string>
     <string name="onb_step_setup_complete">Setup complete</string>
     <string name="onb_setup_complete_body">Setup complete. Your Home screen is ready.</string>
     <string name="onb_setup_step_progress" tools:ignore="PluralsCandidate">Setup step %1$d of %2$d</string>
 
     <string name="onb_set_up_claro">Set up Claro</string>
-    <string name="onb_continue_free">Continue free</string>
-    <string name="onb_welcome_no_trial_note">Installing Claro does not start a trial or charge.</string>
     <string name="onb_welcome_tagline">Your people. One touch away.</string>
     <string name="onb_welcome_subtitle">A simpler home, phone and messages — set up for yourself or together with someone you trust.</string>
     <string name="onb_welcome_permissions_sos_note">Android asks separately for Home, Phone, SMS and Camera access when needed. SOS calls one trusted person — it is not monitored emergency dispatch.</string>
@@ -46,11 +57,11 @@
     <string name="onb_use_style">Use %1$s</string>
     <string name="onb_apply">Apply</string>
     <string name="onb_apply_style">Apply %1$s</string>
-    <string name="onb_phone_style_choice_body">Choose how Claro looks. Both styles share the same people, messages and settings.</string>
+    <string name="onb_phone_style_choice_body">Choose the layout that feels easiest to use.</string>
     <string name="onb_phone_style_settings_body">Preview either style. Switching changes only the presentation — your contacts, messages and settings stay in place.</string>
     <string name="onb_phone_style_pending_switch">A switch to %1$s is waiting for the current activity to finish.</string>
-    <string name="onb_touch_mode_card_summary">Photo contacts &amp; 2-column tiles</string>
-    <string name="onb_classic_mode_card_summary">Fixed keypad, D-pad &amp; Call/Home</string>
+    <string name="onb_touch_mode_card_summary">Large touch buttons and photo contacts</string>
+    <string name="onb_classic_mode_card_summary">Number keys and familiar phone controls</string>
     <string name="onb_mode_selected">✓ Selected</string>
     <string name="onb_tap_to_choose">Tap to choose</string>
     <string name="onb_classic_preview_date">Wed 11</string>
@@ -98,13 +109,11 @@
     <string name="onb_people_setup_hold_note">Holding 1 or 2 places a call immediately without an extra confirmation screen.</string>
 
     <string name="onb_configure_trusted_person">Configure trusted person</string>
-    <string name="onb_continue_sos_incomplete">Continue with SOS incomplete</string>
+    <string name="onb_continue_sos_incomplete">Skip SOS for now</string>
     <string name="onb_sos_setup_body">SOS calls one trusted person after a 5-second countdown. It is not a monitoring service or emergency dispatch, and sends no SMS or location.</string>
     <string name="onb_sos_setup_agreed_info">Trusted recipient recorded with agreement. Run a consented test call separately.</string>
     <string name="onb_sos_setup_unconfigured_warning">SOS is not configured. No SOS call can start until a real recipient agrees.</string>
 
-    <string name="onb_continue_to_handover">Continue to handover</string>
-    <string name="onb_readiness_checklist_info">Each Android role or permission is requested separately. Missing access keeps native fallback actions visible.</string>
     <string name="onb_back_to_settings">Back to Settings</string>
     <string name="onb_readiness_settings_info">Allowed means Android granted access — it does not verify that a real call, SMS or SOS test succeeded.</string>
     <string name="onb_allow_or_repair">Allow or repair</string>
@@ -120,21 +129,9 @@
     <string name="onb_capability_status_unavailable">Unavailable on this device</string>
     <string name="onb_readiness_summary" tools:ignore="PluralsCandidate">%1$d of %2$d allowed</string>
 
-    <string name="onb_optional_plans">Optional plans</string>
     <string name="onb_finish_setup">Finish setup</string>
-    <string name="onb_handover_body">Verify real service behavior together. Unchecked items remain honestly marked not tested.</string>
-    <string name="onb_handover_all_observed" tools:ignore="PluralsCandidate">All %1$d handover checks observed.</string>
-    <string name="onb_handover_progress_observed" tools:ignore="PluralsCandidate">%1$d of %2$d handover checks observed.</string>
-    <string name="onb_handover_outgoing_call">Outgoing call observed</string>
-    <string name="onb_handover_incoming_call">Incoming call observed</string>
-    <string name="onb_handover_sms_send">SMS send observed</string>
-    <string name="onb_handover_sms_receive">SMS receive observed</string>
-    <string name="onb_handover_default_sim">Default SIM checked</string>
-    <string name="onb_handover_ringtone">Audible ringtone checked</string>
-    <string name="onb_handover_home_return">Home return checked</string>
-    <string name="onb_handover_sos_test">Consented SOS test observed</string>
-    <string name="onb_allowed_apps_and_tiles_title">Allowed apps &amp; Home tiles</string>
-    <string name="onb_allowed_apps_and_tiles_subtitle">Choose optional extra apps for Home</string>
+    <string name="onb_set_default_apps">Set Claro as default</string>
+    <string name="onb_default_apps_info">Choose Claro in the Android prompts for Home, Phone and SMS. Setup can finish only after these defaults are confirmed. Other permissions can be configured separately.</string>
 
     <string name="onb_done_settings">Done</string>
     <string name="onb_lock_settings">Lock settings</string>

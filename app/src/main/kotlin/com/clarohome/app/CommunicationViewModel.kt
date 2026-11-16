@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clarohome.feature.communication.AudioRoute
+import com.clarohome.feature.communication.AndroidTelecomGateway
 import com.clarohome.feature.communication.CallHistoryStore
 import com.clarohome.feature.communication.CallerIdentity
 import com.clarohome.feature.communication.CommunicationRoute
@@ -68,7 +69,7 @@ class CommunicationViewModel @Inject constructor(
         }
     }
 
-    fun openDialer() = coordinator.openDialer()
+    fun openDialer(showMissedCalls: Boolean = false) = coordinator.openDialer(showMissedCalls)
     fun openContacts() {
         coordinator.openContacts()
         viewModelScope.launch { coordinator.loadContacts() }
@@ -79,6 +80,7 @@ class CommunicationViewModel @Inject constructor(
     fun backspace() = coordinator.backspace()
     fun requestEnteredNumberCall() = coordinator.requestEnteredNumberCall()
     fun requestCall(identity: CallerIdentity) = coordinator.requestCall(identity)
+    fun selectDialerContact(identity: CallerIdentity) = coordinator.selectDialerContact(identity)
     fun cancelConfirmation() = coordinator.cancelConfirmation()
     fun confirmOutgoingCall() = coordinator.confirmOutgoingCall()
     fun directCallAssignment(slot: String) = coordinator.directCallAssignment(slot)
@@ -110,6 +112,7 @@ class CommunicationViewModel @Inject constructor(
             CallerIdentity(
                 displayName = contact.displayName,
                 number = number.value,
+                photoUri = contact.photoUri,
             ),
         )
     }
@@ -140,17 +143,20 @@ class CommunicationViewModel @Inject constructor(
         onResult: (com.clarohome.feature.communication.ContactWriteResult) -> Unit,
     ) {
         viewModelScope.launch {
+            val existing = state.value.selectedContact?.takeIf { it.lookupKey == existingLookupKey }
             val numbers = buildList {
                 if (primaryNumber.isNotBlank()) {
-                    add(ContactNumber(primaryNumber.trim(), "Mobile"))
+                    add(ContactNumber(primaryNumber.trim(), existing?.numbers?.getOrNull(0)?.label ?: "Mobile"))
                 }
                 if (secondaryNumber.isNotBlank()) {
-                    add(ContactNumber(secondaryNumber.trim(), "Home"))
+                    add(ContactNumber(secondaryNumber.trim(), existing?.numbers?.getOrNull(1)?.label ?: "Home"))
                 }
+                addAll(existing?.numbers.orEmpty().drop(2))
             }
             val mutation = com.clarohome.feature.communication.ContactMutation(
                 displayName = name.trim(),
                 numbers = numbers,
+                photoUri = existing?.photoUri,
             )
             val result = if (existingLookupKey == null) {
                 coordinator.addContact(mutation)
@@ -178,6 +184,11 @@ class CommunicationViewModel @Inject constructor(
     }
 
     fun handleDialIntent(intent: Intent?) {
+        if (intent?.action == AndroidTelecomGateway.ACTION_RETURN_TO_CALL) {
+            coordinator.returnToActiveCall()
+            mutableOpenPhoneRequests.value += 1
+            return
+        }
         if (intent?.action !in setOf(Intent.ACTION_DIAL, Intent.ACTION_VIEW)) return
         val number = intent?.data?.takeIf { it.scheme == "tel" }?.schemeSpecificPart.orEmpty()
         coordinator.openDialer()
@@ -195,6 +206,7 @@ class CommunicationViewModel @Inject constructor(
                 displayName = savedStateHandle[KEY_PENDING_NAME],
                 number = number,
                 isPrivate = savedStateHandle[KEY_PENDING_PRIVATE] ?: false,
+                photoUri = savedStateHandle[KEY_PENDING_PHOTO],
             )
         },
         contactQuery = savedStateHandle[KEY_CONTACT_QUERY] ?: "",
@@ -207,6 +219,7 @@ class CommunicationViewModel @Inject constructor(
         savedStateHandle[KEY_PENDING_NAME] = state.pendingIdentity?.displayName
         savedStateHandle[KEY_PENDING_NUMBER] = state.pendingIdentity?.number
         savedStateHandle[KEY_PENDING_PRIVATE] = state.pendingIdentity?.isPrivate
+        savedStateHandle[KEY_PENDING_PHOTO] = state.pendingIdentity?.photoUri
         savedStateHandle[KEY_CONTACT_QUERY] = state.contactQuery
         savedStateHandle[KEY_SELECTED_CONTACT] = state.selectedContactLookupKey
     }
@@ -217,6 +230,7 @@ class CommunicationViewModel @Inject constructor(
         private const val KEY_PENDING_NAME = "phone.pending.name"
         private const val KEY_PENDING_NUMBER = "phone.pending.number"
         private const val KEY_PENDING_PRIVATE = "phone.pending.private"
+        private const val KEY_PENDING_PHOTO = "phone.pending.photo"
         private const val KEY_CONTACT_QUERY = "phone.contacts.query"
         private const val KEY_SELECTED_CONTACT = "phone.contacts.selected"
     }

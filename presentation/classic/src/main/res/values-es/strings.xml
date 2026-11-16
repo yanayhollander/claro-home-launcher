@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="classic_open_keyboard">Abrir teclado</string>
+    <string name="classic_hold_for_keyboard">Mantén: teclado</string>
     <string name="classic_ok">OK</string>
     <string name="classic_call">Llamar</string>
     <string name="classic_home">Inicio</string>
@@ -8,8 +10,6 @@
     <string name="classic_options">Opciones</string>
     <string name="classic_navigate_up">Navegar arriba</string>
     <string name="classic_navigate_down">Navegar abajo</string>
-    <string name="classic_navigate_left">Navegar a la izquierda</string>
-    <string name="classic_navigate_right">Navegar a la derecha</string>
     <string name="classic_keypad_space">espacio</string>
     <string name="classic_keypad_key_description">%1$s, %2$s</string>
     <string name="classic_keypad_key_speed_dial">%1$s, %2$s. Mantén pulsado para marcación rápida</string>
@@ -32,6 +32,28 @@
     <string name="classic_delete_character">Borrar carácter</string>
     <string name="classic_clear_text">Borrar texto</string>
     <string name="classic_contacts">Contactos</string>
+    <string name="classic_matching_contacts">Contactos coincidentes</string>
+    <string name="classic_contacts_permission_needed">Se necesita permiso de Contactos para sugerir números.</string>
+    <string name="classic_contacts_load_failed">No se pudieron cargar los contactos.</string>
+    <string name="classic_show_keypad">Teclado</string>
+    <string name="classic_hide_keypad">Ocultar teclado</string>
+    <string name="classic_conversation_unavailable">Esta conversación ya no está disponible.</string>
+    <string name="classic_delete_conversation">Eliminar conversación</string>
+    <string name="classic_delete_conversation_action">Eliminar</string>
+    <string name="classic_delete_conversation_confirm">¿Eliminar todos los mensajes y el borrador de respuesta de esta conversación con %1$s? No se puede deshacer.</string>
+    <string name="classic_delete_conversation_permission">Establece Claro como aplicación SMS predeterminada para eliminar conversaciones.</string>
+    <string name="classic_delete_conversation_failed">No se pudo eliminar la conversación. Los mensajes no se han marcado como eliminados.</string>
+    <string name="classic_add_contact">Añadir contacto</string>
+    <string name="classic_edit_contact">Editar contacto</string>
+    <string name="classic_delete_contact">Eliminar contacto</string>
+    <string name="classic_action_save">Guardar</string>
+    <string name="classic_action_cancel">Cancelar</string>
+    <string name="classic_contact_name">Nombre</string>
+    <string name="classic_contact_primary">Número de teléfono</string>
+    <string name="classic_contact_secondary">Otro número (opcional)</string>
+    <string name="classic_contact_invalid">Introduce un nombre y un número de teléfono válido. El otro número también debe ser válido.</string>
+    <string name="classic_delete_contact_confirm">¿Eliminar a %1$s? Los accesos de marcación rápida vinculados deberán configurarse de nuevo. Esta acción no se puede deshacer.</string>
+    <string name="classic_delete_contact_sos_blocked">%1$s es tu contacto SOS. Cambia el contacto SOS en Configuración antes de eliminarlo.</string>
     <string name="classic_search_name_or_number">Buscar nombre o número</string>
     <string name="classic_loading_contacts">Cargando contactos…</string>
 
@@ -48,7 +70,7 @@
     <string name="classic_decline">Rechazar</string>
     <string name="classic_end">Finalizar</string>
     <string name="classic_repair_phone_access">Reparar acceso al teléfono</string>
-    <string name="classic_emergency_call">Llamada de emergencia</string>
+    <string name="classic_emergency_call">Servicios de emergencia</string>
     <string name="classic_earpiece">Auricular</string>
     <string name="classic_speaker">Altavoz</string>
     <string name="classic_mute">Silenciar</string>
@@ -107,7 +129,6 @@
     <string name="classic_message_not_sent">Mensaje no enviado</string>
     <string name="classic_deck_new">Nuevo</string>
     <string name="classic_deck_choose">Elegir</string>
-    <string name="classic_review">Revisar</string>
     <string name="classic_send">Enviar</string>
     <string name="classic_deck_retry">Reintentar</string>
     <string name="classic_sending_ellipsis">Enviando…</string>
@@ -147,8 +168,7 @@
     <string name="classic_send_again">Enviar de nuevo</string>
     <string name="classic_do_not_resend">No reenviar</string>
     <string name="classic_try_again">Intentar de nuevo</string>
-    <string name="classic_sms_counter_gsm">%1$d · ~%2$d SMS · pueden aplicarse cargos del operador</string>
-    <string name="classic_sms_counter_unicode">%1$d · ~%2$d SMS · Unicode · pueden aplicarse cargos del operador</string>
+    <string name="classic_message_time_unknown">Fecha y hora no disponibles</string>
     <string name="classic_recipient">Destinatario</string>
     <string name="classic_msg_failure_invalid_recipient">Introduce un destinatario válido</string>
     <string name="classic_msg_failure_empty_content">Escribe un mensaje antes de enviar</string>

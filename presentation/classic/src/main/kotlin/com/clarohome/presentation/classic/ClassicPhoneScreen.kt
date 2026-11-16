@@ -12,7 +12,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -33,6 +32,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.CompositionLocalProvider
@@ -46,7 +46,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.InputMode
@@ -54,7 +53,6 @@ import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
@@ -70,6 +68,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import com.clarohome.core.design.ClaroAppIcon
 import com.clarohome.core.design.ClaroFocusVisibility
@@ -80,6 +79,7 @@ import com.clarohome.core.design.ClaroColors
 import com.clarohome.core.design.ClaroIcon
 import com.clarohome.core.design.ClaroIconKind
 import com.clarohome.core.design.LocalClaroHaptics
+import com.clarohome.core.design.LocalClaroOpenKeyboard
 import com.clarohome.core.model.BadgeValue
 import com.clarohome.core.model.BatteryStatus
 import com.clarohome.core.model.CellularStatus
@@ -136,9 +136,11 @@ fun ClassicPhoneScreen(
     onHome: () -> Unit = {},
     assignments: Map<Char, String> = emptyMap(),
     onLongDigitSelected: ((Char) -> Unit)? = null,
+    showControls: Boolean = true,
+    tileScrollState: ScrollState = rememberScrollState(),
 ) {
     val phoneTile = home.tiles.firstOrNull { it.kind == HomeTileKind.PHONE }
-    val displayScrollState = rememberScrollState()
+    val displayScrollState = tileScrollState
 
     Column(
         modifier = Modifier
@@ -148,125 +150,101 @@ fun ClassicPhoneScreen(
             .padding(6.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        BoxWithConstraints(
+        Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(10.dp))
                 .background(ClassicDisplay),
         ) {
-            val minDisplayHeight = if (constraints.hasBoundedHeight) maxHeight else 0.dp
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
+                modifier = Modifier.fillMaxWidth().testTag("classic-home-fixed-header"),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                ClassicHomeStatusBar(home)
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                        Text(
+                            text = home.time.ifBlank { stringResource(R.string.classic_brand_claro) },
+                            modifier = Modifier.semantics { heading() },
+                            color = ClassicInk,
+                            fontSize = 52.sp,
+                            lineHeight = 54.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                        )
+                    }
+                    Text(
+                        text = home.dayAndDate,
+                        color = ClassicInk,
+                        fontSize = 20.sp,
+                        lineHeight = 24.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Column(
+                modifier = Modifier.weight(1f).fillMaxWidth()
+                    .testTag("classic-home-tiles")
                     .verticalScroll(displayScrollState),
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = minDisplayHeight),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        ClassicHomeStatusBar(home)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.spacedBy(5.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(
-                                modifier = Modifier.weight(1.38f),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                            ) {
-                                CompositionLocalProvider(
-                                    LocalLayoutDirection provides LayoutDirection.Ltr,
-                                ) {
-                                    Text(
-                                        text = home.time.ifBlank {
-                                            stringResource(R.string.classic_brand_claro)
-                                        },
-                                        modifier = Modifier.semantics { heading() },
-                                        color = ClassicInk,
-                                        fontSize = 52.sp,
-                                        lineHeight = 54.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                    )
-                                }
-                                Text(
-                                    text = home.dayAndDate,
-                                    color = ClassicInk,
-                                    fontSize = 20.sp,
-                                    lineHeight = 24.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                        ClassicHomeTileGrid(
-                            tiles = home.homeTiles,
-                            onTileSelected = onTileSelected,
-                        )
-                        if (home.homeRole != HomeRoleState.GRANTED) {
-                            ClassicLightButton(
-                                label = when (home.homeRole) {
-                                    HomeRoleState.AVAILABLE ->
-                                        stringResource(R.string.classic_choose_claro_as_home)
-                                    HomeRoleState.UNAVAILABLE ->
-                                        stringResource(R.string.classic_open_home_settings)
-                                    HomeRoleState.UNKNOWN ->
-                                        stringResource(R.string.classic_repair_home_access)
-                                    HomeRoleState.GRANTED -> ""
-                                },
-                                onClick = onRepairHomeRole,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.dp),
-                                color = ClaroColors.WarningBg,
-                                textColor = ClaroColors.WarningInk,
-                                borderColor = ClaroColors.WarningBorder,
-                            )
-                        }
-                        home.activeCall?.let { activeCall ->
-                            val callerDisplayName = when (activeCall.displayName) {
-                                "Private number" -> stringResource(R.string.classic_private_number)
-                                "Unknown caller" -> stringResource(R.string.classic_unknown_caller)
-                                else -> activeCall.displayName
-                            }
-                            ClassicLightButton(
-                                label = stringResource(
-                                    R.string.classic_return_to_call,
-                                    callerDisplayName,
-                                ),
-                                onClick = onReturnToCall,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                                color = ClaroColors.Green,
-                                textColor = Color.White,
-                                borderColor = ClaroColors.Green,
-                                leadingIcon = ClaroIconKind.PHONE,
-                            )
-                        }
+                ClassicHomeTileGrid(tiles = home.homeTiles, onTileSelected = onTileSelected)
+                if (home.homeRole != HomeRoleState.GRANTED) {
+                    ClassicLightButton(
+                        label = when (home.homeRole) {
+                            HomeRoleState.AVAILABLE -> stringResource(R.string.classic_choose_claro_as_home)
+                            HomeRoleState.UNAVAILABLE -> stringResource(R.string.classic_open_home_settings)
+                            HomeRoleState.UNKNOWN -> stringResource(R.string.classic_repair_home_access)
+                            HomeRoleState.GRANTED -> ""
+                        },
+                        onClick = onRepairHomeRole,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 3.dp),
+                        color = ClaroColors.WarningBg,
+                        textColor = ClaroColors.WarningInk,
+                        borderColor = ClaroColors.WarningBorder,
+                    )
+                }
+                home.activeCall?.let { activeCall ->
+                    val callerDisplayName = when (activeCall.displayName) {
+                        "Private number" -> stringResource(R.string.classic_private_number)
+                        "Unknown caller" -> stringResource(R.string.classic_unknown_caller)
+                        else -> activeCall.displayName
                     }
+                    ClassicLightButton(
+                        label = stringResource(R.string.classic_return_to_call, callerDisplayName),
+                        onClick = onReturnToCall,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                        color = ClaroColors.Green,
+                        textColor = Color.White,
+                        borderColor = ClaroColors.Green,
+                        leadingIcon = ClaroIconKind.PHONE,
+                    )
                 }
             }
         }
-        ClassicIntegratedPad(
-            menuLabel = stringResource(R.string.classic_menu),
-            greenLabel = "☎ ${stringResource(R.string.classic_call)}",
-            redLabel = "⌂ ${stringResource(R.string.classic_home)}",
-            onBack = onBack,
-            onMenu = onOpenMenu,
-            onGreen = phoneTile?.let { tile -> { onTileSelected(tile) } },
-            onRed = onHome,
-            scrollState = displayScrollState,
-        )
-        ClassicNumericKeypad(
-            onDigitSelected = onDigitSelected,
-            assignments = assignments,
-            onLongDigitSelected = onLongDigitSelected,
-        )
+        if (showControls) {
+            ClassicIntegratedPad(
+                menuLabel = stringResource(R.string.classic_menu),
+                greenLabel = "☎ ${stringResource(R.string.classic_call)}",
+                redLabel = "⌂ ${stringResource(R.string.classic_home)}",
+                onBack = onBack,
+                onMenu = onOpenMenu,
+                onGreen = phoneTile?.let { tile -> { onTileSelected(tile) } },
+                onRed = onHome,
+                scrollState = displayScrollState,
+            )
+            ClassicNumericKeypad(
+                onDigitSelected = onDigitSelected,
+                assignments = assignments,
+                onLongDigitSelected = onLongDigitSelected,
+            )
+        }
     }
 }
 
@@ -441,7 +419,7 @@ private fun ClassicHomeTile(
         ) {
             when (tile.kind) {
                 HomeTileKind.INSTALLED_APP -> ClaroAppIcon(packageName = tile.packageName, size = 38.dp)
-                HomeTileKind.CONTACT -> ClaroAvatar(name = tile.label, size = 38.dp)
+                HomeTileKind.CONTACT -> ClaroAvatar(name = tile.label, size = 38.dp, photoUri = tile.photoUri)
                 else -> ClaroIcon(
                     kind = tile.kind.classicIconKind(),
                     tint = if (isSos) Color.White else tile.kind.classicIconTint(),
@@ -511,26 +489,51 @@ private fun ClassicBadge(badge: BadgeValue, modifier: Modifier = Modifier) {
 internal fun ClassicHeader(
     title: String,
     centered: Boolean = false,
+    titleColor: Color = Color.White,
+    action: (@Composable () -> Unit)? = null,
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 50.dp)
             .background(ClassicFrame)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = 10.dp, vertical = if (action == null) 8.dp else 0.dp),
         contentAlignment = if (centered) Alignment.Center else Alignment.CenterStart,
     ) {
         Text(
             text = title,
-            color = Color.White,
+            color = titleColor,
             fontSize = 28.sp,
             lineHeight = 32.sp,
             fontWeight = FontWeight.Bold,
             textAlign = if (centered) TextAlign.Center else TextAlign.Start,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.semantics { heading() },
+            modifier = Modifier
+                .then(if (action != null) Modifier.padding(end = 56.dp) else Modifier)
+                .semantics { heading() },
         )
+        if (action != null) {
+            Box(Modifier.align(Alignment.CenterEnd)) { action() }
+        }
+    }
+}
+
+@Composable
+internal fun ClassicHeaderAction(
+    label: String,
+    icon: ClaroIconKind,
+    onClick: () -> Unit,
+) {
+    val haptics = LocalClaroHaptics.current
+    IconButton(
+        onClick = {
+            haptics.softkey()
+            onClick()
+        },
+        modifier = Modifier.size(48.dp),
+    ) {
+        ClaroIcon(kind = icon, tint = Color.White, size = 28.dp, contentDescription = label)
     }
 }
 
@@ -772,6 +775,17 @@ internal fun ClassicOptionsOverlay(
 }
 
 @Composable
+fun ClassicKeypadModeStatus(numericMode: Boolean?) {
+    ClassicModeStatusStrip(
+        modeLabel = numericMode?.let {
+            stringResource(
+                if (it) R.string.classic_mode_numbers else R.string.classic_mode_letters,
+            )
+        },
+    )
+}
+
+@Composable
 internal fun ClassicModeStatusStrip(
     modeLabel: String? = null,
     feedback: String? = null,
@@ -861,9 +875,7 @@ fun ClassicIntegratedPad(
     greenColor: Color? = null,
     screenKey: Any? = null,
 ) {
-    val focusManager = LocalFocusManager.current
     val inputModeManager = LocalInputModeManager.current
-    var arrowsStarted by remember(screenKey) { mutableStateOf(false) }
     val view = LocalView.current
     LaunchedEffect(screenKey) { ClaroFocusVisibility.visible = false }
     // A deck tap would otherwise flip Compose into touch mode and drop the focused item.
@@ -892,25 +904,24 @@ fun ClassicIntegratedPad(
         redLabel
     }
 
-    val sendKey: (Int) -> Boolean = { keyCode ->
-        val handled = view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
-        view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
+    val sendKey: (Int, Int) -> Boolean = { keyCode, metaState ->
+        val now = SystemClock.uptimeMillis()
+        val handled = view.dispatchKeyEvent(
+            KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0, metaState),
+        )
+        view.dispatchKeyEvent(
+            KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0, metaState),
+        )
         handled
     }
-    val navigate: (FocusDirection, Int, Int) -> Unit = { direction, keyCode, scrollDelta ->
+    val navigate: (Boolean, Int) -> Unit = { previous, scrollDelta ->
         // Compose only focuses clickable items in keyboard mode; deck taps arrive as touch.
         inputModeManager.requestInputMode(InputMode.Keyboard)
         ClaroFocusVisibility.visible = true
-        // The first arrow on a screen starts from the first item, whatever was implicitly focused.
-        val moved = runCatching {
-            if (!arrowsStarted) {
-                arrowsStarted = true
-                focusManager.clearFocus(force = true)
-                true
-            } else {
-                sendKey(keyCode)
-            }
-        }.getOrDefault(false)
+        val moved = sendKey(
+            KeyEvent.KEYCODE_TAB,
+            if (previous) KeyEvent.META_SHIFT_ON else 0,
+        )
         if (!moved) {
             if (scrollState != null && scrollDelta != 0) {
                 val target = (scrollState.value + scrollDelta).coerceIn(0, scrollState.maxValue)
@@ -965,43 +976,25 @@ fun ClassicIntegratedPad(
                     label = "↑",
                     modifier = Modifier.fillMaxWidth(),
                     accessibilityLabel = stringResource(R.string.classic_navigate_up),
-                    onClick = { navigate(FocusDirection.Up, KeyEvent.KEYCODE_DPAD_UP, -220) },
+                    onClick = { navigate(true, -220) },
                 )
-                Row(
+                ClassicDirectionButton(
+                    label = stringResource(R.string.classic_ok),
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    ClassicDirectionButton(
-                        label = "←",
-                        modifier = Modifier.weight(1f),
-                        accessibilityLabel = stringResource(R.string.classic_navigate_left),
-                        onClick = { navigate(FocusDirection.Left, KeyEvent.KEYCODE_DPAD_LEFT, 0) },
-                    )
-                    ClassicDirectionButton(
-                        label = stringResource(R.string.classic_ok),
-                        modifier = Modifier.weight(1.1f),
-                        center = true,
-                        onClick = {
-                            if (onOk != null) {
-                                onOk()
-                            } else {
-                                sendKey(KeyEvent.KEYCODE_ENTER)
-                            }
-                        },
-                    )
-                    ClassicDirectionButton(
-                        label = "→",
-                        modifier = Modifier.weight(1f),
-                        accessibilityLabel = stringResource(R.string.classic_navigate_right),
-                        onClick = { navigate(FocusDirection.Right, KeyEvent.KEYCODE_DPAD_RIGHT, 0) },
-                    )
-                }
+                    center = true,
+                    onClick = {
+                        if (onOk != null) {
+                            onOk()
+                        } else {
+                            sendKey(KeyEvent.KEYCODE_ENTER, 0)
+                        }
+                    },
+                )
                 ClassicDirectionButton(
                     label = "↓",
                     modifier = Modifier.fillMaxWidth(),
                     accessibilityLabel = stringResource(R.string.classic_navigate_down),
-                    onClick = { navigate(FocusDirection.Down, KeyEvent.KEYCODE_DPAD_DOWN, 220) },
+                    onClick = { navigate(false, 220) },
                 )
             }
             Column(
@@ -1158,8 +1151,10 @@ fun ClassicNumericKeypad(
     onDigitSelected: ((Char) -> Unit)?,
     assignments: Map<Char, String> = emptyMap(),
     onLongDigitSelected: ((Char) -> Unit)? = null,
+    keyHeight: Dp = 64.dp,
 ) {
     val haptics = LocalClaroHaptics.current
+    val openKeyboard = LocalClaroOpenKeyboard.current
     val legends = mapOf(
         '1' to stringResource(R.string.classic_keypad_legend_1),
         '2' to stringResource(R.string.classic_keypad_legend_2),
@@ -1192,9 +1187,14 @@ fun ClassicNumericKeypad(
                 ) {
                     row.forEach { key ->
                         val assignedName = assignments[key]?.takeIf { it.isNotBlank() }?.take(10)
-                        val legend = assignedName ?: legends.getValue(key)
                         val digitAction = onDigitSelected
-                        val enabled = digitAction != null
+                        val keyboardAction = openKeyboard.takeIf { key == '#' }
+                        val legend = if (keyboardAction != null) {
+                            stringResource(R.string.classic_hold_for_keyboard)
+                        } else {
+                            assignedName ?: legends.getValue(key)
+                        }
+                        val enabled = digitAction != null || keyboardAction != null
                         val keyDescription = if (
                             (key == '1' || key == '2') && onLongDigitSelected != null
                         ) {
@@ -1213,7 +1213,7 @@ fun ClassicNumericKeypad(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(64.dp)
+                                .height(keyHeight)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(ClassicKey)
                                 .border(
@@ -1230,17 +1230,25 @@ fun ClassicNumericKeypad(
                                         Modifier.combinedClickable(
                                             role = Role.Button,
                                             hapticFeedbackEnabled = false,
+                                            onLongClickLabel = if (keyboardAction != null) {
+                                                stringResource(R.string.classic_open_keyboard)
+                                            } else {
+                                                null
+                                            },
                                             onClick = {
                                                 haptics.keyClick()
-                                                digitAction(key)
+                                                digitAction?.invoke(key)
                                             },
                                             onLongClick = {
-                                                if ((key == '1' || key == '2') && onLongDigitSelected != null) {
+                                                if (keyboardAction != null) {
+                                                    haptics.confirmHeavy()
+                                                    keyboardAction()
+                                                } else if ((key == '1' || key == '2') && onLongDigitSelected != null) {
                                                     haptics.confirmHeavy()
                                                     onLongDigitSelected(key)
                                                 } else {
                                                     haptics.keyClick()
-                                                    digitAction(key)
+                                                    digitAction?.invoke(key)
                                                 }
                                             },
                                         )
@@ -1282,88 +1290,4 @@ fun ClassicNumericKeypad(
             }
         }
     }
-}
-
-internal data class ClassicMultiTapState(
-    val fieldKey: String,
-    val digit: Char,
-    val cycleIndex: Int,
-    val replaceIndex: Int,
-    val committedValue: String,
-    val timestampElapsedMillis: Long,
-)
-
-private val classicMultiTapAlphabets = mapOf(
-    '1' to ".,?!1",
-    '2' to "abc2",
-    '3' to "def3",
-    '4' to "ghi4",
-    '5' to "jkl5",
-    '6' to "mno6",
-    '7' to "pqrs7",
-    '8' to "tuv8",
-    '9' to "wxyz9",
-    '0' to " 0",
-    '*' to ".,?!*",
-)
-
-internal fun applyClassicKeypadInput(
-    currentValue: String,
-    digit: Char,
-    fieldKey: String,
-    numericMode: Boolean,
-    phoneNumberField: Boolean = false,
-    previousTap: ClassicMultiTapState?,
-): Pair<String, ClassicMultiTapState?> {
-    if (phoneNumberField) {
-        val appended = when {
-            digit == '*' && currentValue.isEmpty() -> "+"
-            digit in "0123456789*#" -> digit.toString()
-            else -> ""
-        }
-        return (currentValue + appended) to null
-    }
-    if (numericMode) {
-        return (currentValue + digit) to null
-    }
-    val alphabet = classicMultiTapAlphabets[digit] ?: return currentValue to null
-    val now = SystemClock.elapsedRealtime()
-    val continuing = previousTap != null &&
-        previousTap.fieldKey == fieldKey &&
-        previousTap.digit == digit &&
-        (now - previousTap.timestampElapsedMillis) < 1_000L &&
-        previousTap.committedValue == currentValue &&
-        previousTap.replaceIndex in currentValue.indices
-
-    val replaceIndex = if (continuing && previousTap != null) {
-        previousTap.replaceIndex
-    } else {
-        currentValue.length
-    }
-    val nextCycleIndex = if (continuing && previousTap != null) {
-        (previousTap.cycleIndex + 1) % alphabet.length
-    } else {
-        0
-    }
-    val prefix = currentValue.take(replaceIndex)
-    val shouldCapitalize = prefix.isEmpty() ||
-        prefix.endsWith(". ") ||
-        prefix.endsWith("? ") ||
-        prefix.endsWith("! ")
-    val rawChar = alphabet[nextCycleIndex]
-    val nextChar = if (shouldCapitalize && rawChar.isLetter()) {
-        rawChar.uppercaseChar()
-    } else {
-        rawChar
-    }
-    val updatedValue = prefix + nextChar
-    val nextState = ClassicMultiTapState(
-        fieldKey = fieldKey,
-        digit = digit,
-        cycleIndex = nextCycleIndex,
-        replaceIndex = replaceIndex,
-        committedValue = updatedValue,
-        timestampElapsedMillis = now,
-    )
-    return updatedValue to nextState
 }

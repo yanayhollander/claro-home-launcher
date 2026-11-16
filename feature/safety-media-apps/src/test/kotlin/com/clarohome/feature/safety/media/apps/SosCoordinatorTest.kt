@@ -17,6 +17,38 @@ class SosCoordinatorTest {
     )
 
     @Test
+    fun setupRequiresAValidNumberAndRecipientAgreement() {
+        assertThat(normalizeSosDestination("+972 (50) 123-4567")).isEqualTo("+972501234567")
+        assertThat(normalizeSosDestination("")).isNull()
+        assertThat(normalizeSosDestination("abc")).isNull()
+        assertThat(normalizeSosDestination("050+123")).isNull()
+        val gateway = RecordingPhoneGateway()
+        val coordinator = coordinator(gateway)
+        assertThat(coordinator.configure(contact.copy(destination = ""))).isEqualTo(SosReadiness.NotConfigured)
+        assertThat(coordinator.start(0)).isFalse()
+        assertThat(coordinator.configure(contact.copy(recipientConsented = false)))
+            .isEqualTo(SosReadiness.RecipientConsentMissing)
+        assertThat(coordinator.start(0)).isFalse()
+        assertThat(gateway.requests).isEmpty()
+    }
+
+    @Test
+    fun activeSosCallCannotBeRetriedAndEndedCallRequiresANewCountdown() = runTest {
+        val gateway = RecordingPhoneGateway()
+        val coordinator = coordinator(gateway)
+        coordinator.configure(contact)
+        coordinator.start(0)
+        coordinator.advance(5_000)
+        assertThat(coordinator.start(6_000)).isFalse()
+        assertThat(gateway.requests).hasSize(1)
+        coordinator.onCallOutcome(SosCallOutcome.ENDED)
+        assertThat(coordinator.start(7_000)).isTrue()
+        assertThat(gateway.requests).hasSize(1)
+        coordinator.advance(12_000)
+        assertThat(gateway.requests).hasSize(2)
+    }
+
+    @Test
     fun cancelBeforeDeadlinePlacesNoCall() = runTest {
         val gateway = RecordingPhoneGateway()
         val coordinator = coordinator(gateway)

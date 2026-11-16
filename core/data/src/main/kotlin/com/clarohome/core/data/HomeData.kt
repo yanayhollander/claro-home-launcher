@@ -6,6 +6,8 @@ import com.clarohome.core.model.BatteryStatus
 import com.clarohome.core.model.CellularAvailability
 import com.clarohome.core.model.CellularStatus
 import com.clarohome.core.model.HOME_SLOT_COUNT
+import com.clarohome.core.model.optionalHomeTileKinds
+import com.clarohome.core.domain.HomeTileVisibilityResult
 import com.clarohome.core.model.HomeRoleState
 import com.clarohome.core.model.HomeSnapshot
 import com.clarohome.core.model.HomeTile
@@ -30,6 +32,8 @@ interface HomeSlotStore {
     fun save(slots: List<HomeTile?>)
     fun loadMenuOrder(): List<String> = emptyList()
     fun saveMenuOrder(order: List<String>) = Unit
+    fun loadAppSettings(): List<InstalledApp> = emptyList()
+    fun saveAppSettings(apps: List<InstalledApp>) = Unit
 }
 
 class InMemoryHomeSlotStore(
@@ -41,6 +45,9 @@ class InMemoryHomeSlotStore(
     }
 
     private var savedOrder: List<String> = emptyList()
+    private var savedApps: List<InstalledApp> = emptyList()
+    override fun loadAppSettings(): List<InstalledApp> = savedApps
+    override fun saveAppSettings(apps: List<InstalledApp>) { savedApps = apps.toList() }
     override fun loadMenuOrder() = savedOrder
     override fun saveMenuOrder(order: List<String>) {
         savedOrder = order
@@ -97,6 +104,24 @@ class SharedPreferencesHomeSlotStore @Inject constructor(
 ) : HomeSlotStore {
     private val prefs = context.getSharedPreferences("claro_home_slots", Context.MODE_PRIVATE)
     private val orderPrefs = context.getSharedPreferences("claro_menu_order", Context.MODE_PRIVATE)
+    private val appPrefs = context.getSharedPreferences("claro_app_policy", Context.MODE_PRIVATE)
+
+    override fun loadAppSettings(): List<InstalledApp> {
+        val allowed = appPrefs.getStringSet("allowed", emptySet()).orEmpty()
+        val favorite = appPrefs.getStringSet("favorite", emptySet()).orEmpty()
+        val home = appPrefs.getStringSet("home", emptySet()).orEmpty()
+        return (allowed + favorite + home).map {
+            InstalledApp(it, "", it in allowed, it in favorite, it in home)
+        }
+    }
+
+    override fun saveAppSettings(apps: List<InstalledApp>) {
+        appPrefs.edit {
+            putStringSet("allowed", apps.filter { it.isAllowed }.mapTo(mutableSetOf()) { it.packageName })
+            putStringSet("favorite", apps.filter { it.isFavorite }.mapTo(mutableSetOf()) { it.packageName })
+            putStringSet("home", apps.filter { it.isOnHome }.mapTo(mutableSetOf()) { it.packageName })
+        }
+    }
 
     override fun loadMenuOrder(): List<String> =
         orderPrefs.getString(MENU_ORDER, null)?.split('\n')?.filter { it.isNotBlank() }.orEmpty()
@@ -205,6 +230,49 @@ class LocalHomeRepository @Inject constructor(
 
     override val home: Flow<HomeSnapshot> = state.asStateFlow()
 
+    override suspend fun setInstalledAppHomeTile(
+        packageName: String,
+        visible: Boolean,
+    ): HomeTileVisibilityResult {
+        val home = state.value
+        val app = home.installedApps.firstOrNull { it.packageName == packageName && it.isAvailable }
+            ?: return HomeTileVisibilityResult.APP_UNAVAILABLE
+        val existing = home.homeSlots.indexOfFirst { it?.packageName == packageName }
+        if (visible) {
+            val slot = if (existing >= 0) existing else home.homeSlots.indexOfFirst { it == null }
+            if (slot < 0) return HomeTileVisibilityResult.HOME_FULL
+            setAppAllowed(packageName, true)
+            setAppOnHome(packageName, true)
+            setHomeSlot(slot, homeSlotTile(slot, HomeTileKind.INSTALLED_APP, app.label, packageName))
+        } else {
+            home.homeSlots.forEachIndexed { slot, tile ->
+                if (tile?.packageName == packageName) clearHomeSlot(slot)
+            }
+            setAppOnHome(packageName, false)
+        }
+        return HomeTileVisibilityResult.APPLIED
+    }
+
+    override suspend fun setHomeTileVisibility(
+        kind: HomeTileKind,
+        visible: Boolean,
+    ): HomeTileVisibilityResult {
+        require(kind in optionalHomeTileKinds)
+        val home = state.value
+        if (visible) {
+            if (home.homeTiles.none { it.kind == kind }) {
+                val slot = home.homeSlots.indexOfFirst { it == null }
+                if (slot < 0) return HomeTileVisibilityResult.HOME_FULL
+                setHomeSlot(slot, home.tiles.first { it.kind == kind })
+            }
+        } else {
+            home.homeSlots.forEachIndexed { index, tile ->
+                if (tile?.kind == kind) clearHomeSlot(index)
+            }
+        }
+        return HomeTileVisibilityResult.APPLIED
+    }
+
     override suspend fun setHomeSlot(slot: Int, tile: HomeTile) {
         if (slot !in 0 until HOME_SLOT_COUNT) return
         val updated = state.value.homeSlots.mapIndexed { index, current ->
@@ -224,6 +292,7 @@ class LocalHomeRepository @Inject constructor(
         }
         state.value = state.value.copy(homeSlots = updated)
         slotStore.save(updated)
+        syncAppHomeFlags()
     }
 
     override suspend fun clearHomeSlot(slot: Int) {
@@ -233,6 +302,7 @@ class LocalHomeRepository @Inject constructor(
         }
         state.value = state.value.copy(homeSlots = updated)
         slotStore.save(updated)
+        syncAppHomeFlags()
     }
 
     override suspend fun reset() {
@@ -244,6 +314,7 @@ class LocalHomeRepository @Inject constructor(
         state.value = current.copy(homeSlots = defaults, menuOrder = emptyList()).withApps(clearedApps)
         slotStore.save(defaults)
         slotStore.saveMenuOrder(emptyList())
+        slotStore.saveAppSettings(emptyList())
     }
 
     override suspend fun setMenuOrder(order: List<String>) {
@@ -254,19 +325,33 @@ class LocalHomeRepository @Inject constructor(
 
     override suspend fun setInstalledApps(apps: List<InstalledApp>) {
         val current = state.value
+        val assignedPackages = current.homeSlots.mapNotNull { it?.packageName }.toSet()
+        val policies = slotStore.loadAppSettings().associateBy { it.packageName }
         val discovered = apps.associateBy { it.packageName }
         val savedPackages = current.installedApps.map { it.packageName }.toSet()
         val merged = current.installedApps.map { saved ->
             discovered[saved.packageName]?.copy(
-                isAllowed = saved.isAllowed,
+                isAllowed = saved.isAllowed || saved.packageName in assignedPackages,
                 isFavorite = saved.isFavorite,
-                isOnHome = saved.isOnHome,
+                isOnHome = saved.isOnHome || saved.packageName in assignedPackages,
             ) ?: saved.copy(isAvailable = false)
-        } + apps.filterNot { it.packageName in savedPackages }
+        } + apps.filterNot { it.packageName in savedPackages }.map {
+            val policy = policies[it.packageName]
+            it.copy(
+                isAllowed = (policy?.isAllowed ?: it.isAllowed) || it.packageName in assignedPackages,
+                isFavorite = policy?.isFavorite ?: it.isFavorite,
+                isOnHome = (policy?.isOnHome ?: it.isOnHome) || it.packageName in assignedPackages,
+            )
+        }
         state.value = current.withApps(merged)
     }
 
     override suspend fun setAppAllowed(packageName: String, allowed: Boolean) {
+        if (!allowed) {
+            state.value.homeSlots.forEachIndexed { slot, tile ->
+                if (tile?.packageName == packageName) clearHomeSlot(slot)
+            }
+        }
         val current = state.value
         state.value = current.withApps(
             current.installedApps.map { app ->
@@ -277,6 +362,7 @@ class LocalHomeRepository @Inject constructor(
                 }
             },
         )
+        slotStore.saveAppSettings(state.value.installedApps)
     }
 
     override suspend fun setAppOnHome(packageName: String, onHome: Boolean) {
@@ -290,15 +376,12 @@ class LocalHomeRepository @Inject constructor(
                 }
             },
         )
+        slotStore.saveAppSettings(state.value.installedApps)
     }
 
     override suspend fun setHomeRoleState(state: HomeRoleState) {
         val current = this.state.value
-        val badge = if (state == HomeRoleState.GRANTED) {
-            BadgeValue.Known(1)
-        } else {
-            BadgeValue.Unknown
-        }
+        val badge = BadgeValue.Unknown
         this.state.value = current.copy(
             homeRole = state,
             tiles = current.tiles.map { tile -> tile.withBadge(badge) },
@@ -322,6 +405,15 @@ class LocalHomeRepository @Inject constructor(
 
     private fun HomeTile.withBadge(badge: BadgeValue): HomeTile =
         if (kind == HomeTileKind.PHONE || kind == HomeTileKind.MESSAGES) copy(badge = badge) else this
+
+    private fun syncAppHomeFlags() {
+        val home = state.value
+        val packages = home.homeSlots.mapNotNull { it?.packageName }.toSet()
+        state.value = home.withApps(home.installedApps.map {
+            it.copy(isOnHome = it.packageName in packages, isAllowed = it.isAllowed || it.packageName in packages)
+        })
+        slotStore.saveAppSettings(state.value.installedApps)
+    }
 
     private fun HomeSnapshot.badgeFor(kind: HomeTileKind): BadgeValue? =
         tiles.firstOrNull { it.kind == kind }?.badge

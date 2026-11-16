@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="classic_open_keyboard">Open keyboard</string>
+    <string name="classic_hold_for_keyboard">Hold: keyboard</string>
     <string name="classic_brand_claro" translatable="false">Claro</string>
     <string name="classic_battery_dot_percent" translatable="false">· %1$d%%</string>
     <string name="classic_battery_percent_short" translatable="false">%1$d%%</string>
@@ -23,8 +25,6 @@
     <string name="classic_options">Options</string>
     <string name="classic_navigate_up">Navigate up</string>
     <string name="classic_navigate_down">Navigate down</string>
-    <string name="classic_navigate_left">Navigate left</string>
-    <string name="classic_navigate_right">Navigate right</string>
     <string name="classic_keypad_space">space</string>
     <string name="classic_keypad_key_description">%1$s, %2$s</string>
     <string name="classic_keypad_key_speed_dial">%1$s, %2$s. Hold for speed dial</string>
@@ -47,6 +47,28 @@
     <string name="classic_delete_character">Delete character</string>
     <string name="classic_clear_text">Clear text</string>
     <string name="classic_contacts">Contacts</string>
+    <string name="classic_matching_contacts">Matching contacts</string>
+    <string name="classic_contacts_permission_needed">Contacts permission is needed for number suggestions.</string>
+    <string name="classic_contacts_load_failed">Contacts could not be loaded.</string>
+    <string name="classic_show_keypad">Keypad</string>
+    <string name="classic_hide_keypad">Hide keypad</string>
+    <string name="classic_conversation_unavailable">This conversation is no longer available.</string>
+    <string name="classic_delete_conversation">Delete conversation</string>
+    <string name="classic_delete_conversation_action">Delete</string>
+    <string name="classic_delete_conversation_confirm">Delete all messages and the saved reply in this conversation with %1$s? This cannot be undone.</string>
+    <string name="classic_delete_conversation_permission">Set Claro as the default SMS app to delete conversations.</string>
+    <string name="classic_delete_conversation_failed">The conversation could not be deleted. Your messages have not been marked as deleted.</string>
+    <string name="classic_add_contact">Add contact</string>
+    <string name="classic_edit_contact">Edit contact</string>
+    <string name="classic_delete_contact">Delete contact</string>
+    <string name="classic_action_save">Save</string>
+    <string name="classic_action_cancel">Cancel</string>
+    <string name="classic_contact_name">Name</string>
+    <string name="classic_contact_primary">Phone number</string>
+    <string name="classic_contact_secondary">Other number (optional)</string>
+    <string name="classic_contact_invalid">Enter a name and a valid phone number. Any other number must also be valid.</string>
+    <string name="classic_delete_contact_confirm">Delete %1$s? Linked speed-dial shortcuts will need to be set up again. This cannot be undone.</string>
+    <string name="classic_delete_contact_sos_blocked">%1$s is your SOS contact. Replace the SOS contact in Settings before deleting.</string>
     <string name="classic_search_name_or_number">Search name or number</string>
     <string name="classic_loading_contacts">Loading contacts…</string>
 
@@ -63,7 +85,7 @@
     <string name="classic_decline">Decline</string>
     <string name="classic_end">End</string>
     <string name="classic_repair_phone_access">Repair phone access</string>
-    <string name="classic_emergency_call">Emergency call</string>
+    <string name="classic_emergency_call">Emergency services</string>
     <string name="classic_earpiece">Earpiece</string>
     <string name="classic_speaker">Speaker</string>
     <string name="classic_mute">Mute</string>
@@ -122,7 +144,6 @@
     <string name="classic_message_not_sent">Message not sent</string>
     <string name="classic_deck_new">New</string>
     <string name="classic_deck_choose">Choose</string>
-    <string name="classic_review">Review</string>
     <string name="classic_send">Send</string>
     <string name="classic_deck_retry">Retry</string>
     <string name="classic_sending_ellipsis">Sending…</string>
@@ -162,8 +183,7 @@
     <string name="classic_send_again">Send again</string>
     <string name="classic_do_not_resend">Do not resend</string>
     <string name="classic_try_again">Try again</string>
-    <string name="classic_sms_counter_gsm">%1$d · ~%2$d SMS · carrier charges may apply</string>
-    <string name="classic_sms_counter_unicode">%1$d · ~%2$d SMS · Unicode · carrier charges may apply</string>
+    <string name="classic_message_time_unknown">Date and time unavailable</string>
     <string name="classic_recipient">Recipient</string>
     <string name="classic_msg_failure_invalid_recipient">Enter a valid recipient</string>
     <string name="classic_msg_failure_empty_content">Write a message before sending</string>

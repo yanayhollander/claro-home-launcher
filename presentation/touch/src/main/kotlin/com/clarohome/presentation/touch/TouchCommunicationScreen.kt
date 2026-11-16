@@ -31,10 +31,12 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -137,6 +139,7 @@ fun TouchCommunicationScreen(
     onSaveContact: (String?, String, String, String) -> Unit = { _, _, _, _ -> },
     onDeleteContact: (String) -> Unit = {},
     onRequestUnlockForContacts: () -> Unit = {},
+    onSelectDialerContact: (CallerIdentity) -> Unit = {},
 ) {
     var editorMode by rememberSaveable(state.route, state.selectedContact?.lookupKey) {
         mutableStateOf<String?>(null)
@@ -215,6 +218,7 @@ fun TouchCommunicationScreen(
                 onOpenHistoryEntry = onOpenHistoryEntry,
                 onEmergencyDialer = onEmergencyDialer,
                 onRepairPhone = onRepairPhone,
+                onSelectDialerContact = onSelectDialerContact,
             )
 
             state.route == CommunicationRoute.CONTACTS -> ContactListRoute(
@@ -350,8 +354,17 @@ private fun ColumnScope.TouchDialerRoute(
     onOpenHistoryEntry: (String) -> Unit,
     onEmergencyDialer: () -> Unit,
     onRepairPhone: () -> Unit,
+    onSelectDialerContact: (CallerIdentity) -> Unit,
 ) {
-    var selectedTab by rememberSaveable { mutableStateOf(DialerTab.KEYPAD) }
+    var selectedTab by rememberSaveable(state.dialerSearchGeneration) {
+        mutableStateOf(
+            if (state.showMissedCalls && (state.missedIncomingCount ?: 0) > 0) {
+                DialerTab.MISSED
+            } else {
+                DialerTab.KEYPAD
+            },
+        )
+    }
 
     ClaroHeader(title = stringResource(R.string.touch_tile_phone))
     Row(
@@ -416,10 +429,56 @@ private fun ColumnScope.TouchDialerRoute(
             state.message?.let { message ->
                 ClaroInfoCard(text = localizedPhoneMessage(message, state.failure))
             }
+            state.pendingIdentity?.let { identity ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().testTag("touch-dialer-selected-contact"),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    ClaroAvatar(name = identity.displayName, photoUri = identity.photoUri, size = 48.dp)
+                    Text(
+                        text = identity.localizedCallerName(),
+                        color = ClaroColors.Ink,
+                        fontSize = 25.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
             DialNumberDisplayRow(
                 digits = state.digits,
                 onBackspace = onBackspace,
             )
+            if (state.digits.isNotEmpty() && state.digits.all(Char::isDigit) && state.pendingIdentity == null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.touch_matching_contacts),
+                        color = ClaroColors.Ink,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+                        if (state.dialerMatchesLoading) {
+                            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                        }
+                    }
+                }
+                state.dialerMatches.forEach { identity ->
+                    key(identity) {
+                        ClaroRowButton(
+                            title = identity.localizedCallerName(),
+                            subtitle = identity.number,
+                            leading = {
+                                ClaroAvatar(name = identity.displayName, photoUri = identity.photoUri, size = 44.dp)
+                            },
+                            onClick = { onSelectDialerContact(identity) },
+                        )
+                    }
+                }
+            }
             SpeedDialShortcutBar(
                 state = state,
                 onDigit = onDigit,
@@ -504,6 +563,7 @@ private fun ColumnScope.TouchDialerRoute(
                                 paletteSeed = index,
                                 isUnassigned = entry.identity.isPrivate ||
                                     entry.identity.displayName.isNullOrBlank(),
+                                photoUri = entry.identity.photoUri,
                             )
                         },
                         trailing = {
@@ -860,6 +920,7 @@ private fun ColumnScope.ContactListRoute(
                         name = contact.displayName,
                         size = 48.dp,
                         paletteSeed = index,
+                        photoUri = contact.photoUri,
                     )
                 },
                 onClick = { onOpenContact(contact.lookupKey) },
@@ -952,6 +1013,7 @@ private fun ColumnScope.ContactDetailRoute(
             ClaroAvatar(
                 name = contact.displayName,
                 size = 104.dp,
+                photoUri = contact.photoUri,
             )
             Text(
                 text = contact.displayName,
@@ -1252,6 +1314,7 @@ private fun ColumnScope.IncomingCallRoute(
         ClaroAvatar(
             name = identity?.displayName,
             size = 112.dp,
+            photoUri = identity?.photoUri,
             isUnassigned = isPrivate || identity?.displayName.isNullOrBlank(),
         )
         Text(
@@ -1318,6 +1381,36 @@ private fun ColumnScope.ActiveCallRoute(
     val activeCallTitle = stringResource(R.string.touch_active_call_title)
 
     ClaroHeader(title = activeCallTitle, centered = true)
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = ClaroDimensions.ScreenPadding, vertical = 6.dp)
+            .testTag("touch-active-caller"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        ClaroAvatar(
+            name = identity?.displayName,
+            photoUri = identity?.photoUri,
+            size = 64.dp,
+            modifier = Modifier.testTag("touch-active-avatar"),
+            isUnassigned = identity?.isPrivate == true,
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = identity?.localizedCallerName() ?: stringResource(R.string.touch_caller_unknown),
+                color = ClaroColors.Ink,
+                fontSize = 26.sp,
+                lineHeight = 30.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+            )
+            identity?.number?.takeIf { !identity.isPrivate && !identity.displayName.isNullOrBlank() }
+                ?.let { number ->
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                        Text(text = number, color = ClaroColors.Ink, fontSize = 22.sp, lineHeight = 26.sp)
+                    }
+                }
+        }
+    }
     Column(
         modifier = Modifier
             .weight(1f)
@@ -1327,11 +1420,6 @@ private fun ColumnScope.ActiveCallRoute(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        CenteredCallerBlock(
-            identity = identity,
-            avatarSizeDp = 96,
-            fallbackTitle = activeCallTitle,
-        )
         val phaseLabel = when (call?.phase) {
             CallPhase.DIALING -> stringResource(R.string.touch_call_phase_dialing)
             CallPhase.RINGING -> stringResource(R.string.touch_call_phase_ringing)
@@ -1349,9 +1437,13 @@ private fun ColumnScope.ActiveCallRoute(
         ) {
             Text(
                 text = phaseLabel,
-                color = Color(0xFF55647B),
-                fontSize = 23.sp,
-                lineHeight = 28.sp,
+                color = if (call?.phase == CallPhase.DISCONNECTED) {
+                    ClaroColors.Red
+                } else {
+                    Color(0xFF55647B)
+                },
+                fontSize = 19.sp,
+                lineHeight = 24.sp,
                 textAlign = TextAlign.Center,
             )
             if (
@@ -1368,8 +1460,8 @@ private fun ColumnScope.ActiveCallRoute(
                         text = durationMillis.formatCallDuration(),
                         color = ClaroColors.Ink,
                         style = TextStyle(
-                            fontSize = 32.sp,
-                            lineHeight = 36.sp,
+                            fontSize = 22.sp,
+                            lineHeight = 26.sp,
                             fontWeight = FontWeight.Bold,
                             fontFeatureSettings = "tnum",
                         ),
@@ -1382,80 +1474,83 @@ private fun ColumnScope.ActiveCallRoute(
             ClaroInfoCard(text = stringResource(R.string.touch_audio_bluetooth))
         }
 
-        if (call != null) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
-                ) {
-                    CallControlTile(
-                        label = stringResource(R.string.touch_call_control_speaker),
-                        icon = ClaroIconKind.SPEAKER,
-                        active = call.audioRoute == AudioRoute.SPEAKER,
-                        enabled = call.capabilities.canChangeAudioRoute,
-                        onClick = {
-                            onAudioRoute(
-                                if (call.audioRoute == AudioRoute.SPEAKER) {
-                                    AudioRoute.EARPIECE
-                                } else {
-                                    AudioRoute.SPEAKER
-                                },
-                            )
-                        },
-                        modifier = Modifier.weight(1f),
-                    )
-                    CallControlTile(
-                        label = stringResource(R.string.touch_call_control_mute),
-                        icon = ClaroIconKind.MICROPHONE,
-                        active = call.isMuted,
-                        enabled = call.capabilities.canMute,
-                        onClick = onToggleMute,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
-                ) {
-                    CallControlTile(
-                        label = if (call.phase == CallPhase.ON_HOLD) {
-                            stringResource(R.string.touch_call_control_resume)
-                        } else {
-                            stringResource(R.string.touch_call_control_hold)
-                        },
-                        icon = null,
-                        active = call.phase == CallPhase.ON_HOLD,
-                        enabled = call.capabilities.canHold,
-                        onClick = onToggleHold,
-                        modifier = Modifier.weight(1f),
-                    )
-                    CallControlTile(
-                        label = stringResource(R.string.touch_tab_keypad),
-                        icon = ClaroIconKind.APPS,
-                        active = showDtmfPad,
-                        enabled = call.capabilities.canSendDtmf,
-                        onClick = { showDtmfPad = !showDtmfPad },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                if (call.capabilities.canSwap) {
-                    ClaroSecondaryButton(
-                        label = stringResource(R.string.touch_call_control_swap),
-                        onClick = onSwap,
-                    )
-                }
-            }
+        if (showDtmfPad && call?.capabilities?.canSendDtmf == true) {
+            InCallDtmfPad(
+                tones = dtmfTones,
+                onDigit = { digit ->
+                    dtmfTones = (dtmfTones + digit).takeLast(20)
+                    onDigit(digit)
+                },
+            )
+        }
+    }
 
-            if (showDtmfPad && call.capabilities.canSendDtmf) {
-                InCallDtmfPad(
-                    tones = dtmfTones,
-                    onDigit = { digit ->
-                        dtmfTones = (dtmfTones + digit).takeLast(20)
-                        onDigit(digit)
+    if (call != null) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(ClaroDimensions.ScreenPadding),
+            verticalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
+            ) {
+                CallControlTile(
+                    label = stringResource(R.string.touch_call_control_speaker),
+                    icon = ClaroIconKind.SPEAKER,
+                    active = call.audioRoute == AudioRoute.SPEAKER,
+                    enabled = call.capabilities.canChangeAudioRoute,
+                    onClick = {
+                        onAudioRoute(
+                            if (call.audioRoute == AudioRoute.SPEAKER) {
+                                AudioRoute.EARPIECE
+                            } else {
+                                AudioRoute.SPEAKER
+                            },
+                        )
                     },
+                    modifier = Modifier.weight(1f),
+                )
+                CallControlTile(
+                    label = stringResource(R.string.touch_call_control_mute),
+                    icon = if (call.isMuted) ClaroIconKind.MICROPHONE_OFF else ClaroIconKind.MICROPHONE,
+                    active = call.isMuted,
+                    enabled = call.capabilities.canMute,
+                    onClick = onToggleMute,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
+            ) {
+                CallControlTile(
+                    label = if (call.phase == CallPhase.ON_HOLD) {
+                        stringResource(R.string.touch_call_control_resume)
+                    } else {
+                        stringResource(R.string.touch_call_control_hold)
+                    },
+                    icon = if (call.phase == CallPhase.ON_HOLD) ClaroIconKind.PLAY else ClaroIconKind.PAUSE,
+                    active = call.phase == CallPhase.ON_HOLD,
+                    enabled = call.capabilities.canHold,
+                    onClick = onToggleHold,
+                    modifier = Modifier.weight(1f),
+                )
+                CallControlTile(
+                    label = stringResource(R.string.touch_tab_keypad),
+                    icon = ClaroIconKind.KEYPAD,
+                    active = showDtmfPad,
+                    enabled = call.capabilities.canSendDtmf,
+                    onClick = { showDtmfPad = !showDtmfPad },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            if (call.capabilities.canSwap) {
+                ClaroSecondaryButton(
+                    label = stringResource(R.string.touch_call_control_swap),
+                    onClick = onSwap,
+                    icon = ClaroIconKind.SWAP,
                 )
             }
         }
@@ -1604,7 +1699,15 @@ private fun ColumnScope.CallOutcomeRoute(
         else -> stringResource(R.string.touch_outcome_call_ended)
     }
 
-    ClaroHeader(title = title, centered = true)
+    ClaroHeader(
+        title = title,
+        centered = true,
+        titleColor = if (state.route == CommunicationRoute.CALL_ENDED) {
+            ClaroColors.RedOnDark
+        } else {
+            Color.White
+        },
+    )
     Column(
         modifier = Modifier
             .weight(1f)
@@ -1647,6 +1750,7 @@ private fun ColumnScope.CallOutcomeRoute(
         ClaroAvatar(
             name = identity?.displayName,
             size = 112.dp,
+            photoUri = identity?.photoUri,
             isUnassigned = identity?.isPrivate == true || identity?.displayName.isNullOrBlank(),
         )
         if (displayName == null && rawNumber != null && callerName == rawNumber) {
@@ -1742,7 +1846,11 @@ private fun ColumnScope.CallOutcomeRoute(
                         else -> stringResource(R.string.touch_outcome_call_ended)
                     }
                 },
-                color = ClaroColors.Muted,
+                color = if (state.route == CommunicationRoute.CALL_ENDED) {
+                    ClaroColors.Red
+                } else {
+                    ClaroColors.Muted
+                },
                 fontSize = 21.sp,
                 lineHeight = 27.sp,
                 textAlign = TextAlign.Center,
@@ -1818,6 +1926,7 @@ private fun ColumnScope.CallFailedRoute(
                 ClaroAvatar(
                     name = target.displayName,
                     size = 48.dp,
+                    photoUri = target.photoUri,
                     isUnassigned = target.isPrivate || target.displayName.isNullOrBlank(),
                 )
                 Column(modifier = Modifier.weight(1f)) {
@@ -1897,6 +2006,7 @@ private fun CenteredCallerBlock(
         ClaroAvatar(
             name = displayName,
             size = avatarSizeDp.dp,
+            photoUri = identity?.photoUri,
             isUnassigned = identity?.isPrivate == true || displayName == null,
         )
         if (identity?.isPrivate != true && displayName == null && number != null) {
@@ -2038,6 +2148,10 @@ private fun localizedPhoneMessage(message: String, failure: CallFailure?): Strin
             return stringResource(R.string.touch_emergency_handoff_message)
         message == "Contact is no longer available" ->
             return stringResource(R.string.touch_contact_unavailable)
+        message == "Contacts permission is needed" ->
+            return stringResource(R.string.touch_contacts_permission_needed)
+        message == "Contacts could not be loaded" ->
+            return stringResource(R.string.touch_contacts_load_failed)
         message.startsWith("Hold ") && message.endsWith(" is not set") -> {
             val slot = message.removePrefix("Hold ").removeSuffix(" is not set")
             return stringResource(R.string.touch_phone_hold_slot_not_set, slot)

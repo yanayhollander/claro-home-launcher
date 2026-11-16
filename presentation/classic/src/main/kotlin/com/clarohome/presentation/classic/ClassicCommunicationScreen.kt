@@ -1,21 +1,29 @@
 package com.clarohome.presentation.classic
 
 import android.os.SystemClock
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,24 +35,32 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.clarohome.core.design.ClaroAvatar
 import com.clarohome.core.design.ClaroBannerTone
 import com.clarohome.core.design.ClaroColors
+import com.clarohome.core.design.ClassicMultiTapState
+import com.clarohome.core.design.applyClassicKeypadInput
 import com.clarohome.core.design.ClaroEmergencyButton
 import com.clarohome.core.design.ClaroIcon
 import com.clarohome.core.design.ClaroIconKind
 import com.clarohome.core.design.ClaroInfoCard
+import com.clarohome.core.design.LocalClaroDeleteText
+import com.clarohome.core.design.LocalClaroKeypadInput
+import com.clarohome.core.design.LocalClaroKeypadNumericMode
 import com.clarohome.core.model.BatteryStatus
 import com.clarohome.core.model.CellularStatus
 import com.clarohome.feature.communication.AudioRoute
@@ -52,10 +68,13 @@ import com.clarohome.feature.communication.CallDirection
 import com.clarohome.feature.communication.CallFailure
 import com.clarohome.feature.communication.CallOutcome
 import com.clarohome.feature.communication.CallPhase
+import com.clarohome.feature.communication.CallSession
 import com.clarohome.feature.communication.CallerIdentity
+import com.clarohome.feature.communication.ClaroContact
 import com.clarohome.feature.communication.CommunicationRoute
 import com.clarohome.feature.communication.CommunicationUiState
 import com.clarohome.feature.communication.ContactNumber
+import com.clarohome.feature.communication.PhoneContactsCoordinator
 import com.clarohome.feature.communication.formatCallDuration
 import com.clarohome.presentation.classic.R
 import java.time.Instant
@@ -94,12 +113,91 @@ fun ClassicCommunicationScreen(
     cellular: CellularStatus? = null,
     onEmergencyDialer: () -> Unit = {},
     onCallIdentity: ((CallerIdentity) -> Unit)? = null,
+    canManageContacts: Boolean = false,
+    onSaveContact: (String?, String, String, String) -> Unit = { _, _, _, _ -> },
+    onDeleteContact: (String) -> Unit = {},
+    onRequestUnlockForContacts: () -> Unit = {},
+    onSelectDialerContact: (CallerIdentity) -> Unit = {},
+    sharedDialerControls: Boolean = false,
+    dialerOptionsOpen: Boolean = false,
+    onDialerOptionsChange: ((Boolean) -> Unit)? = null,
+    dialerScrollState: ScrollState? = null,
 ) {
-    val displayScrollState = rememberScrollState()
-    var optionsOpen by rememberSaveable(state.route) { mutableStateOf(false) }
+    val detailKey = state.selectedContact?.lookupKey.takeIf { state.route == CommunicationRoute.CONTACT_DETAIL }
+    var localOptionsOpen by rememberSaveable(state.route, detailKey) { mutableStateOf(false) }
+    val sharedDialer = sharedDialerControls && state.route == CommunicationRoute.DIALER
+    val optionsOpen = if (sharedDialer) dialerOptionsOpen else localOptionsOpen
+    val setOptionsOpen: (Boolean) -> Unit = {
+        if (sharedDialer && onDialerOptionsChange != null) onDialerOptionsChange(it) else localOptionsOpen = it
+    }
+    BackHandler(enabled = sharedDialer && optionsOpen) { setOptionsOpen(false) }
+    val localScrollState = key(state.route, detailKey, optionsOpen) { rememberScrollState() }
+    val displayScrollState = if (sharedDialer) dialerScrollState ?: localScrollState else localScrollState
     var dtmfFeedback by rememberSaveable(state.call?.id, state.route) { mutableStateOf("") }
+    var showCallKeypad by rememberSaveable(state.call?.id, state.route) { mutableStateOf(false) }
     var contactsNumericMode by rememberSaveable(state.route) { mutableStateOf(false) }
     var contactsMultiTap by remember(state.route) { mutableStateOf<ClassicMultiTapState?>(null) }
+    var editorMode by rememberSaveable(state.route, state.selectedContact?.lookupKey) {
+        mutableStateOf<String?>(null)
+    }
+    var confirmDelete by rememberSaveable(state.route, state.selectedContact?.lookupKey) {
+        mutableStateOf(false)
+    }
+    LaunchedEffect(canManageContacts) {
+        if (!canManageContacts) {
+            editorMode = null
+            confirmDelete = false
+        }
+    }
+    val contact = state.selectedContact
+    val openEditor: (String) -> Unit = { mode ->
+        if (canManageContacts) {
+            setOptionsOpen(false)
+            editorMode = mode
+        } else {
+            onRequestUnlockForContacts()
+        }
+    }
+    val addContact = { openEditor("add") }
+    val editContact = { openEditor("edit") }
+    val requestDelete: () -> Unit = {
+        if (canManageContacts) {
+            setOptionsOpen(false)
+            confirmDelete = true
+        } else {
+            onRequestUnlockForContacts()
+        }
+    }
+    if (editorMode != null && canManageContacts) {
+        ClassicContactEditor(
+            contact = contact.takeIf { editorMode == "edit" },
+            battery = battery,
+            cellular = cellular,
+            onSave = { name, primary, secondary ->
+                if (canManageContacts && (editorMode == "add" || contact?.canEdit == true)) {
+                    onSaveContact(contact?.lookupKey.takeIf { editorMode == "edit" }, name, primary, secondary)
+                    editorMode = null
+                }
+            },
+            onCancel = { editorMode = null },
+        )
+        return
+    }
+    val deleting = confirmDelete && canManageContacts && contact != null
+    val isSosContact = state.assignments.any {
+        it.contactLookupKey == contact?.lookupKey && it.slot.equals("sos", ignoreCase = true)
+    }
+    val confirmDeleteAction: (() -> Unit)? = if (deleting && !isSosContact && contact?.canDelete == true) {
+        {
+            if (canManageContacts) {
+                onDeleteContact(contact.lookupKey)
+                confirmDelete = false
+            }
+        }
+    } else {
+        null
+    }
+    BackHandler(enabled = deleting) { confirmDelete = false }
 
     val resolvedIdentity = state.call?.identity ?: state.pendingIdentity
     val callbackAction: (() -> Unit)? = resolvedIdentity
@@ -125,30 +223,52 @@ fun ClassicCommunicationScreen(
         callbackAction = callbackAction,
         onBackspace = onBackspace,
         onOpenContacts = onOpenContacts,
-        onSearchContacts = {
-            contactsMultiTap = null
-            onSearchContacts(it)
-        },
         onToggleMute = onToggleMute,
         onAudioRoute = onAudioRoute,
         onToggleHold = onToggleHold,
         onSwap = onSwap,
         onRepairPhone = onRepairPhone,
         onEmergencyDialer = onEmergencyDialer,
-    )
+    ) + when (state.route) {
+        CommunicationRoute.CONTACTS -> listOf(
+            ClassicOptionAction(label = stringResource(R.string.classic_add_contact), onSelect = addContact),
+        )
+        CommunicationRoute.CONTACT_DETAIL -> listOf(
+            ClassicOptionAction(
+                label = stringResource(R.string.classic_edit_contact),
+                enabled = contact?.canEdit == true,
+                onSelect = editContact,
+            ),
+            ClassicOptionAction(
+                label = stringResource(R.string.classic_delete_contact),
+                enabled = contact?.canDelete == true,
+                onSelect = requestDelete,
+            ),
+        )
+        else -> emptyList()
+    }
 
     val backAction: (() -> Unit)? = when {
+        deleting -> { { confirmDelete = false } }
         optionsOpen -> {
-            { optionsOpen = false }
+            { setOptionsOpen(false) }
         }
         state.route == CommunicationRoute.INCOMING_CALL -> null
         state.route == CommunicationRoute.DIALER && state.digits.isNotEmpty() -> onBackspace
+        state.route == CommunicationRoute.CONTACTS && state.contactQuery.isNotEmpty() -> {
+            {
+                contactsMultiTap = null
+                onSearchContacts(state.contactQuery.dropLast(1))
+            }
+        }
         state.route == CommunicationRoute.CALL_CONFIRMATION -> onCancelCall
         state.route == CommunicationRoute.CONTACT_DETAIL -> onOpenContacts
         else -> onHome
     }
 
-    val greenAction: (() -> Unit)? = if (optionsOpen) {
+    val greenAction: (() -> Unit)? = if (deleting) {
+        confirmDeleteAction
+    } else if (optionsOpen) {
         null
     } else {
         when (state.route) {
@@ -171,19 +291,22 @@ fun ClassicCommunicationScreen(
         }
     }
 
-    val redAction: () -> Unit = when (state.route) {
+    val redAction: () -> Unit = if (deleting) {
+        { confirmDelete = false }
+    } else when (state.route) {
         CommunicationRoute.INCOMING_CALL -> onDecline
         CommunicationRoute.ACTIVE_CALL -> onEnd
         CommunicationRoute.CALL_CONFIRMATION -> onCancelCall
         else -> {
             {
-                optionsOpen = false
+                setOptionsOpen(false)
                 onHome()
             }
         }
     }
 
     val keypadAction: ((Char) -> Unit)? = when {
+        deleting -> null
         optionsOpen -> null
         state.route == CommunicationRoute.DIALER -> onDigit
         state.route == CommunicationRoute.ACTIVE_CALL &&
@@ -234,26 +357,85 @@ fun ClassicCommunicationScreen(
                 .background(ClassicDisplay),
         ) {
             ClassicSystemStatusBar(battery = battery, cellular = cellular)
-            ClassicHeader(
-                title = if (optionsOpen) {
-                    stringResource(R.string.classic_options)
-                } else {
-                    classicTitle(state.route)
-                },
-                centered = !optionsOpen && isCenteredHeaderRoute(state.route),
-            )
+            if (!optionsOpen && state.route == CommunicationRoute.ACTIVE_CALL) {
+                ClassicActiveCallIdentity(state)
+            } else {
+                ClassicHeader(
+                    title = if (optionsOpen) {
+                        stringResource(R.string.classic_options)
+                    } else if (deleting) {
+                        stringResource(R.string.classic_delete_contact)
+                    } else {
+                        classicTitle(state.route)
+                    },
+                    centered = !optionsOpen && isCenteredHeaderRoute(state.route),
+                    titleColor = if (!optionsOpen && state.route == CommunicationRoute.CALL_ENDED) {
+                        ClaroColors.RedOnDark
+                    } else {
+                        Color.White
+                    },
+                    action = if (!optionsOpen && state.route == CommunicationRoute.DIALER) {
+                        {
+                            ClassicHeaderAction(
+                                label = stringResource(R.string.classic_contacts),
+                                icon = ClaroIconKind.CONTACT,
+                                onClick = onOpenContacts,
+                            )
+                        }
+                    } else if (!optionsOpen && state.route == CommunicationRoute.CONTACTS) {
+                        {
+                            ClassicHeaderAction(
+                                label = stringResource(R.string.classic_add_contact),
+                                icon = ClaroIconKind.CONTACT_ADD,
+                                onClick = addContact,
+                            )
+                        }
+                    } else {
+                        null
+                    },
+                )
+            }
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
+                    .testTag("classic-phone-content")
                     .verticalScroll(displayScrollState),
             ) {
-                if (optionsOpen) {
+                if (deleting) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        ClaroInfoCard(
+                            text = stringResource(
+                                if (isSosContact) R.string.classic_delete_contact_sos_blocked
+                                else R.string.classic_delete_contact_confirm,
+                                contact?.displayName.orEmpty(),
+                            ),
+                            tone = if (isSosContact) ClaroBannerTone.ERROR else ClaroBannerTone.WARNING,
+                        )
+                        if (confirmDeleteAction != null) {
+                            ClassicLightButton(
+                                label = stringResource(R.string.classic_delete_contact),
+                                modifier = Modifier.testTag("classic-confirm-delete-contact"),
+                                onClick = confirmDeleteAction,
+                                color = ClaroColors.Red,
+                                textColor = Color.White,
+                            )
+                        }
+                        ClassicLightButton(
+                            label = stringResource(R.string.classic_action_cancel),
+                            modifier = Modifier.testTag("classic-cancel-delete-contact"),
+                            onClick = { confirmDelete = false },
+                        )
+                    }
+                } else if (optionsOpen) {
                     ClassicOptionsOverlay(
                         options = options,
-                        onClose = { optionsOpen = false },
+                        onClose = { setOptionsOpen(false) },
                     )
-                } else {
+                } else if (state.route != CommunicationRoute.ACTIVE_CALL) {
                     ClassicCommunicationDisplay(
                         state = state,
                         resolvedIdentity = resolvedIdentity,
@@ -266,30 +448,43 @@ fun ClassicCommunicationScreen(
                         onOpenContact = onOpenContact,
                         onOpenHistoryEntry = onOpenHistoryEntry,
                         onChooseNumber = onChooseNumber,
-                        onToggleMute = onToggleMute,
-                        onAudioRoute = onAudioRoute,
-                        onToggleHold = onToggleHold,
-                        onSwap = onSwap,
                         onRepairPhone = onRepairPhone,
                         onEmergencyDialer = onEmergencyDialer,
+                        onSelectDialerContact = onSelectDialerContact,
                     )
                 }
             }
+            if (!optionsOpen && state.route == CommunicationRoute.ACTIVE_CALL) {
+                ClassicCallControls(
+                    call = state.call,
+                    onToggleMute = onToggleMute,
+                    onAudioRoute = onAudioRoute,
+                    onToggleHold = onToggleHold,
+                    onSwap = onSwap,
+                    showKeypad = showCallKeypad,
+                    onToggleKeypad = { showCallKeypad = !showCallKeypad },
+                )
+            }
         }
+        if (!sharedDialer) {
         ClassicIntegratedPad(
             menuLabel = stringResource(R.string.classic_options),
-            greenLabel = when (state.route) {
+            greenLabel = if (deleting) {
+                stringResource(R.string.classic_delete_contact)
+            } else when (state.route) {
                 CommunicationRoute.INCOMING_CALL -> "☎ ${stringResource(R.string.classic_answer)}"
                 else -> "☎ ${stringResource(R.string.classic_call)}"
             },
-            redLabel = when (state.route) {
+            redLabel = if (deleting) {
+                stringResource(R.string.classic_action_cancel)
+            } else when (state.route) {
                 CommunicationRoute.INCOMING_CALL -> stringResource(R.string.classic_decline)
                 CommunicationRoute.ACTIVE_CALL -> stringResource(R.string.classic_end)
                 else -> "⌂ ${stringResource(R.string.classic_home)}"
             },
             onBack = backAction,
-            onMenu = if (options.isNotEmpty() || optionsOpen) {
-                { optionsOpen = !optionsOpen }
+            onMenu = if (!deleting && (options.isNotEmpty() || optionsOpen)) {
+                { setOptionsOpen(!optionsOpen) }
             } else {
                 null
             },
@@ -297,6 +492,7 @@ fun ClassicCommunicationScreen(
             onRed = redAction,
             scrollState = displayScrollState,
         )
+        if (state.route != CommunicationRoute.ACTIVE_CALL || showCallKeypad) {
         ClassicModeStatusStrip(
             modeLabel = if (state.route == CommunicationRoute.CONTACTS && !optionsOpen) {
                 if (contactsNumericMode) {
@@ -325,6 +521,129 @@ fun ClassicCommunicationScreen(
             } else {
                 null
             },
+            keyHeight = if (state.route == CommunicationRoute.ACTIVE_CALL) 48.dp else 64.dp,
+        )
+        }
+        }
+    }
+}
+
+@Composable
+private fun ClassicContactEditor(
+    contact: ClaroContact?,
+    battery: BatteryStatus?,
+    cellular: CellularStatus?,
+    onSave: (String, String, String) -> Unit,
+    onCancel: () -> Unit,
+) {
+    var name by rememberSaveable(contact?.lookupKey) { mutableStateOf(contact?.displayName.orEmpty()) }
+    var primary by rememberSaveable(contact?.lookupKey) {
+        mutableStateOf(contact?.numbers?.getOrNull(0)?.value.orEmpty())
+    }
+    var secondary by rememberSaveable(contact?.lookupKey) {
+        mutableStateOf(contact?.numbers?.getOrNull(1)?.value.orEmpty())
+    }
+    var showError by rememberSaveable { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+    val scroll = rememberScrollState()
+    val input = LocalClaroKeypadInput.current
+    val deleteText = LocalClaroDeleteText.current
+    val numericMode = LocalClaroKeypadNumericMode.current
+    val save: () -> Unit = {
+        val primaryValid = PhoneContactsCoordinator.normalizeDialString(primary).length >= 3
+        val secondaryValid = secondary.isBlank() ||
+            PhoneContactsCoordinator.normalizeDialString(secondary).length >= 3
+        if (name.isBlank() || !primaryValid || !secondaryValid) {
+            showError = true
+        } else {
+            onSave(name.trim(), primary.trim(), secondary.trim())
+        }
+    }
+    BackHandler(onBack = onCancel)
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    Column(
+        modifier = Modifier.fillMaxSize().background(ClassicFrame).padding(6.dp)
+            .testTag("classic-contact-editor"),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Column(
+            modifier = Modifier.weight(1f).fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp)).background(ClassicDisplay),
+        ) {
+            ClassicSystemStatusBar(battery = battery, cellular = cellular)
+            ClassicHeader(
+                title = stringResource(
+                    if (contact == null) R.string.classic_add_contact else R.string.classic_edit_contact,
+                ),
+            )
+            Column(
+                modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll).padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (showError) {
+                    ClaroInfoCard(
+                        text = stringResource(R.string.classic_contact_invalid),
+                        tone = ClaroBannerTone.ERROR,
+                    )
+                }
+                ClassicContactField(
+                    label = stringResource(R.string.classic_contact_name),
+                    value = name,
+                    onChange = { name = it; showError = false },
+                    modifier = Modifier.focusRequester(focusRequester).testTag("classic-contact-name"),
+                )
+                ClassicContactField(
+                    label = stringResource(R.string.classic_contact_primary),
+                    value = primary,
+                    onChange = { primary = it; showError = false },
+                    phone = true,
+                    modifier = Modifier.testTag("classic-contact-primary"),
+                )
+                ClassicContactField(
+                    label = stringResource(R.string.classic_contact_secondary),
+                    value = secondary,
+                    onChange = { secondary = it; showError = false },
+                    phone = true,
+                    modifier = Modifier.testTag("classic-contact-secondary"),
+                )
+            }
+        }
+        ClassicIntegratedPad(
+            greenLabel = stringResource(R.string.classic_action_save),
+            greenIcon = ClaroIconKind.CHECK,
+            redLabel = stringResource(R.string.classic_action_cancel),
+            onBack = { if (deleteText?.invoke() != true) onCancel() },
+            onGreen = save,
+            onRed = onCancel,
+            scrollState = scroll,
+        )
+        ClassicKeypadModeStatus(numericMode = numericMode)
+        ClassicNumericKeypad(onDigitSelected = input)
+    }
+}
+
+@Composable
+private fun ClassicContactField(
+    label: String,
+    value: String,
+    onChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    phone: Boolean = false,
+) {
+    CompositionLocalProvider(
+        LocalLayoutDirection provides if (phone) LayoutDirection.Ltr else LocalLayoutDirection.current,
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onChange,
+            label = { Text(label) },
+            modifier = modifier.fillMaxWidth(),
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = if (phone) KeyboardType.Phone else KeyboardType.Text,
+            ),
+            textStyle = TextStyle(fontSize = 23.sp, color = ClassicInk),
+            shape = RectangleShape,
         )
     }
 }
@@ -335,7 +654,6 @@ private fun buildClassicCommunicationOptions(
     callbackAction: (() -> Unit)?,
     onBackspace: () -> Unit,
     onOpenContacts: () -> Unit,
-    onSearchContacts: (String) -> Unit,
     onToggleMute: () -> Unit,
     onAudioRoute: (AudioRoute) -> Unit,
     onToggleHold: () -> Unit,
@@ -382,29 +700,13 @@ private fun buildClassicCommunicationOptions(
             }
 
             CommunicationRoute.CONTACTS -> {
-                add(
-                    ClassicOptionAction(
-                        label = deleteCharacterLabel,
-                        enabled = state.contactQuery.isNotEmpty(),
-                        onSelect = { onSearchContacts(state.contactQuery.dropLast(1)) },
-                    ),
-                )
-                add(
-                    ClassicOptionAction(
-                        label = clearTextLabel,
-                        enabled = state.contactQuery.isNotEmpty(),
-                        onSelect = { onSearchContacts("") },
-                    ),
-                )
                 if (state.qualification.needsRepair && state.qualification.telephonySupported) {
                     add(ClassicOptionAction(label = repairPhoneLabel, onSelect = onRepairPhone))
                 }
-                add(ClassicOptionAction(label = emergencyCallLabel, onSelect = onEmergencyDialer))
             }
 
             CommunicationRoute.CONTACT_DETAIL -> {
                 add(ClassicOptionAction(label = contactsLabel, onSelect = onOpenContacts))
-                add(ClassicOptionAction(label = emergencyCallLabel, onSelect = onEmergencyDialer))
             }
 
             CommunicationRoute.ACTIVE_CALL -> {
@@ -481,15 +783,20 @@ private fun ClassicCommunicationDisplay(
     onOpenContact: (String) -> Unit,
     onOpenHistoryEntry: (String) -> Unit,
     onChooseNumber: (ContactNumber) -> Unit,
-    onToggleMute: () -> Unit,
-    onAudioRoute: (AudioRoute) -> Unit,
-    onToggleHold: () -> Unit,
-    onSwap: () -> Unit,
     onRepairPhone: () -> Unit,
     onEmergencyDialer: () -> Unit,
+    onSelectDialerContact: (CallerIdentity) -> Unit,
 ) {
     when (state.route) {
         CommunicationRoute.DIALER -> {
+            val selectedPerson = state.pendingIdentity
+            val recentCalls = if (state.digits.isBlank()) {
+                state.history.sortedByDescending {
+                    it.outcome == CallOutcome.MISSED_INCOMING && !it.isOpened
+                }.take(5)
+            } else {
+                emptyList()
+            }
             val numberDescription = if (state.digits.isBlank()) {
                 stringResource(R.string.classic_phone_number_empty)
             } else {
@@ -501,6 +808,27 @@ private fun ClassicCommunicationDisplay(
                     .padding(3.dp),
                 verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
+                selectedPerson?.let { identity ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(6.dp)
+                            .testTag("classic-dialer-selected-contact"),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        ClaroAvatar(
+                            name = identity.displayName,
+                            photoUri = identity.photoUri,
+                            size = 48.dp,
+                            isUnassigned = identity.isPrivate,
+                        )
+                        Text(
+                            text = identity.classicAccessibleName(),
+                            color = ClassicInk,
+                            fontSize = 25.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
                 ClassicLtrText(
                     text = state.digits.ifBlank {
                         stringResource(R.string.classic_enter_number)
@@ -517,6 +845,37 @@ private fun ClassicCommunicationDisplay(
                             contentDescription = numberDescription
                         },
                 )
+                if (state.digits.isNotEmpty() && state.digits.all(Char::isDigit) && selectedPerson == null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.classic_matching_contacts),
+                            color = ClassicInk,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
+                            if (state.dialerMatchesLoading) {
+                                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                            }
+                        }
+                    }
+                    state.dialerMatches.forEach { identity ->
+                        key(identity) {
+                            ClassicRowItem(
+                                title = identity.classicAccessibleName(),
+                                subtitle = identity.number,
+                                onClick = { onSelectDialerContact(identity) },
+                                leading = {
+                                    ClaroAvatar(name = identity.displayName, photoUri = identity.photoUri, size = 44.dp)
+                                },
+                            )
+                        }
+                    }
+                }
                 if (!state.qualification.canOwnCalls) {
                     ClaroInfoCard(
                         text = if (!state.qualification.telephonySupported) {
@@ -536,7 +895,7 @@ private fun ClassicCommunicationDisplay(
                         )
                     }
                 }
-                state.history.take(5).forEachIndexed { index, entry ->
+                recentCalls.forEachIndexed { index, entry ->
                     val isMissed = entry.outcome == CallOutcome.MISSED_INCOMING
                     val timeLabel = formatCallHistoryTimestamp(entry.timestampMillis)
                     ClassicRowItem(
@@ -551,6 +910,7 @@ private fun ClassicCommunicationDisplay(
                                 paletteSeed = index,
                                 isUnassigned = entry.identity.isPrivate ||
                                     entry.identity.displayName.isNullOrBlank(),
+                                photoUri = entry.identity.photoUri,
                             )
                         },
                         trailing = {
@@ -580,17 +940,6 @@ private fun ClassicCommunicationDisplay(
                         },
                     )
                 }
-                ClassicRowItem(
-                    title = stringResource(R.string.classic_contacts),
-                    onClick = onOpenContacts,
-                    leading = {
-                        ClaroIcon(
-                            kind = ClaroIconKind.CONTACT,
-                            tint = ClaroColors.Blue,
-                            size = 32.dp,
-                        )
-                    },
-                )
                 ClaroEmergencyButton(
                     label = stringResource(R.string.classic_emergency_call),
                     onClick = onEmergencyDialer,
@@ -663,6 +1012,7 @@ private fun ClassicCommunicationDisplay(
                                 name = contact.displayName,
                                 size = 44.dp,
                                 paletteSeed = index,
+                                photoUri = contact.photoUri,
                             )
                         },
                     )
@@ -696,7 +1046,12 @@ private fun ClassicCommunicationDisplay(
                         onClick = onOpenContacts,
                     )
                 } else {
-                    ClaroAvatar(name = contact.displayName, size = 72.dp)
+                    ClaroAvatar(
+                        name = contact.displayName,
+                        size = 72.dp,
+                        photoUri = contact.photoUri,
+                        modifier = Modifier.testTag("classic-contact-avatar"),
+                    )
                     DisplayName(contact.displayName)
                     contact.numbers.forEach { number ->
                         ClassicRowItem(
@@ -728,6 +1083,7 @@ private fun ClassicCommunicationDisplay(
                 ClaroAvatar(
                     name = identity?.displayName?.takeIf { !identity.isPrivate },
                     size = 72.dp,
+                    photoUri = identity?.photoUri,
                     isUnassigned = identity == null ||
                         identity.isPrivate ||
                         identity.displayName.isNullOrBlank(),
@@ -750,6 +1106,7 @@ private fun ClassicCommunicationDisplay(
                 ClaroAvatar(
                     name = identity?.displayName?.takeIf { !identity.isPrivate },
                     size = 72.dp,
+                    photoUri = identity?.photoUri,
                     isUnassigned = identity == null ||
                         identity.isPrivate ||
                         identity.displayName.isNullOrBlank(),
@@ -760,142 +1117,7 @@ private fun ClassicCommunicationDisplay(
             }
         }
 
-        CommunicationRoute.ACTIVE_CALL -> {
-            val call = state.call
-            var nowElapsed by remember(call?.connectedAtElapsedMillis) {
-                mutableLongStateOf(SystemClock.elapsedRealtime())
-            }
-            LaunchedEffect(call?.connectedAtElapsedMillis, call?.phase) {
-                while (
-                    call?.connectedAtElapsedMillis != null &&
-                    call.phase in setOf(CallPhase.CONNECTED, CallPhase.ON_HOLD)
-                ) {
-                    nowElapsed = SystemClock.elapsedRealtime()
-                    delay(1_000L)
-                }
-            }
-            val duration = call?.connectedDurationMillis(nowElapsed)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(5.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                if (
-                    call?.phase in setOf(CallPhase.CONNECTED, CallPhase.ON_HOLD) &&
-                    duration != null
-                ) {
-                    val stateWord = if (call?.phase == CallPhase.ON_HOLD) {
-                        stringResource(R.string.classic_call_on_hold)
-                    } else {
-                        stringResource(R.string.classic_call_connected)
-                    }
-                    val formattedDuration = duration.formatCallDuration()
-                    val statusLine = stringResource(
-                        R.string.classic_call_status_duration,
-                        stateWord,
-                        formattedDuration,
-                    )
-                    Text(
-                        text = buildAnnotatedString {
-                            append(statusLine)
-                            val durationStart = statusLine.indexOf(formattedDuration)
-                            if (durationStart >= 0) {
-                                addStyle(
-                                    SpanStyle(
-                                        fontSize = 28.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF475569),
-                                    ),
-                                    start = durationStart,
-                                    end = durationStart + formattedDuration.length,
-                                )
-                            }
-                        },
-                        color = Color(0xFF55647B),
-                        fontSize = 21.sp,
-                        lineHeight = 30.sp,
-                        fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center,
-                    )
-                } else {
-                    DisplayHint(
-                        when (call?.phase) {
-                            CallPhase.DIALING -> stringResource(R.string.classic_call_dialing)
-                            CallPhase.RINGING -> stringResource(R.string.classic_call_ringing)
-                            else -> state.message?.let {
-                                localizeCommunicationMessage(it, state.failure)
-                            } ?: stringResource(R.string.classic_waiting_phone_service)
-                        },
-                    )
-                }
-                ClaroAvatar(
-                    name = resolvedIdentity?.displayName?.takeIf { !resolvedIdentity.isPrivate },
-                    size = 72.dp,
-                    isUnassigned = resolvedIdentity == null ||
-                        resolvedIdentity.isPrivate ||
-                        resolvedIdentity.displayName.isNullOrBlank(),
-                )
-                DisplayName(resolvedIdentity.classicAccessibleName())
-                DisplayNumber(resolvedIdentity)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    val speakerActive = call?.audioRoute == AudioRoute.SPEAKER
-                    ClassicLightButton(
-                        label = if (speakerActive) {
-                            stringResource(R.string.classic_earpiece)
-                        } else {
-                            stringResource(R.string.classic_speaker)
-                        },
-                        onClick = {
-                            onAudioRoute(
-                                if (speakerActive) AudioRoute.EARPIECE else AudioRoute.SPEAKER,
-                            )
-                        },
-                        modifier = Modifier.weight(1f),
-                        enabled = call?.capabilities?.canChangeAudioRoute == true,
-                        minHeight = 48,
-                    )
-                    ClassicLightButton(
-                        label = if (call?.isMuted == true) {
-                            stringResource(R.string.classic_unmute)
-                        } else {
-                            stringResource(R.string.classic_mute)
-                        },
-                        onClick = onToggleMute,
-                        modifier = Modifier.weight(1f),
-                        enabled = call?.capabilities?.canMute == true,
-                        minHeight = 48,
-                    )
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    ClassicLightButton(
-                        label = if (call?.phase == CallPhase.ON_HOLD) {
-                            stringResource(R.string.classic_resume_call)
-                        } else {
-                            stringResource(R.string.classic_hold_call)
-                        },
-                        onClick = onToggleHold,
-                        modifier = Modifier.weight(1f),
-                        enabled = call?.capabilities?.canHold == true,
-                        minHeight = 48,
-                    )
-                    ClassicLightButton(
-                        label = stringResource(R.string.classic_swap_call),
-                        onClick = onSwap,
-                        modifier = Modifier.weight(1f),
-                        enabled = call?.capabilities?.canSwap == true,
-                        minHeight = 48,
-                    )
-                }
-            }
-        }
+        CommunicationRoute.ACTIVE_CALL -> Unit
 
         CommunicationRoute.CALL_ENDED,
         CommunicationRoute.MISSED_CALL,
@@ -913,6 +1135,7 @@ private fun ClassicCommunicationDisplay(
                 ClaroAvatar(
                     name = resolvedIdentity?.displayName?.takeIf { !resolvedIdentity.isPrivate },
                     size = 72.dp,
+                    photoUri = resolvedIdentity?.photoUri,
                     isUnassigned = resolvedIdentity == null ||
                         resolvedIdentity.isPrivate ||
                         resolvedIdentity.displayName.isNullOrBlank(),
@@ -936,7 +1159,10 @@ private fun ClassicCommunicationDisplay(
                                 textAlign = TextAlign.Center,
                             )
                         } else {
-                            DisplayHint(stringResource(R.string.classic_call_ended))
+                            DisplayHint(
+                                value = stringResource(R.string.classic_call_ended),
+                                color = ClaroColors.Red,
+                            )
                         }
                     }
 
@@ -1053,10 +1279,165 @@ private fun DisplayNumber(identity: CallerIdentity?) {
 }
 
 @Composable
-private fun DisplayHint(value: String) {
+private fun ClassicCallControls(
+    call: CallSession?,
+    onToggleMute: () -> Unit,
+    onAudioRoute: (AudioRoute) -> Unit,
+    onToggleHold: () -> Unit,
+    onSwap: () -> Unit,
+    showKeypad: Boolean,
+    onToggleKeypad: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            val speakerActive = call?.audioRoute == AudioRoute.SPEAKER
+            ClassicLightButton(
+                label = stringResource(
+                    if (speakerActive) R.string.classic_earpiece else R.string.classic_speaker,
+                ),
+                onClick = {
+                    onAudioRoute(if (speakerActive) AudioRoute.EARPIECE else AudioRoute.SPEAKER)
+                },
+                modifier = Modifier.weight(1f),
+                enabled = call?.capabilities?.canChangeAudioRoute == true,
+                minHeight = 48,
+                leadingIcon = if (speakerActive) ClaroIconKind.PHONE else ClaroIconKind.SPEAKER,
+            )
+            ClassicLightButton(
+                label = stringResource(
+                    if (call?.isMuted == true) R.string.classic_unmute else R.string.classic_mute,
+                ),
+                onClick = onToggleMute,
+                modifier = Modifier.weight(1f),
+                enabled = call?.capabilities?.canMute == true,
+                minHeight = 48,
+                leadingIcon = if (call?.isMuted == true) ClaroIconKind.MICROPHONE_OFF else ClaroIconKind.MICROPHONE,
+            )
+        }
+        if (!showKeypad) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                ClassicLightButton(
+                    label = stringResource(
+                        if (call?.phase == CallPhase.ON_HOLD) {
+                            R.string.classic_resume_call
+                        } else {
+                            R.string.classic_hold_call
+                        },
+                    ),
+                    onClick = onToggleHold,
+                    modifier = Modifier.weight(1f),
+                    enabled = call?.capabilities?.canHold == true,
+                    minHeight = 48,
+                    leadingIcon = if (call?.phase == CallPhase.ON_HOLD) ClaroIconKind.PLAY else ClaroIconKind.PAUSE,
+                )
+                ClassicLightButton(
+                    label = stringResource(R.string.classic_swap_call),
+                    onClick = onSwap,
+                    modifier = Modifier.weight(1f),
+                    enabled = call?.capabilities?.canSwap == true,
+                    minHeight = 48,
+                    leadingIcon = ClaroIconKind.SWAP,
+                )
+            }
+        }
+        if (call?.capabilities?.canSendDtmf == true) {
+            ClassicLightButton(
+                label = stringResource(
+                    if (showKeypad) R.string.classic_hide_keypad else R.string.classic_show_keypad,
+                ),
+                onClick = onToggleKeypad,
+                minHeight = 48,
+                leadingIcon = ClaroIconKind.KEYPAD,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ClassicActiveCallIdentity(state: CommunicationUiState) {
+    val call = state.call
+    val identity = call?.identity ?: state.pendingIdentity
+    var now by remember(call?.id) { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+    LaunchedEffect(call?.id, call?.phase) {
+        while (call?.phase in setOf(CallPhase.CONNECTED, CallPhase.ON_HOLD)) {
+            now = SystemClock.elapsedRealtime()
+            delay(1_000)
+        }
+    }
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)
+            .testTag("classic-active-caller"),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            ClaroAvatar(
+                name = identity?.displayName,
+                photoUri = identity?.photoUri,
+                size = 48.dp,
+                modifier = Modifier.testTag("classic-active-avatar"),
+                isUnassigned = identity?.isPrivate == true,
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = identity.classicAccessibleName(),
+                    color = ClassicInk,
+                    fontSize = 24.sp,
+                    lineHeight = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                )
+                identity?.number?.takeIf { !identity.isPrivate && !identity.displayName.isNullOrBlank() }
+                    ?.let { number ->
+                        ClassicLtrText(
+                            text = number,
+                            color = ClassicInk,
+                            fontSize = 20.sp,
+                            lineHeight = 24.sp,
+                        )
+                    }
+            }
+        }
+        val phaseLabel = when (call?.phase) {
+            CallPhase.CONNECTED -> stringResource(R.string.classic_call_connected)
+            CallPhase.ON_HOLD -> stringResource(R.string.classic_call_on_hold)
+            CallPhase.DIALING -> stringResource(R.string.classic_call_dialing)
+            CallPhase.RINGING -> stringResource(R.string.classic_call_ringing)
+            else -> stringResource(R.string.classic_waiting_phone_service)
+        }
+        val duration = call?.connectedDurationMillis(now)
+        Text(
+            text = if (duration != null) {
+                stringResource(R.string.classic_call_status_duration, phaseLabel, duration.formatCallDuration())
+            } else {
+                phaseLabel
+            },
+            color = ClaroColors.Muted,
+            fontSize = 17.sp,
+            lineHeight = 20.sp,
+        )
+    }
+}
+
+@Composable
+private fun DisplayHint(value: String, color: Color = Color(0xFF55647B)) {
     Text(
         text = value,
-        color = Color(0xFF55647B),
+        color = color,
         fontSize = 20.sp,
         lineHeight = 24.sp,
         fontWeight = FontWeight.Medium,
@@ -1108,6 +1489,8 @@ private fun localizeCommunicationMessage(
         "Continue in the system emergency dialer" ->
             stringResource(R.string.classic_continue_system_emergency_dialer)
         "Contact is no longer available" -> stringResource(R.string.classic_contact_unavailable)
+        "Contacts permission is needed" -> stringResource(R.string.classic_contacts_permission_needed)
+        "Contacts could not be loaded" -> stringResource(R.string.classic_contacts_load_failed)
         else -> rawMessage
     }
 }

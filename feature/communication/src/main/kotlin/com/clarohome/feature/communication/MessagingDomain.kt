@@ -3,6 +3,11 @@ package com.clarohome.feature.communication
 import android.content.Intent
 import com.clarohome.core.model.VisualMode
 import java.util.UUID
+import java.util.Locale
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -89,7 +94,21 @@ data class ClaroMessage(
     val kind: MessageKind = MessageKind.SMS,
     val attachments: List<MessageAttachment> = emptyList(),
     val groupParticipants: List<String> = emptyList(),
+    val sentTimestampMillis: Long? = null,
 )
+
+fun formatMessageTimestamp(
+    timestampMillis: Long,
+    locale: Locale,
+    zoneId: ZoneId = ZoneId.systemDefault(),
+): String? = if (timestampMillis > 0) {
+    DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT)
+        .withLocale(locale)
+        .withZone(zoneId)
+        .format(Instant.ofEpochMilli(timestampMillis))
+} else {
+    null
+}
 
 data class MessageConversation(
     val id: Long,
@@ -230,6 +249,7 @@ interface MessageRepository {
     suspend fun refresh(query: String = "")
     suspend fun messages(conversationId: Long): List<ClaroMessage>
     suspend fun markConversationRead(conversationId: Long)
+    suspend fun deleteConversation(conversationId: Long): ConversationDeleteResult
     suspend fun reconcileIncoming(messages: List<ClaroMessage>)
     suspend fun updateOutgoingState(
         clientMessageId: String,
@@ -238,6 +258,8 @@ interface MessageRepository {
         failure: MessageFailure? = null,
     )
 }
+
+enum class ConversationDeleteResult { DELETED, NOT_ALLOWED, FAILED }
 
 interface MessageDraftStore {
     suspend fun get(id: String): MessageDraft?
@@ -279,6 +301,7 @@ data class MessagingUiState(
     val unknownOutcome: Boolean = false,
     val duplicateRiskConfirmationRequired: Boolean = false,
     val statusMessage: String? = null,
+    val deletingConversation: Boolean = false,
 ) {
     val encoding: SmsEncodingInfo get() = SmsLengthCalculator.calculate(draft.body)
     val canConfirm: Boolean
@@ -421,17 +444,30 @@ class MessagingCoordinator(
         scope.launch { repository.refresh(query) }
     }
 
-    fun openConversation(conversationId: Long) {
+    fun openConversation(conversationId: Long, refreshBeforeOpen: Boolean = false) {
         scope.launch {
-            val conversation = mutableState.value.conversations.firstOrNull { it.id == conversationId }
-                ?: return@launch
+            val query = if (refreshBeforeOpen) "" else mutableState.value.searchQuery
+            if (refreshBeforeOpen) repository.refresh(query)
+            val conversation = repository.conversations.value.firstOrNull { it.id == conversationId }
+            if (conversation == null) {
+                logger.event("sms_open_conversation", "not_found")
+                mutableState.value = mutableState.value.copy(
+                    route = MessagingRoute.INBOX,
+                    selectedConversation = null,
+                    messages = emptyList(),
+                    searchQuery = query,
+                    statusMessage = "Message conversation is no longer available",
+                )
+                return@launch
+            }
             val messages = repository.messages(conversationId)
             repository.markConversationRead(conversationId)
-            repository.refresh(mutableState.value.searchQuery)
+            repository.refresh(query)
             val draftId = "conversation-$conversationId"
             val savedDraft = draftStore.get(draftId)
             mutableState.value = mutableState.value.copy(
                 route = MessagingRoute.CONVERSATION,
+                searchQuery = query,
                 selectedConversation = conversation.copy(unreadCount = 0),
                 messages = messages,
                 draft = savedDraft ?: MessageDraft(
@@ -441,7 +477,51 @@ class MessagingCoordinator(
                 ),
                 sendFailure = null,
                 unknownOutcome = false,
+                statusMessage = null,
             )
+        }
+    }
+
+    fun deleteConversation(conversationId: Long) {
+        val current = mutableState.value
+        if (current.deletingConversation || current.route != MessagingRoute.CONVERSATION ||
+            current.selectedConversation?.id != conversationId
+        ) return
+        mutableState.value = current.copy(deletingConversation = true, statusMessage = null)
+        scope.launch {
+            val result = repository.deleteConversation(conversationId)
+            if (result == ConversationDeleteResult.DELETED) {
+                draftStore.delete("conversation-$conversationId")
+                repository.refresh()
+                val latest = mutableState.value
+                val stillSelected = latest.selectedConversation?.id == conversationId
+                mutableState.value = if (stillSelected || latest.deletingConversation &&
+                    latest.route == MessagingRoute.CONVERSATION && latest.selectedConversation == null
+                ) {
+                    latest.copy(
+                        route = MessagingRoute.INBOX,
+                        selectedConversation = null,
+                        messages = emptyList(),
+                        draft = MessageDraft(newDraftId()),
+                        searchQuery = "",
+                        recipientQuery = "",
+                        deletingConversation = false,
+                        statusMessage = null,
+                    )
+                } else {
+                    latest.copy(deletingConversation = false)
+                }
+            } else {
+                logger.event("sms_delete_conversation", result.name.lowercase())
+                mutableState.value = mutableState.value.copy(
+                    deletingConversation = false,
+                    statusMessage = if (result == ConversationDeleteResult.NOT_ALLOWED) {
+                        "Set Claro as default SMS app to delete conversations"
+                    } else {
+                        "Conversation could not be deleted"
+                    },
+                )
+            }
         }
     }
 
@@ -588,15 +668,7 @@ class MessagingCoordinator(
     }
 
     fun review() {
-        val draft = mutableState.value.draft
-        val failure = when {
-            draft.recipient == null || !isValidSmsDestination(draft.recipient.number) ->
-                MessageFailure.INVALID_RECIPIENT
-
-            draft.body.isBlank() -> MessageFailure.EMPTY_CONTENT
-            !mutableState.value.qualification.canSend -> MessageFailure.ROLE_LOST
-            else -> null
-        }
+        val failure = draftFailure()
         mutableState.value = if (failure == null) {
             mutableState.value.copy(route = MessagingRoute.CONFIRMATION, statusMessage = null)
         } else {
@@ -607,22 +679,36 @@ class MessagingCoordinator(
         }
     }
 
+    private fun draftFailure(): MessageFailure? {
+        val draft = mutableState.value.draft
+        return when {
+            draft.recipient == null || !isValidSmsDestination(draft.recipient.number) ->
+                MessageFailure.INVALID_RECIPIENT
+
+            draft.body.isBlank() -> MessageFailure.EMPTY_CONTENT
+            !mutableState.value.qualification.canSend -> MessageFailure.ROLE_LOST
+            else -> null
+        }
+    }
+
     fun editAfterReview() {
         mutableState.value = mutableState.value.copy(route = MessagingRoute.COMPOSE)
     }
 
     fun send() {
         val current = mutableState.value
-        val recipient = current.draft.recipient ?: return
-        if (!current.qualification.canSend || current.draft.body.isBlank()) {
-            review()
+        val failure = draftFailure()
+        if (failure != null) {
+            mutableState.value = current.copy(sendFailure = failure, statusMessage = failure.userMessage())
             return
         }
+        val recipient = requireNotNull(current.draft.recipient)
         if (!sendInFlight.compareAndSet(false, true)) return
         mutableState.value = current.copy(
             route = MessagingRoute.SENDING,
             statusMessage = "Sending message",
             duplicateRiskConfirmationRequired = false,
+            sendFailure = null,
         )
         val clientMessageId = "${current.draft.id}:${clock.nowMillis()}"
         scope.launch {

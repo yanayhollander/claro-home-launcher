@@ -3,9 +3,12 @@ package com.clarohome.app
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.util.Log
+import androidx.core.content.edit
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.clarohome.core.data.deviceAppLanguage
 import com.clarohome.core.design.withClaroLanguage
 import com.clarohome.core.domain.ClaroPreferencesRepository
 import com.clarohome.core.domain.CriticalActivityRepository
@@ -13,6 +16,7 @@ import com.clarohome.core.domain.EmergencyNumberDetector
 import com.clarohome.core.domain.ExternalAppLaunchResult
 import com.clarohome.core.domain.ExternalAppLauncher
 import com.clarohome.core.domain.HomeRepository
+import com.clarohome.core.domain.HomeTileVisibilityResult
 import com.clarohome.core.domain.NativeEmergencyDialerGateway
 import com.clarohome.core.domain.PhoneCallGateway
 import com.clarohome.core.domain.StartupRecoveryCoordinator
@@ -24,6 +28,7 @@ import com.clarohome.core.model.CriticalActivity
 import com.clarohome.core.model.HandoverCheck
 import com.clarohome.core.model.HomeSnapshot
 import com.clarohome.core.model.HomeTile
+import com.clarohome.core.model.HomeTileKind
 import com.clarohome.core.model.OnboardingStep
 import com.clarohome.core.model.ReadinessCapability
 import com.clarohome.core.model.TextSize
@@ -44,7 +49,11 @@ import com.clarohome.feature.safety.media.apps.PersistedSosState
 import com.clarohome.feature.safety.media.apps.SosCallOutcome
 import com.clarohome.feature.safety.media.apps.SosCoordinator
 import com.clarohome.feature.safety.media.apps.SosState
+import com.clarohome.feature.safety.media.apps.SosReadiness
 import com.clarohome.feature.safety.media.apps.TrustedContact
+import com.clarohome.feature.safety.media.apps.normalizeSosDestination
+import com.clarohome.feature.communication.PhoneAssignmentStore
+import com.clarohome.feature.communication.PhoneAssignment
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -79,7 +88,8 @@ class MainViewModel @Inject constructor(
     private val installedAppCatalog: InstalledAppCatalog,
     private val launcherStatusReader: LauncherStatusReader,
     phoneCallGateway: PhoneCallGateway,
-    emergencyNumberDetector: EmergencyNumberDetector,
+    private val emergencyNumberDetector: EmergencyNumberDetector,
+    private val phoneAssignments: PhoneAssignmentStore,
     private val emergencyDialerGateway: NativeEmergencyDialerGateway,
     private val externalAppLauncher: ExternalAppLauncher,
     private val billingRepository: BillingRepository,
@@ -90,6 +100,7 @@ class MainViewModel @Inject constructor(
     private val message = MutableStateFlow<String?>(null)
     private val sosCoordinator = SosCoordinator(phoneCallGateway, emergencyNumberDetector)
     private val mutableSosState = MutableStateFlow<SosState>(SosState.Unset())
+    private val sosPreferences = appContext.getSharedPreferences("claro_sos_contact", Context.MODE_PRIVATE)
 
     val sosState: StateFlow<SosState> = mutableSosState
     private val billingObservability = combine(
@@ -139,9 +150,14 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun advanceOnboarding(next: OnboardingStep) {
+    fun advanceOnboarding(next: OnboardingStep, onCompleted: () -> Unit = {}) {
         viewModelScope.launch {
-            settingsManager.advanceOnboarding(next)
+            val applied = settingsManager.advanceOnboarding(next, appContext.defaultAppReadiness())
+            if (!applied) {
+                message.value = localizedContext().getString(R.string.app_default_apps_required)
+            } else if (next == OnboardingStep.COMPLETE) {
+                onCompleted()
+            }
         }
     }
 
@@ -157,6 +173,8 @@ class MainViewModel @Inject constructor(
     }
 
     fun setHapticFeedback(enabled: Boolean) = launch { settingsManager.setHapticFeedback(enabled) }
+    fun setCallAudio(enabled: Boolean, maximumSpeakerVolume: Boolean) =
+        launch { settingsManager.setCallAudio(enabled, maximumSpeakerVolume) }
 
     fun useDateQuestion() = launch { settingsManager.useDateQuestion() }
 
@@ -313,9 +331,15 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    fun refreshLauncherStatus() = launch { syncLauncherStatus() }
+
     private suspend fun syncLauncherState() {
         homeRepository.setHomeRoleState(homeRoleController.currentState())
         homeRepository.setInstalledApps(installedAppCatalog.discoverEligibleApps())
+        syncLauncherStatus()
+    }
+
+    private suspend fun syncLauncherStatus() {
         launcherStatusReader.read().let { status ->
             homeRepository.setStatus(
                 dayAndDate = status.dayAndDate,
@@ -341,6 +365,18 @@ class MainViewModel @Inject constructor(
     fun setHomeSlot(slot: Int, tile: HomeTile) {
         viewModelScope.launch {
             homeRepository.setHomeSlot(slot, tile)
+        }
+    }
+
+    fun setHomeTileVisibility(kind: HomeTileKind, visible: Boolean) {
+        viewModelScope.launch {
+            message.value = when (homeRepository.setHomeTileVisibility(kind, visible)) {
+                HomeTileVisibilityResult.APPLIED -> null
+                HomeTileVisibilityResult.HOME_FULL ->
+                    localizedContext().getString(R.string.app_home_tiles_full)
+                HomeTileVisibilityResult.APP_UNAVAILABLE ->
+                    localizedContext().getString(R.string.app_missing_or_disabled_notice)
+            }
         }
     }
 
@@ -372,9 +408,11 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             homeRepository.reset()
             sosCoordinator.configure(null)
+            sosPreferences.edit { clear() }
+            phoneAssignments.clear("sos")
             publishSos()
             consentController.reset()
-            settingsManager.resetAll()
+            settingsManager.resetAll(language = deviceAppLanguage())
             refreshLauncherState()
             message.value = null
             onResetComplete()
@@ -383,32 +421,59 @@ class MainViewModel @Inject constructor(
 
     fun setAppOnHome(packageName: String, onHome: Boolean) {
         viewModelScope.launch {
-            homeRepository.setAppOnHome(packageName, onHome)
+            message.value = when (homeRepository.setInstalledAppHomeTile(packageName, onHome)) {
+                HomeTileVisibilityResult.APPLIED -> null
+                HomeTileVisibilityResult.HOME_FULL -> localizedContext().getString(R.string.app_home_tiles_full)
+                HomeTileVisibilityResult.APP_UNAVAILABLE ->
+                    localizedContext().getString(R.string.app_missing_or_disabled_notice)
+            }
         }
     }
 
-    fun configureSos(name: String, destination: String, consented: Boolean) {
-        val contact = if (name.isBlank() || destination.isBlank()) {
-            null
-        } else {
-            TrustedContact(
-                contactId = "trusted-contact",
-                displayName = name.trim(),
-                destination = destination.trim(),
-                recipientConsented = consented,
-            )
+    fun configureSos(
+        name: String,
+        destination: String,
+        consented: Boolean,
+        contactLookupKey: String? = null,
+        photoUri: String? = null,
+    ): SosReadiness {
+        val number = normalizeSosDestination(destination)
+            ?: return SosReadiness.Blocked("Enter a valid SOS phone number.")
+        if (emergencyNumberDetector.isEmergencyNumber(number)) {
+            return SosReadiness.Blocked("Emergency numbers cannot be saved as trusted contacts.")
         }
+        if (!consented) return SosReadiness.RecipientConsentMissing
+        val contact = TrustedContact(
+            contactId = contactLookupKey ?: "manual-number",
+            displayName = name.trim().ifBlank { localizedContext().getString(R.string.app_sos_custom_number) },
+            destination = number,
+            recipientConsented = true,
+            photoUri = photoUri,
+        )
+        if (!saveSosContact(contact)) return SosReadiness.Blocked("SOS contact could not be saved.")
         sosCoordinator.configure(contact)
         publishSos()
         viewModelScope.launch {
-            val onboarding = uiState.value.preferences.onboarding
-            settingsManager.updateSetupAssignments(
-                favoriteSlotsAssigned = onboarding.favoriteSlotsAssigned,
-                speedDialOneAssigned = onboarding.speedDialOneAssigned,
-                speedDialTwoAssigned = onboarding.speedDialTwoAssigned,
-                sosRecipientAgreed = contact?.recipientConsented == true,
-            )
+            if (contactLookupKey != null) {
+                phoneAssignments.save(PhoneAssignment("sos", contactLookupKey, number, contact.displayName))
+            } else {
+                phoneAssignments.clear("sos")
+            }
+            settingsManager.setSosRecipientAgreed(true)
         }
+        return SosReadiness.Ready
+    }
+
+    private fun saveSosContact(contact: TrustedContact): Boolean {
+        val saved = sosPreferences.edit()
+            .putString("name", contact.displayName)
+            .putString("number", contact.destination)
+            .putString("contact_id", contact.contactId)
+            .putString("photo_uri", contact.photoUri)
+            .putBoolean("consented", contact.recipientConsented)
+            .commit()
+        if (!saved) Log.e("ClaroSOS", "SOS contact could not be persisted.")
+        return saved
     }
 
     fun startSos(testMode: Boolean, nowElapsedMillis: Long) {
@@ -479,6 +544,8 @@ class MainViewModel @Inject constructor(
         val snapshot = sosCoordinator.snapshot()
         savedStateHandle["sos_name"] = snapshot.contact?.displayName
         savedStateHandle["sos_number"] = snapshot.contact?.destination
+        savedStateHandle["sos_contact_id"] = snapshot.contact?.contactId
+        savedStateHandle["sos_photo_uri"] = snapshot.contact?.photoUri
         savedStateHandle["sos_consent"] = snapshot.contact?.recipientConsented ?: false
         savedStateHandle["sos_deadline"] = snapshot.countdownDeadlineElapsedMillis
         savedStateHandle["sos_activation"] = snapshot.activationId
@@ -486,18 +553,25 @@ class MainViewModel @Inject constructor(
     }
 
     private fun restoreSos() {
-        val name = savedStateHandle.get<String>("sos_name")
-        val number = savedStateHandle.get<String>("sos_number")
-        val contact = if (name != null && number != null) {
+        val persisted = sosPreferences.contains("number")
+        val name = if (persisted) sosPreferences.getString("name", null) else savedStateHandle.get<String>("sos_name")
+        val number = (if (persisted) sosPreferences.getString("number", null) else savedStateHandle.get<String>("sos_number"))
+            ?.let(::normalizeSosDestination)
+        val contact = if (name != null && number != null && !emergencyNumberDetector.isEmergencyNumber(number)) {
             TrustedContact(
-                contactId = "trusted-contact",
+                contactId = if (persisted) sosPreferences.getString("contact_id", null) ?: "manual-number"
+                    else savedStateHandle.get<String>("sos_contact_id") ?: "manual-number",
                 displayName = name,
                 destination = number,
-                recipientConsented = savedStateHandle["sos_consent"] ?: false,
+                recipientConsented = if (persisted) sosPreferences.getBoolean("consented", false)
+                    else savedStateHandle["sos_consent"] ?: false,
+                photoUri = if (persisted) sosPreferences.getString("photo_uri", null)
+                    else savedStateHandle["sos_photo_uri"],
             )
         } else {
             null
         }
+        if (contact != null && !persisted) saveSosContact(contact)
         sosCoordinator.restore(
             PersistedSosState(
                 contact = contact,
@@ -507,6 +581,7 @@ class MainViewModel @Inject constructor(
             ),
         )
         mutableSosState.value = sosCoordinator.state
+        viewModelScope.launch { settingsManager.setSosRecipientAgreed(contact?.recipientConsented == true) }
     }
 
     private fun localizedContext(): Context =

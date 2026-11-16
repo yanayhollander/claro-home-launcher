@@ -65,6 +65,7 @@ fun AppsMenuScreen(
     onSetAllowed: (InstalledApp, Boolean) -> Unit,
     onSetOnHome: (InstalledApp, Boolean) -> Unit,
     useGrid: Boolean = false,
+    message: String? = null,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     var unavailableAppLabel by remember { mutableStateOf<String?>(null) }
@@ -84,6 +85,8 @@ fun AppsMenuScreen(
     ClaroScreenScaffold(
         title = if (editing) stringResource(R.string.app_apps_and_menu) else stringResource(R.string.app_apps),
         scrollable = false,
+        bannerText = message,
+        bannerTone = ClaroBannerTone.ERROR,
         dockInSoftkeys = true,
         dock = {
             if (editing) {

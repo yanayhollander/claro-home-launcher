@@ -1,6 +1,7 @@
 package com.clarohome.app
 
 import android.Manifest
+import android.app.role.RoleManager
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -14,15 +15,20 @@ import android.annotation.SuppressLint
 import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,6 +39,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +50,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -62,6 +70,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -76,6 +85,10 @@ import com.clarohome.core.design.claroFocusRing
 import com.clarohome.core.design.ClaroColors
 import com.clarohome.core.design.ClaroIcon
 import com.clarohome.core.design.ClaroIconKind
+import com.clarohome.core.design.ClaroKeyboardContainer
+import com.clarohome.core.design.LocalClaroKeypadInput
+import com.clarohome.core.design.LocalClaroDeleteText
+import com.clarohome.core.design.LocalClaroKeypadNumericMode
 import com.clarohome.core.design.ClaroLocaleContainer
 import com.clarohome.core.design.ClaroSoftkey
 import com.clarohome.core.design.ClaroSoftkeyHost
@@ -95,12 +108,14 @@ import com.clarohome.core.model.HomeTile
 import com.clarohome.core.model.HomeTileKind
 import com.clarohome.core.model.OnboardingStep
 import com.clarohome.core.model.ReadinessCapability
+import com.clarohome.core.model.defaultAppCapabilities
 import com.clarohome.core.model.VisualMode
 import com.clarohome.feature.onboarding.settings.AccessGateScreen
 import com.clarohome.feature.onboarding.settings.AccessMethodSettingsScreen
 import com.clarohome.feature.onboarding.settings.DisplayLanguageSettingsScreen
 import com.clarohome.feature.onboarding.settings.OnboardingCallbacks
 import com.clarohome.feature.onboarding.settings.OnboardingFlow
+import com.clarohome.feature.onboarding.settings.CallAudioSettingsScreen
 import com.clarohome.feature.onboarding.settings.PhoneStyleSettingsScreen
 import com.clarohome.feature.onboarding.settings.PinRecoveryScreen
 import com.clarohome.feature.onboarding.settings.ReadinessSettingsScreen
@@ -109,14 +124,18 @@ import com.clarohome.feature.onboarding.settings.SettingsHubScreen
 import com.clarohome.feature.billing.observability.BillingObservabilityScreen
 import com.clarohome.feature.billing.observability.PurchaseResult
 import com.clarohome.feature.communication.CallOutcome
+import com.clarohome.feature.communication.CallDirection
+import com.clarohome.feature.communication.CallPhase
 import com.clarohome.feature.communication.CommunicationRoute
 import com.clarohome.feature.communication.CommunicationUiState
 import com.clarohome.feature.communication.CallerIdentity
 import com.clarohome.feature.communication.ContactWriteResult
 import com.clarohome.feature.communication.MessagingUiState
 import com.clarohome.feature.safety.media.apps.SosState
+import com.clarohome.feature.safety.media.apps.SosCallOutcome
 import com.clarohome.presentation.classic.ClassicIntegratedPad
 import com.clarohome.presentation.classic.ClassicNumericKeypad
+import com.clarohome.presentation.classic.ClassicKeypadModeStatus
 import com.clarohome.presentation.classic.ClassicPhoneScreen
 import com.clarohome.presentation.classic.ClassicCommunicationScreen
 import com.clarohome.presentation.classic.ClassicMessagingScreen
@@ -129,8 +148,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable private data object RecoveryRoute
 @Serializable private data object OnboardingRoute
-@Serializable private data object TouchHomeRoute
-@Serializable private data object ClassicHomeRoute
+@Serializable internal data object TouchHomeRoute
+@Serializable internal data object ClassicHomeRoute
 @Serializable private data class AppsRoute(val customize: Boolean = false)
 @Serializable private data object LauncherMenuRoute
 @Serializable private data class AccessGateRoute(val target: String = TARGET_SETTINGS)
@@ -150,6 +169,7 @@ import kotlinx.serialization.Serializable
 @Serializable private data object MembershipRoute
 @Serializable private data class PeopleSettingsRoute(val requiresAuth: Boolean)
 @Serializable private data object MenuOrderRoute
+@Serializable private data object CallAudioRoute
 
 private val FOCUS_KEYS = setOf(
     KeyEvent.KEYCODE_DPAD_UP,
@@ -173,29 +193,48 @@ class MainActivity : ComponentActivity() {
 
     private val communicationViewModel by viewModels<CommunicationViewModel>()
     private val messagingViewModel by viewModels<MessagingViewModel>()
+    private val mainViewModel by viewModels<MainViewModel>()
+    private var settingUpDefaults = false
+    private var openHomeRequests by mutableLongStateOf(0L)
+    private val homeRoleLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) {
+        mainViewModel.refreshLauncherState()
+        if (settingUpDefaults) finishDefaultRoleRequest(RoleManager.ROLE_HOME)
+    }
     private val phonePermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) {
         communicationViewModel.refreshQualification()
         communicationViewModel.openContacts()
+        if (settingUpDefaults) continueDefaultAppSetup()
     }
     private val phoneRoleLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) {
         communicationViewModel.refreshQualification()
-        requestPhonePermissions()
+        if (settingUpDefaults && !isRoleHeld(RoleManager.ROLE_DIALER)) {
+            settingUpDefaults = false
+        } else {
+            requestPhonePermissions()
+        }
     }
     private val messagePermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) {
         messagingViewModel.refreshQualification()
         messagingViewModel.openInbox()
+        if (settingUpDefaults) continueDefaultAppSetup()
     }
     private val smsRoleLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) {
         messagingViewModel.refreshQualification()
-        requestMessagePermissions()
+        if (settingUpDefaults && !isRoleHeld(RoleManager.ROLE_SMS)) {
+            settingUpDefaults = false
+        } else {
+            requestMessagePermissions()
+        }
     }
     private val contactsPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -219,9 +258,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        settingUpDefaults = savedInstanceState?.getBoolean("setting-up-defaults") == true
+        openHomeRequests = savedInstanceState?.getLong("open-home-requests") ?: 0L
+        if (savedInstanceState == null && intent.isHomeRequest()) openHomeRequests++
         communicationViewModel.handleDialIntent(intent)
         messagingViewModel.handleSendToIntent(intent)
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(
+                android.graphics.Color.BLACK,
+                android.graphics.Color.BLACK,
+            ),
+        )
         setContent {
             ClaroApp(
                 communicationViewModel = communicationViewModel,
@@ -229,13 +276,73 @@ class MainActivity : ComponentActivity() {
                 onRepairPhone = ::repairPhoneAccess,
                 onRepairMessages = ::repairMessagesAccess,
                 onRequestCapability = ::requestCapability,
+                onSetDefaultApps = ::setupDefaultApps,
+                openHomeRequest = openHomeRequests,
             )
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("setting-up-defaults", settingUpDefaults)
+        outState.putLong("open-home-requests", openHomeRequests)
+        super.onSaveInstanceState(outState)
+    }
+
+    private fun isRoleHeld(role: String): Boolean =
+        getSystemService(RoleManager::class.java)?.isRoleHeld(role) == true
+
+    private fun setupDefaultApps() {
+        if (settingUpDefaults) return
+        settingUpDefaults = true
+        continueDefaultAppSetup()
+    }
+
+    private fun finishDefaultRoleRequest(role: String) {
+        if (isRoleHeld(role)) continueDefaultAppSetup() else settingUpDefaults = false
+    }
+
+    private fun continueDefaultAppSetup() {
+        val readiness = defaultAppReadiness()
+        val next = defaultAppCapabilities.firstOrNull {
+            readiness[it] == CapabilityStatus.NEEDS_ATTENTION
+        }
+        if (next == null) {
+            settingUpDefaults = false
+            mainViewModel.refreshLauncherState()
+            communicationViewModel.refreshQualification()
+            messagingViewModel.refreshQualification()
+        } else {
+            try {
+                val manager = getSystemService(RoleManager::class.java)
+                val role = when (next) {
+                    ReadinessCapability.HOME -> RoleManager.ROLE_HOME
+                    ReadinessCapability.PHONE -> RoleManager.ROLE_DIALER
+                    ReadinessCapability.MESSAGES -> RoleManager.ROLE_SMS
+                    else -> error("Unsupported default app: $next")
+                }
+                if (manager == null) {
+                    settingUpDefaults = false
+                    openDefaultAppsSettings()
+                    return
+                }
+                val request = manager.createRequestRoleIntent(role)
+                when (next) {
+                    ReadinessCapability.HOME -> homeRoleLauncher.launch(request)
+                    ReadinessCapability.PHONE -> phoneRoleLauncher.launch(request)
+                    ReadinessCapability.MESSAGES -> smsRoleLauncher.launch(request)
+                    else -> error("Unsupported default app: $next")
+                }
+            } catch (_: ActivityNotFoundException) {
+                settingUpDefaults = false
+                openDefaultAppsSettings()
+            }
         }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (intent.isHomeRequest()) openHomeRequests++
         communicationViewModel.handleDialIntent(intent)
         messagingViewModel.handleSendToIntent(intent)
     }
@@ -322,10 +429,11 @@ class MainActivity : ComponentActivity() {
     private fun requestCapability(capability: ReadinessCapability) {
         when (capability) {
             ReadinessCapability.HOME -> {
-                val intent = runCatching {
-                    ViewModelProvider(this)[MainViewModel::class.java].homeRoleActionIntent()
-                }.getOrNull()
-                if (intent != null) startActivity(intent) else openDefaultAppsSettings()
+                try {
+                    homeRoleLauncher.launch(mainViewModel.homeRoleActionIntent())
+                } catch (_: ActivityNotFoundException) {
+                    openDefaultAppsSettings()
+                }
             }
             ReadinessCapability.PHONE -> repairPhoneAccess()
             ReadinessCapability.MESSAGES -> repairMessagesAccess()
@@ -416,14 +524,20 @@ private fun ClaroApp(
     onRepairPhone: () -> Unit,
     onRepairMessages: () -> Unit,
     onRequestCapability: (ReadinessCapability) -> Unit,
+    onSetDefaultApps: () -> Unit,
+    openHomeRequest: Long,
     viewModel: MainViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val communication by communicationViewModel.state.collectAsStateWithLifecycle()
     val messaging by messagingViewModel.state.collectAsStateWithLifecycle()
     val openPhoneRequest by communicationViewModel.openPhoneRequests.collectAsStateWithLifecycle()
+    val openMessageRequest by messagingViewModel.openMessageRequests.collectAsStateWithLifecycle()
     val sosState by viewModel.sosState.collectAsStateWithLifecycle()
     val navController = rememberNavController()
+    val homeTileScrollState = rememberScrollState()
+    val dialerScrollState = rememberScrollState()
+    var dialerOptionsOpen by rememberSaveable { mutableStateOf(false) }
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val context = LocalContext.current
     val localizedContext = remember(context, state.preferences.language) {
@@ -462,42 +576,72 @@ private fun ClaroApp(
             )
         } catch (_: ActivityNotFoundException) {
             platformNotice = localizedContext.getString(R.string.app_could_not_open_notice)
+        } catch (_: SecurityException) {
+            platformNotice = localizedContext.getString(R.string.app_could_not_open_notice)
+        }
+    }
+    val openEmergencyDialer: () -> Unit = {
+        if (!viewModel.openEmergencyDialer()) {
+            platformNotice = localizedContext.getString(R.string.app_emergency_dialer_unavailable)
         }
     }
     val projectedHome = state.home?.withCommunicationProjections(communication, messaging)
     val runtimeBlockers = integrationBlockers(
         hasActiveCall = communication.hasActiveCall,
-        sosCritical = sosState is SosState.CountingDown || sosState is SosState.Calling,
+        sosCritical = sosState is SosState.CountingDown ||
+            (sosState as? SosState.Calling)?.let { it.outcome != SosCallOutcome.ENDED } == true,
         purchaseCritical =
             state.billingObservability.purchaseResult == PurchaseResult.Purchasing ||
                 state.billingObservability.purchaseResult == PurchaseResult.Pending,
     )
+    var sosCallId by remember((sosState as? SosState.Calling)?.activationId) { mutableStateOf<String?>(null) }
+    LaunchedEffect(sosState, communication.call) {
+        val sos = sosState as? SosState.Calling ?: return@LaunchedEffect
+        val call = communication.call ?: return@LaunchedEffect
+        if (call.direction != CallDirection.OUTGOING ||
+            !android.telephony.PhoneNumberUtils.compare(call.identity.number, sos.contact.destination)
+        ) return@LaunchedEffect
+        if (sosCallId == null && call.phase != CallPhase.DISCONNECTED) sosCallId = call.id
+        if (sosCallId != call.id) return@LaunchedEffect
+        val outcome = when (call.phase) {
+            CallPhase.DIALING -> SosCallOutcome.DIALING
+            CallPhase.RINGING -> SosCallOutcome.RINGING
+            CallPhase.CONNECTED, CallPhase.ON_HOLD -> SosCallOutcome.CONNECTED
+            CallPhase.DISCONNECTED -> when (call.outcome) {
+                CallOutcome.UNANSWERED_OUTGOING -> SosCallOutcome.NO_ANSWER
+                CallOutcome.FAILED -> SosCallOutcome.UNKNOWN_FAILURE
+                else -> SosCallOutcome.ENDED
+            }
+            else -> return@LaunchedEffect
+        }
+        if (sos.outcome != outcome) viewModel.updateSosCallOutcome(outcome)
+    }
+    val isSharedDialer = currentBackStackEntry?.destination?.hasRoute<PhoneRoute>() == true &&
+        communication.route == CommunicationRoute.DIALER
     val classicRouteOwnsDeck = currentBackStackEntry?.destination?.let { destination ->
-        destination.hasRoute<ClassicHomeRoute>() ||
-            destination.hasRoute<PhoneRoute>() ||
+        destination.hasRoute<PhoneRoute>() && !isSharedDialer ||
             destination.hasRoute<MessagesRoute>()
     } == true
+    val isClassicHome = currentBackStackEntry?.destination?.hasRoute<ClassicHomeRoute>() == true
+    LaunchedEffect(isSharedDialer) {
+        dialerOptionsOpen = false
+        dialerScrollState.scrollTo(0)
+    }
+    LaunchedEffect(dialerOptionsOpen) { dialerScrollState.scrollTo(0) }
     val isRecoveryOrOnboarding = currentBackStackEntry?.destination?.let { destination ->
         destination.hasRoute<RecoveryRoute>() ||
             destination.hasRoute<OnboardingRoute>()
     } == true
     val openPhoneFromHome = {
-        val unopenedMissed = if ((communication.missedIncomingCount ?: 0) > 0) {
-            communication.history.firstOrNull {
-                it.outcome == CallOutcome.MISSED_INCOMING && !it.isOpened
-            }
-        } else {
-            null
-        }
-        if (unopenedMissed != null) {
-            communicationViewModel.openHistoryEntry(unopenedMissed.id)
-        } else {
-            communicationViewModel.openDialer()
-        }
+        communicationViewModel.openDialer(showMissedCalls = true)
         navController.navigate(PhoneRoute)
     }
 
     var resumeTick by remember { mutableIntStateOf(0) }
+    val defaultApps = remember(
+        resumeTick, projectedHome?.homeRole,
+        communication.qualification.roleHeld, messaging.qualification.roleHeld,
+    ) { context.defaultAppReadiness() }
     DisposableEffect(lifecycleOwner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -508,6 +652,15 @@ private fun ClaroApp(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(lifecycleOwner, viewModel) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                delay(5_000L)
+                viewModel.refreshLauncherStatus()
+            }
+        }
     }
 
     LaunchedEffect(state.preferences.language) {
@@ -537,11 +690,31 @@ private fun ClaroApp(
         }
     }
 
-    LaunchedEffect(communication.route, openPhoneRequest) {
+    var handledOpenHomeRequest by rememberSaveable { mutableLongStateOf(0L) }
+    LaunchedEffect(openHomeRequest, state.startup) {
+        if (state.startup is StartupRecoveryState.Ready && openHomeRequest > handledOpenHomeRequest) {
+            handledOpenHomeRequest = openHomeRequest
+            if (state.preferences.onboarding.currentStep == OnboardingStep.COMPLETE) {
+                navController.goHome(state.preferences.visualMode)
+            }
+        }
+    }
+
+    var handledOpenPhoneRequest by rememberSaveable { mutableLongStateOf(0L) }
+    var handledOpenMessageRequest by rememberSaveable { mutableLongStateOf(0L) }
+    LaunchedEffect(openMessageRequest, state.startup) {
+        if (state.startup is StartupRecoveryState.Ready && openMessageRequest > handledOpenMessageRequest) {
+            handledOpenMessageRequest = openMessageRequest
+            navController.navigate(MessagesRoute) { launchSingleTop = true }
+        }
+    }
+    LaunchedEffect(communication.route, openPhoneRequest, state.startup) {
         if (
-            communication.route == CommunicationRoute.INCOMING_CALL ||
-            openPhoneRequest > 0
+            state.startup is StartupRecoveryState.Ready &&
+            (communication.route == CommunicationRoute.INCOMING_CALL ||
+                openPhoneRequest > handledOpenPhoneRequest)
         ) {
+            handledOpenPhoneRequest = openPhoneRequest
             navController.navigate(PhoneRoute) { launchSingleTop = true }
         }
     }
@@ -632,6 +805,10 @@ private fun ClaroApp(
             highContrast = state.preferences.highContrast,
             hapticFeedback = state.preferences.hapticFeedback,
         ) {
+            ClaroKeyboardContainer(
+                manualKeyboard = state.preferences.visualMode == VisualMode.CLASSIC &&
+                    !isRecoveryOrOnboarding,
+            ) {
             val softkeyHost = remember { ClaroSoftkeyHost() }
             val classicDeckShown = !isRecoveryOrOnboarding &&
                 !classicRouteOwnsDeck &&
@@ -642,16 +819,32 @@ private fun ClaroApp(
             Column(
                 Modifier
                     .fillMaxSize()
-                    .background(ClaroColors.Charcoal)
+                    .background(Color.Black)
                     .systemBarsPadding()
+                    .background(ClaroColors.Charcoal)
                     .testTag("app-root"),
             ) {
+                ActiveCallReturnBar(
+                    state = communication,
+                    isPhoneScreen = currentBackStackEntry?.destination?.hasRoute<PhoneRoute>() == true,
+                    onReturnToCall = {
+                        communicationViewModel.returnToActiveCall()
+                        navController.navigate(PhoneRoute) { launchSingleTop = true }
+                    },
+                )
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
                 ) {
-                NavHost(navController = navController, startDestination = RecoveryRoute) {
+                NavHost(
+                    navController = navController,
+                    startDestination = RecoveryRoute,
+                    enterTransition = { EnterTransition.None },
+                    exitTransition = { ExitTransition.None },
+                    popEnterTransition = { EnterTransition.None },
+                    popExitTransition = { ExitTransition.None },
+                ) {
                     composable<RecoveryRoute> {
                         when (val startup = state.startup) {
                             StartupRecoveryState.Recovering -> LoadingScreen()
@@ -664,11 +857,14 @@ private fun ClaroApp(
                         OnboardingFlow(
                             preferences = state.preferences,
                             message = state.message,
+                            homeTileKinds = state.home?.homeTiles.orEmpty().map { it.kind }.toSet(),
+                            defaultAppReadiness = defaultApps,
+                            installedApps = state.home?.installedApps.orEmpty(),
+                            homeAppPackages = state.home?.homeSlots.orEmpty().mapNotNull { it?.packageName }.toSet(),
                             callbacks = OnboardingCallbacks(
                                 onContinue = { next ->
                                     viewModel.clearMessage()
-                                    viewModel.advanceOnboarding(next)
-                                    if (next == OnboardingStep.COMPLETE) {
+                                    viewModel.advanceOnboarding(next) {
                                         navController.goHome(state.preferences.visualMode)
                                     }
                                 },
@@ -690,14 +886,10 @@ private fun ClaroApp(
                                     )
                                 },
                                 onRequestCapability = onRequestCapability,
-                                onHandover = viewModel::setHandover,
-                                onOpenAppsSetup = {
-                                    navController.navigate(AppsRoute(customize = true))
-                                },
-                                onOpenPlans = {
-                                    navController.navigate(MembershipRoute)
-                                },
+                                onHomeTileVisibility = viewModel::setHomeTileVisibility,
                                 onHapticFeedbackChange = viewModel::setHapticFeedback,
+                                onSetDefaultApps = onSetDefaultApps,
+                                onInstalledAppVisibility = viewModel::setAppOnHome,
                             ),
                         )
                     }
@@ -722,7 +914,7 @@ private fun ClaroApp(
                                         launchApp = launchPackage,
                                         callContact = { contact ->
                                             communicationViewModel.requestCall(
-                                                CallerIdentity(contact.label, contact.phoneNumber),
+                                                CallerIdentity(contact.label, contact.phoneNumber, photoUri = contact.photoUri),
                                             )
                                             navController.navigate(PhoneRoute)
                                         },
@@ -741,6 +933,8 @@ private fun ClaroApp(
                         localizedHome?.let { home ->
                             ClassicPhoneScreen(
                                 home = home,
+                                showControls = false,
+                                tileScrollState = homeTileScrollState,
                                 onOpenMenu = { navController.navigate(LauncherMenuRoute) },
                                 onTileSelected = { tile ->
                                     handleTile(
@@ -758,7 +952,7 @@ private fun ClaroApp(
                                         launchApp = launchPackage,
                                         callContact = { contact ->
                                             communicationViewModel.requestCall(
-                                                CallerIdentity(contact.label, contact.phoneNumber),
+                                                CallerIdentity(contact.label, contact.phoneNumber, photoUri = contact.photoUri),
                                             )
                                             navController.navigate(PhoneRoute)
                                         },
@@ -768,11 +962,6 @@ private fun ClaroApp(
                                 onRepairHomeRole = launchHomeRole,
                                 onReturnToCall = {
                                     communicationViewModel.returnToActiveCall()
-                                    navController.navigate(PhoneRoute)
-                                },
-                                onDigitSelected = { digit ->
-                                    communicationViewModel.openDialer()
-                                    communicationViewModel.inputDigit(digit)
                                     navController.navigate(PhoneRoute)
                                 },
                                 onBack = navController::popBackStack,
@@ -788,6 +977,7 @@ private fun ClaroApp(
                         state.home?.let { home ->
                             AppsMenuScreen(
                                 apps = home.installedApps,
+                                message = state.message,
                                 allowCustomization = customize,
                                 onBack = navController::popBackStack,
                                 onLaunch = { launchPackage(it.packageName) },
@@ -802,7 +992,7 @@ private fun ClaroApp(
                         }
                     }
                     composable<LauncherMenuRoute> {
-                        state.home?.let { home ->
+                        projectedHome?.let { home ->
                             LauncherMenuScreen(
                                 tiles = home.tiles,
                                 menuOrder = home.menuOrder,
@@ -837,17 +1027,25 @@ private fun ClaroApp(
                             state = communication,
                             visualMode = state.preferences.visualMode,
                             viewModel = communicationViewModel,
+                            sharedDialerControls = true,
+                            dialerOptionsOpen = dialerOptionsOpen,
+                            onDialerOptionsChange = { dialerOptionsOpen = it },
+                            dialerScrollState = dialerScrollState,
                             battery = localizedHome?.battery,
                             cellular = localizedHome?.cellular,
                             canManageContacts = viewModel.isSettingsUnlocked(),
                             onRepairPhone = onRepairPhone,
-                            onEmergencyDialer = { viewModel.openEmergencyDialer() },
+                            onEmergencyDialer = openEmergencyDialer,
                             onMessageNumber = { number, _ ->
                                 messagingViewModel.startNewMessage()
                                 messagingViewModel.updateRecipientInput(number)
                                 navController.navigate(MessagesRoute)
                             },
-                            onSaveContact = { lookupKey, name, primary, secondary ->
+                            onSaveContact = saveContact@{ lookupKey, name, primary, secondary ->
+                                if (!viewModel.isSettingsUnlocked()) {
+                                    navController.openProtected(viewModel, TARGET_CONTACTS)
+                                    return@saveContact
+                                }
                                 communicationViewModel.saveContact(lookupKey, name, primary, secondary) { result ->
                                     platformNotice = when (result) {
                                         is ContactWriteResult.Saved -> null
@@ -860,7 +1058,11 @@ private fun ClaroApp(
                                     }
                                 }
                             },
-                            onDeleteContact = { lookupKey ->
+                            onDeleteContact = deleteContact@{ lookupKey ->
+                                if (!viewModel.isSettingsUnlocked()) {
+                                    navController.openProtected(viewModel, TARGET_CONTACTS)
+                                    return@deleteContact
+                                }
                                 communicationViewModel.deleteSelectedContact(lookupKey) { result ->
                                     platformNotice = when (result) {
                                         is ContactWriteResult.Saved -> null
@@ -916,6 +1118,15 @@ private fun ClaroApp(
                             onRequestMediaAccess = {
                                 onRequestCapability(ReadinessCapability.MEDIA)
                             },
+                            onEmergencyDialer = openEmergencyDialer,
+                            hasActiveCall = communication.hasActiveCall,
+                            onReturnToCall = {
+                                communicationViewModel.returnToActiveCall()
+                                navController.navigate(PhoneRoute) { launchSingleTop = true }
+                            },
+                            onSearchContacts = communicationViewModel::searchContacts,
+                            onLoadMoreContacts = communicationViewModel::loadMoreContacts,
+                            hasMoreContacts = communication.contactsNextOffset != null && !communication.contactsLoading,
                         )
                     }
                     composable<MembershipRoute> {
@@ -938,6 +1149,7 @@ private fun ClaroApp(
                         }
                         PeopleSettingsScreen(
                             homeSlots = state.home?.homeSlots.orEmpty(),
+                            message = state.message,
                             installedApps = state.home?.installedApps.orEmpty(),
                             contacts = communication.contacts,
                             assignments = communication.assignments,
@@ -955,6 +1167,8 @@ private fun ClaroApp(
                                 viewModel.setSpeedDialConfigured(slot, configured = false)
                             },
                             onBack = navController::popBackStack,
+                            onHomeTileVisibility = viewModel::setHomeTileVisibility,
+                            onInstalledAppVisibility = viewModel::setAppOnHome,
                         )
                     }
                     composable<MenuOrderRoute> {
@@ -1011,6 +1225,7 @@ private fun ClaroApp(
                         ProtectedSessionMonitor(viewModel, navController)
                         SettingsHubScreen(
                             preferences = state.preferences,
+                            onCallAudio = { navController.navigate(CallAudioRoute) },
                             onPhoneStyle = {
                                 navController.navigate(PhoneStyleRoute)
                             },
@@ -1053,6 +1268,14 @@ private fun ClaroApp(
                             onResetClaro = {
                                 navController.navigate(ResetRoute)
                             },
+                        )
+                    }
+                    composable<CallAudioRoute> {
+                        ProtectedSessionMonitor(viewModel, navController)
+                        CallAudioSettingsScreen(
+                            preferences = state.preferences,
+                            onChange = viewModel::setCallAudio,
+                            onBack = navController::popBackStack,
                         )
                     }
                     composable<PhoneStyleRoute> {
@@ -1183,19 +1406,72 @@ private fun ClaroApp(
                     val classicBackDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
                     ClassicGlobalDeck(
                         onBack = {
-                            if (navController.previousBackStackEntry != null && classicBackDispatcher != null) {
+                            if (isSharedDialer && dialerOptionsOpen) {
+                                dialerOptionsOpen = false
+                            } else if (isSharedDialer && communication.digits.isNotEmpty()) {
+                                communicationViewModel.backspace()
+                            } else if (navController.previousBackStackEntry != null && classicBackDispatcher != null) {
                                 classicBackDispatcher.onBackPressed()
                             } else {
                                 navController.goHome(state.preferences.visualMode)
                             }
                         },
-                        onCall = openPhoneFromHome,
-                        onMenu = { navController.navigate(LauncherMenuRoute) },
+                        onCall = if (isSharedDialer) communicationViewModel::requestEnteredNumberCall else openPhoneFromHome,
+                        onMenu = {
+                            if (isSharedDialer) {
+                                dialerOptionsOpen = !dialerOptionsOpen
+                            } else {
+                                navController.navigate(LauncherMenuRoute) { launchSingleTop = true }
+                            }
+                        },
                         onHome = { navController.goHome(state.preferences.visualMode) },
                         softkeyHost = softkeyHost,
                         screenKey = currentBackStackEntry?.id,
+                        scrollState = when {
+                            isClassicHome -> homeTileScrollState
+                            isSharedDialer -> dialerScrollState
+                            else -> null
+                        },
+                        menuLabelOverride = if (isSharedDialer) {
+                            stringResource(com.clarohome.presentation.classic.R.string.classic_options)
+                        } else {
+                            null
+                        },
+                        keypadEnabled = !isSharedDialer || !dialerOptionsOpen,
+                        callEnabled = !isSharedDialer || !dialerOptionsOpen,
+                        onDigitSelected = if (isSharedDialer) {
+                            communicationViewModel::inputDigit
+                        } else if (isClassicHome) {
+                            { digit ->
+                                if (navController.currentDestination?.hasRoute<PhoneRoute>() != true) {
+                                    communicationViewModel.openDialer()
+                                }
+                                communicationViewModel.inputDigit(digit)
+                                navController.navigate(PhoneRoute) { launchSingleTop = true }
+                            }
+                        } else {
+                            null
+                        },
+                        assignments = if (isClassicHome || isSharedDialer && !dialerOptionsOpen) {
+                            communication.assignments.filter { it.slot == "1" || it.slot == "2" }
+                                .associate { it.slot.first() to it.displayNameSnapshot }
+                        } else {
+                            emptyMap()
+                        },
+                        onLongDigitSelected = if (isSharedDialer && !dialerOptionsOpen) {
+                            { digit -> communicationViewModel.directCallAssignment(digit.toString()) }
+                        } else if (isClassicHome) {
+                            { digit ->
+                                communicationViewModel.openDialer()
+                                communicationViewModel.directCallAssignment(digit.toString())
+                                navController.navigate(PhoneRoute)
+                            }
+                        } else {
+                            null
+                        },
                     )
                 }
+            }
             }
             }
         }
@@ -1285,15 +1561,25 @@ private fun ProductNavigationBar(
 }
 
 @Composable
-private fun ClassicGlobalDeck(
+internal fun ClassicGlobalDeck(
     onBack: () -> Unit,
     onCall: () -> Unit,
     onMenu: () -> Unit,
     onHome: () -> Unit,
     softkeyHost: ClaroSoftkeyHost,
     screenKey: Any? = null,
+    onDigitSelected: ((Char) -> Unit)? = null,
+    assignments: Map<Char, String> = emptyMap(),
+    onLongDigitSelected: ((Char) -> Unit)? = null,
+    scrollState: ScrollState? = null,
+    menuLabelOverride: String? = null,
+    keypadEnabled: Boolean = true,
+    callEnabled: Boolean = true,
 ) {
     val view = LocalView.current
+    val keypadInput = LocalClaroKeypadInput.current
+    val deleteText = LocalClaroDeleteText.current
+    val keypadNumericMode = LocalClaroKeypadNumericMode.current
     val green = softkeyHost.actionFor(ClaroSoftkey.GREEN)
     val menu = softkeyHost.actionFor(ClaroSoftkey.MENU)
     val back = softkeyHost.actionFor(ClaroSoftkey.BACK)
@@ -1304,36 +1590,57 @@ private fun ClassicGlobalDeck(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .testTag("classic-global-deck")
             .background(ClaroColors.Charcoal)
             .padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         ClassicIntegratedPad(
-            menuLabel = menu?.label ?: stringResource(R.string.app_menu),
+            menuLabel = menuLabelOverride ?: menu?.label ?: stringResource(R.string.app_menu),
             greenLabel = green?.label ?: "☎ ${stringResource(R.string.app_call)}",
             redLabel = "⌂ ${stringResource(R.string.app_home)}",
             backLabel = back?.label.orEmpty(),
             greenIcon = green?.let { it.icon ?: ClaroIconKind.CHECK },
             menuIcon = menu?.icon,
             greenColor = green?.color,
-            greenEnabled = green?.enabled ?: true,
+            greenEnabled = callEnabled && (green?.enabled ?: true),
             menuEnabled = menu?.enabled ?: true,
-            onBack = back?.onClick ?: onBack,
+            onBack = {
+                if (back != null) {
+                    back.onClick()
+                } else if (deleteText?.invoke() != true) {
+                    onBack()
+                }
+            },
             onMenu = menu?.onClick ?: onMenu,
             onGreen = green?.onClick ?: onCall,
             onRed = onHome,
             screenKey = screenKey,
+            scrollState = scrollState,
         )
+        ClassicKeypadModeStatus(numericMode = keypadNumericMode)
         ClassicNumericKeypad(
-            onDigitSelected = { digit ->
-                sendKey(
-                    when (digit) {
-                        '*' -> KeyEvent.KEYCODE_STAR
-                        '#' -> KeyEvent.KEYCODE_POUND
-                        else -> KeyEvent.KEYCODE_0 + (digit - '0')
-                    },
-                )
+            onDigitSelected = if (keypadEnabled) {
+                { digit ->
+                    if (onDigitSelected != null) {
+                        onDigitSelected(digit)
+                    } else if (keypadInput != null) {
+                        keypadInput(digit)
+                    } else {
+                        sendKey(
+                            when (digit) {
+                                '*' -> KeyEvent.KEYCODE_STAR
+                                '#' -> KeyEvent.KEYCODE_POUND
+                                else -> KeyEvent.KEYCODE_0 + (digit - '0')
+                            },
+                        )
+                    }
+                }
+            } else {
+                null
             },
+            assignments = assignments,
+            onLongDigitSelected = onLongDigitSelected,
         )
     }
 }
@@ -1386,6 +1693,35 @@ private fun handleTile(
 }
 
 @Composable
+internal fun ActiveCallReturnBar(
+    state: CommunicationUiState,
+    isPhoneScreen: Boolean,
+    onReturnToCall: () -> Unit,
+) {
+    val showingCall = isPhoneScreen &&
+        state.route in setOf(CommunicationRoute.ACTIVE_CALL, CommunicationRoute.INCOMING_CALL)
+    if (!state.hasActiveCall || showingCall) return
+
+    Button(
+        onClick = onReturnToCall,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 64.dp)
+            .testTag("return-to-call"),
+        shape = RectangleShape,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = ClaroColors.Green,
+            contentColor = Color.White,
+        ),
+    ) {
+        Text(
+            text = stringResource(R.string.app_return_to_call),
+            style = MaterialTheme.typography.titleLarge,
+        )
+    }
+}
+
+@Composable
 private fun IntegratedCommunicationScreen(
     state: CommunicationUiState,
     visualMode: VisualMode,
@@ -1400,6 +1736,10 @@ private fun IntegratedCommunicationScreen(
     onDeleteContact: (String) -> Unit,
     onRequestUnlockForContacts: () -> Unit,
     onHome: () -> Unit,
+    sharedDialerControls: Boolean = false,
+    dialerOptionsOpen: Boolean = false,
+    onDialerOptionsChange: ((Boolean) -> Unit)? = null,
+    dialerScrollState: ScrollState? = null,
 ) {
     val callbacks = CommunicationCallbacks(viewModel, onRepairPhone, onHome)
     if (visualMode == VisualMode.TOUCH) {
@@ -1432,6 +1772,7 @@ private fun IntegratedCommunicationScreen(
             onSaveContact = onSaveContact,
             onDeleteContact = onDeleteContact,
             onRequestUnlockForContacts = onRequestUnlockForContacts,
+            onSelectDialerContact = viewModel::selectDialerContact,
         )
     } else {
         ClassicCommunicationScreen(
@@ -1461,6 +1802,15 @@ private fun IntegratedCommunicationScreen(
             cellular = cellular,
             onEmergencyDialer = onEmergencyDialer,
             onCallIdentity = viewModel::requestCall,
+            canManageContacts = canManageContacts,
+            onSaveContact = onSaveContact,
+            onDeleteContact = onDeleteContact,
+            onRequestUnlockForContacts = onRequestUnlockForContacts,
+            onSelectDialerContact = viewModel::selectDialerContact,
+            sharedDialerControls = sharedDialerControls,
+            dialerOptionsOpen = dialerOptionsOpen,
+            onDialerOptionsChange = onDialerOptionsChange,
+            dialerScrollState = dialerScrollState,
         )
     }
 }
@@ -1514,7 +1864,7 @@ private fun IntegratedMessagingScreen(
             onChooseContactNumber = viewModel::chooseContactNumber,
             onManualRecipient = viewModel::enterManualRecipient,
             onBodyChange = viewModel::updateBody,
-            onReview = viewModel::review,
+            onReview = viewModel::sendDraft,
             onEdit = viewModel::editAfterReview,
             onSend = viewModel::send,
             onRetry = viewModel::retry,
@@ -1525,6 +1875,7 @@ private fun IntegratedMessagingScreen(
             onOpenRecipients = viewModel::openRecipientPicker,
             onCancelRecipients = viewModel::cancelRecipientPicker,
             onRecipientInputChange = viewModel::updateRecipientInput,
+            onOpenInbox = viewModel::openInbox,
         )
     } else {
         ClassicMessagingScreen(
@@ -1536,7 +1887,7 @@ private fun IntegratedMessagingScreen(
             onChooseContactNumber = viewModel::chooseContactNumber,
             onManualRecipient = viewModel::enterManualRecipient,
             onBodyChange = viewModel::updateBody,
-            onReview = viewModel::review,
+            onReview = viewModel::sendDraft,
             onEdit = viewModel::editAfterReview,
             onSend = viewModel::send,
             onRetry = viewModel::retry,
@@ -1549,6 +1900,8 @@ private fun IntegratedMessagingScreen(
             onOpenRecipients = viewModel::openRecipientPicker,
             onCancelRecipients = viewModel::cancelRecipientPicker,
             onRecipientInputChange = viewModel::updateRecipientInput,
+            onOpenInbox = viewModel::openInbox,
+            onDeleteConversation = viewModel::deleteConversation,
         )
     }
 }
@@ -1605,9 +1958,21 @@ private fun NavHostController.leaveSettingsForMenu(mode: VisualMode) {
     }
 }
 
-private fun NavHostController.goHome(mode: VisualMode) {
+internal fun NavHostController.goHome(mode: VisualMode) {
+    val alreadyHome = when (mode) {
+        VisualMode.TOUCH -> currentDestination?.hasRoute<TouchHomeRoute>()
+        VisualMode.CLASSIC -> currentDestination?.hasRoute<ClassicHomeRoute>()
+    } == true
+    if (alreadyHome) return
+
+    val returnedHome = when (mode) {
+        VisualMode.TOUCH -> popBackStack<TouchHomeRoute>(inclusive = false)
+        VisualMode.CLASSIC -> popBackStack<ClassicHomeRoute>(inclusive = false)
+    }
+    if (returnedHome) return
+
     navigate(mode.homeRoute()) {
-        popUpTo(graph.startDestinationId) { inclusive = true }
+        popUpTo(graph.id) { inclusive = false }
         launchSingleTop = true
     }
 }

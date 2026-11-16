@@ -8,24 +8,35 @@
     <string name="unlock">Desbloquear</string>
 
     <string name="onb_cancel">Cancelar</string>
+    <string name="onb_back">Atrás</string>
     <string name="onb_continue">Continuar</string>
     <string name="onb_save">Guardar</string>
-    <string name="onb_save_and_continue">Guardar y continuar</string>
 
     <string name="onb_step_choose_phone_style">Elegir estilo del teléfono</string>
     <string name="onb_language_and_display_title">Idioma y pantalla</string>
+    <string name="onb_call_audio_title">Audio de llamadas</string>
+    <string name="onb_call_audio_summary">Usa el altavoz cuando el teléfono está lejos y el auricular cuando está cerca. Bluetooth y los auriculares externos no cambian. La selección manual de audio tiene prioridad durante esa llamada.</string>
+    <string name="onb_easy_call_audio">Altavoz y auricular automáticos</string>
+    <string name="onb_maximum_speaker_volume">Volumen máximo del altavoz</string>
+    <string name="onb_call_audio_sensor_note">El cambio automático requiere un sensor de proximidad operativo. Detecta objetos cercanos, no específicamente tu oído. Sin una lectura del sensor, Claro usa el auricular.</string>
+    <string name="onb_maximum_speaker_warning">El volumen máximo del altavoz puede ser muy alto. Mantén el altavoz lejos del oído. No confíes en el sensor para proteger la audición. Se restaura el volumen anterior al cambiar al auricular o finalizar la llamada.</string>
+    <string name="onb_enable_maximum_volume">Activar volumen máximo del altavoz</string>
+    <string name="onb_home_tiles_title">Elegir mosaicos de Inicio</string>
+    <string name="onb_home_tiles_body">Elige los accesos directos que se muestran en Inicio. Ocultar un mosaico no desactiva la función.</string>
+    <string name="onb_show_messages_tile">Mostrar Mensajes en Inicio</string>
+    <string name="onb_show_camera_tile">Mostrar Cámara en Inicio</string>
+    <string name="onb_show_gallery_tile">Mostrar Galería en Inicio</string>
+    <string name="onb_show_apps_tile">Mostrar Aplicaciones en Inicio</string>
+    <string name="onb_show_app_on_home">Mostrar %1$s en Inicio</string>
     <string name="onb_settings_access">Acceso a Configuración</string>
     <string name="onb_step_people_and_speed_dial">Mosaicos de inicio y marcación rápida</string>
     <string name="onb_sos_contact_title">Contacto SOS</string>
     <string name="onb_step_permissions_and_roles">Permisos y funciones</string>
-    <string name="onb_step_handover_checklist">Lista de verificación final</string>
     <string name="onb_step_setup_complete">Configuración completada</string>
     <string name="onb_setup_complete_body">Configuración completada. Tu pantalla de Inicio está lista.</string>
     <string name="onb_setup_step_progress">Paso %1$d de %2$d de la configuración</string>
 
     <string name="onb_set_up_claro">Configurar Claro</string>
-    <string name="onb_continue_free">Continuar gratis</string>
-    <string name="onb_welcome_no_trial_note">Instalar Claro no inicia ningún periodo de prueba ni genera cargos.</string>
     <string name="onb_welcome_tagline">Tu gente. A un toque de distancia.</string>
     <string name="onb_welcome_subtitle">Inicio, teléfono y mensajes más sencillos — configúralo por tu cuenta o junto a alguien de confianza.</string>
     <string name="onb_welcome_permissions_sos_note">Android pide acceso a Inicio, Teléfono, SMS y Cámara por separado cuando hace falta. SOS llama a una persona de confianza; no es un servicio de emergencias supervisado.</string>
@@ -33,11 +44,11 @@
     <string name="onb_use_style">Usar %1$s</string>
     <string name="onb_apply">Aplicar</string>
     <string name="onb_apply_style">Aplicar %1$s</string>
-    <string name="onb_phone_style_choice_body">Elige cómo se ve Claro. Ambos estilos comparten las mismas personas, mensajes y configuración.</string>
+    <string name="onb_phone_style_choice_body">Elige el diseño que te resulte más fácil de usar.</string>
     <string name="onb_phone_style_settings_body">Prueba cualquiera de los dos estilos. Cambiar solo modifica la apariencia; tus contactos, mensajes y configuración se mantienen igual.</string>
     <string name="onb_phone_style_pending_switch">El cambio a %1$s está esperando a que termine la actividad actual.</string>
-    <string name="onb_touch_mode_card_summary">Contactos con foto y botones en 2 columnas</string>
-    <string name="onb_classic_mode_card_summary">Teclado fijo, botones de dirección y Llamar/Inicio</string>
+    <string name="onb_touch_mode_card_summary">Botones táctiles grandes y contactos con foto</string>
+    <string name="onb_classic_mode_card_summary">Teclas numéricas y controles de teléfono conocidos</string>
     <string name="onb_mode_selected">✓ Seleccionado</string>
     <string name="onb_tap_to_choose">Toca para elegir</string>
     <string name="onb_classic_preview_date">Mié 11</string>
@@ -85,13 +96,11 @@
     <string name="onb_people_setup_hold_note">Mantener pulsado 1 o 2 inicia la llamada de inmediato, sin pantalla de confirmación adicional.</string>
 
     <string name="onb_configure_trusted_person">Configurar persona de confianza</string>
-    <string name="onb_continue_sos_incomplete">Continuar con SOS incompleto</string>
+    <string name="onb_continue_sos_incomplete">Omitir SOS por ahora</string>
     <string name="onb_sos_setup_body">SOS llama a una persona de confianza tras una cuenta regresiva de 5 segundos. No es un servicio de monitoreo ni de emergencias, y no envía SMS ni ubicación.</string>
     <string name="onb_sos_setup_agreed_info">Persona de confianza registrada con su acuerdo. Realiza una llamada de prueba acordada por separado.</string>
     <string name="onb_sos_setup_unconfigured_warning">SOS no está configurado. No se puede iniciar ninguna llamada SOS hasta que una persona real acepte recibirla.</string>
 
-    <string name="onb_continue_to_handover">Continuar a la verificación final</string>
-    <string name="onb_readiness_checklist_info">Cada función o permiso de Android se solicita por separado. Si falta algún acceso, seguirán disponibles las opciones estándar del teléfono.</string>
     <string name="onb_back_to_settings">Volver a Configuración</string>
     <string name="onb_readiness_settings_info">Permitido significa que Android concedió el acceso; no confirma que una llamada, un SMS o una prueba SOS real hayan funcionado.</string>
     <string name="onb_allow_or_repair">Permitir o reparar</string>
@@ -107,21 +116,9 @@
     <string name="onb_capability_status_unavailable">No disponible en este dispositivo</string>
     <string name="onb_readiness_summary">%1$d de %2$d permitidos</string>
 
-    <string name="onb_optional_plans">Planes opcionales</string>
     <string name="onb_finish_setup">Finalizar configuración</string>
-    <string name="onb_handover_body">Comprueba junto a la persona que todo funcione de verdad. Los puntos sin marcar quedan registrados honestamente como no probados.</string>
-    <string name="onb_handover_all_observed">Se completaron las %1$d comprobaciones finales.</string>
-    <string name="onb_handover_progress_observed">%1$d de %2$d comprobaciones finales realizadas.</string>
-    <string name="onb_handover_outgoing_call">Llamada saliente comprobada</string>
-    <string name="onb_handover_incoming_call">Llamada entrante comprobada</string>
-    <string name="onb_handover_sms_send">Envío de SMS comprobado</string>
-    <string name="onb_handover_sms_receive">Recepción de SMS comprobada</string>
-    <string name="onb_handover_default_sim">Tarjeta SIM predeterminada revisada</string>
-    <string name="onb_handover_ringtone">Volumen del timbre comprobado</string>
-    <string name="onb_handover_home_return">Regreso a Inicio comprobado</string>
-    <string name="onb_handover_sos_test">Prueba SOS acordada comprobada</string>
-    <string name="onb_allowed_apps_and_tiles_title">Aplicaciones permitidas y botones en Inicio</string>
-    <string name="onb_allowed_apps_and_tiles_subtitle">Elige aplicaciones adicionales opcionales para Inicio</string>
+    <string name="onb_set_default_apps">Establecer Claro como predeterminado</string>
+    <string name="onb_default_apps_info">Elige Claro en los avisos de Android para Inicio, Teléfono y SMS. La configuración solo puede finalizar después de confirmar estas opciones. Los demás permisos se pueden configurar por separado.</string>
 
     <string name="onb_done_settings">Listo</string>
     <string name="onb_lock_settings">Bloquear ajustes</string>

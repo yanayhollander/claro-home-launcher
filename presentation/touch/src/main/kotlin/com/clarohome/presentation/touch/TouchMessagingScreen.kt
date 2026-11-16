@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -53,7 +54,7 @@ import com.clarohome.feature.communication.MessageKind
 import com.clarohome.feature.communication.MessageRecipient
 import com.clarohome.feature.communication.MessagingRoute
 import com.clarohome.feature.communication.MessagingUiState
-import com.clarohome.feature.communication.SmsEncoding
+import com.clarohome.feature.communication.formatMessageTimestamp
 import com.clarohome.presentation.touch.R
 
 @Composable
@@ -78,6 +79,7 @@ fun TouchMessagingScreen(
     onOpenRecipients: () -> Unit = {},
     onCancelRecipients: () -> Unit = {},
     onRecipientInputChange: (String) -> Unit = onManualRecipient,
+    onOpenInbox: () -> Unit = onHome,
 ) {
     val rootModifier = Modifier.testTag("touch-messaging")
 
@@ -87,9 +89,11 @@ fun TouchMessagingScreen(
             MessagingRoute.RECIPIENTS,
             MessagingRoute.CONFIRMATION,
             MessagingRoute.FAILED,
+            MessagingRoute.CONVERSATION,
         ),
     ) {
         when (state.route) {
+            MessagingRoute.CONVERSATION -> onOpenInbox()
             MessagingRoute.RECIPIENTS -> onCancelRecipients()
             MessagingRoute.CONFIRMATION -> onEdit()
             else -> onCancelFailure()
@@ -242,7 +246,13 @@ private fun InboxRoute(
                     .ifBlank { stringResource(R.string.touch_unknown_number) }
                 ClaroRowButton(
                     title = titleText,
-                    subtitle = snippetText,
+                    subtitle = listOf(
+                        snippetText,
+                        formatMessageTimestamp(
+                            conversation.timestampMillis,
+                            LocalConfiguration.current.locales[0],
+                        ) ?: stringResource(R.string.touch_message_time_unknown),
+                    ).filter(String::isNotBlank).joinToString("\n"),
                     unreadDot = conversation.unreadCount > 0,
                     leading = {
                         ClaroAvatar(
@@ -275,7 +285,7 @@ private fun ComposeRoute(
         scrollable = true,
         dock = {
             ClaroPrimaryButton(
-                label = stringResource(R.string.touch_action_review),
+                label = stringResource(R.string.touch_action_send),
                 onClick = onReview,
                 containerColor = ClaroColors.Blue,
             )
@@ -334,13 +344,6 @@ private fun ComposeRoute(
             textStyle = TextStyle(fontSize = 24.sp, lineHeight = 32.sp, color = ClaroColors.Ink),
             shape = RoundedCornerShape(2.dp),
             colors = messagingFieldColors(),
-        )
-        Text(
-            text = smsLengthHelper(state),
-            color = ClaroColors.Muted,
-            fontSize = 17.sp,
-            lineHeight = 23.sp,
-            modifier = Modifier.padding(horizontal = 2.dp),
         )
         if (!state.qualification.canSend) {
             ClaroInfoCard(
@@ -422,6 +425,7 @@ private fun RecipientsRoute(
                                 name = contact.displayName,
                                 size = 48.dp,
                                 paletteSeed = contactIndex,
+                                photoUri = contact.photoUri,
                             )
                         },
                         onClick = { onChooseContactNumber(contact, number) },
@@ -472,7 +476,7 @@ private fun ConversationRoute(
         scrollable = false,
         dock = {
             ClaroPrimaryButton(
-                label = stringResource(R.string.touch_action_review),
+                label = stringResource(R.string.touch_action_send),
                 onClick = onReview,
                 containerColor = ClaroColors.Blue,
             )
@@ -523,12 +527,6 @@ private fun ConversationRoute(
             shape = RoundedCornerShape(2.dp),
             colors = messagingFieldColors(),
         )
-        Text(
-            text = smsLengthHelper(state),
-            color = ClaroColors.Muted,
-            fontSize = 17.sp,
-            lineHeight = 22.sp,
-        )
         if (!state.qualification.canSend) {
             ClaroInfoCard(
                 text = if (!state.qualification.telephonySupported) {
@@ -550,13 +548,14 @@ private fun ConversationRoute(
 
 @Composable
 private fun ConversationBubble(message: ClaroMessage) {
+    val messageLocale = LocalConfiguration.current.locales[0]
     val isOutgoing = message.direction == MessageDirection.OUTGOING
     val bubbleShape = if (isOutgoing) {
         RoundedCornerShape(topStart = 10.dp, topEnd = 3.dp, bottomEnd = 3.dp, bottomStart = 10.dp)
     } else {
         RoundedCornerShape(topStart = 3.dp, topEnd = 10.dp, bottomEnd = 10.dp, bottomStart = 3.dp)
     }
-    val statusLabel = when (message.deliveryState) {
+    val statusLabel = if (!isOutgoing) null else when (message.deliveryState) {
         MessageDeliveryState.DELIVERY_CONFIRMED ->
             stringResource(R.string.touch_delivery_confirmed)
         MessageDeliveryState.DELIVERY_UNKNOWN ->
@@ -620,6 +619,15 @@ private fun ConversationBubble(message: ClaroMessage) {
                 )
             }
         }
+        Text(
+            text = formatMessageTimestamp(message.timestampMillis, messageLocale)
+                ?: stringResource(R.string.touch_message_time_unknown),
+            color = Color(0xFF4B5565),
+            fontSize = 17.sp,
+            lineHeight = 22.sp,
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                .testTag("message-time-${message.providerId}"),
+        )
         statusLabel?.let { status ->
             Text(
                 text = status,
@@ -678,12 +686,6 @@ private fun ConfirmationRoute(
                 lineHeight = 33.sp,
             )
         }
-        Text(
-            text = smsLengthHelper(state),
-            color = ClaroColors.Muted,
-            fontSize = 17.sp,
-            lineHeight = 23.sp,
-        )
         state.statusMessage?.let { status ->
             ClaroInfoCard(text = localizedMessagingStatus(status, state.sendFailure))
         }
@@ -900,22 +902,6 @@ private fun messagingFieldColors() = OutlinedTextFieldDefaults.colors(
 )
 
 @Composable
-private fun smsLengthHelper(state: MessagingUiState): String =
-    if (state.encoding.encoding == SmsEncoding.UNICODE) {
-        stringResource(
-            R.string.touch_sms_length_unicode,
-            state.draft.body.length,
-            state.encoding.segments,
-        )
-    } else {
-        stringResource(
-            R.string.touch_sms_length_standard,
-            state.draft.body.length,
-            state.encoding.segments,
-        )
-    }
-
-@Composable
 private fun AttachmentState.accessibleAttachmentMessage(): String = when (this) {
     AttachmentState.NONE -> stringResource(R.string.touch_attachment_none)
     AttachmentState.AVAILABLE -> stringResource(R.string.touch_attachment_available)
@@ -927,6 +913,8 @@ private fun AttachmentState.accessibleAttachmentMessage(): String = when (this) 
 @Composable
 private fun localizedMessagingStatus(message: String, failure: MessageFailure?): String {
     when (message) {
+        "Message conversation is no longer available" ->
+            return stringResource(R.string.touch_conversation_unavailable)
         "Messages access needs repair",
         "Message access needs repair.",
         -> return stringResource(R.string.touch_message_access_repair)

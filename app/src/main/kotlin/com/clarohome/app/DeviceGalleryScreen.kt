@@ -5,14 +5,16 @@ import android.app.Activity
 import android.content.ContentUris
 import android.content.Intent
 import android.content.Context
-import android.content.ContentResolver
+import android.database.ContentObserver
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
-import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import android.util.Size
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
@@ -28,10 +30,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -50,6 +54,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -105,34 +110,24 @@ internal fun deviceMediaAccess(context: Context): DeviceMediaAccess {
     }
 }
 
-private data class DevicePhoto(val id: Long, val uri: Uri, val name: String)
+internal data class DevicePhoto(val id: Long, val uri: Uri, val name: String)
 
 private const val MAX_DEVICE_PHOTOS = 300
 
-private fun queryDevicePhotos(context: Context): List<DevicePhoto> {
+internal fun queryDevicePhotos(context: Context): List<DevicePhoto> {
     val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-    val query = Bundle().apply {
-        putInt(ContentResolver.QUERY_ARG_LIMIT, MAX_DEVICE_PHOTOS)
-        putStringArray(
-            ContentResolver.QUERY_ARG_SORT_COLUMNS,
-            arrayOf(MediaStore.Images.Media.DATE_ADDED, MediaStore.Images.Media._ID),
-        )
-        putInt(
-            ContentResolver.QUERY_ARG_SORT_DIRECTION,
-            ContentResolver.QUERY_SORT_DIRECTION_DESCENDING,
-        )
-    }
     return runCatching {
         context.contentResolver.query(
             collection,
             arrayOf(MediaStore.Images.Media._ID, MediaStore.Images.Media.DISPLAY_NAME),
-            query,
             null,
+            null,
+            "${MediaStore.Images.Media.DATE_ADDED} DESC, ${MediaStore.Images.Media._ID} DESC",
         )?.use { cursor ->
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
             val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
             buildList {
-                while (cursor.moveToNext()) {
+                while (size < MAX_DEVICE_PHOTOS && cursor.moveToNext()) {
                     val id = cursor.getLong(idColumn)
                     add(
                         DevicePhoto(
@@ -259,15 +254,44 @@ internal fun DeviceGalleryScreen(onRequestAccess: () -> Unit) {
     var selectedId by rememberSaveable { mutableStateOf<Long?>(null) }
     var confirmingDelete by rememberSaveable { mutableStateOf(false) }
     var status by remember { mutableStateOf<Pair<String, ClaroBannerTone>?>(null) }
+    val gridState = rememberLazyGridState()
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { refreshTick++ }
 
     val access = remember(refreshTick) { deviceMediaAccess(context) }
+    DisposableEffect(context, access) {
+        var registered = false
+        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                refreshTick++
+            }
+        }
+        if (access != DeviceMediaAccess.DENIED) {
+            try {
+                context.contentResolver.registerContentObserver(
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    true,
+                    observer,
+                )
+                registered = true
+            } catch (_: SecurityException) {
+                Log.w("ClaroGallery", "Android denied monitoring Gallery changes.")
+                status = resources.getString(R.string.app_gallery_access_needed) to ClaroBannerTone.WARNING
+            }
+        }
+        onDispose { if (registered) context.contentResolver.unregisterContentObserver(observer) }
+    }
     LaunchedEffect(refreshTick) {
+        val previousNewestId = photos?.firstOrNull()?.id
         photos = if (access == DeviceMediaAccess.DENIED) {
             emptyList()
         } else {
             withContext(Dispatchers.IO) { queryDevicePhotos(context) }
+        }
+        if (selectedId == null && previousNewestId != null &&
+            photos?.firstOrNull()?.id != previousNewestId && !photos.isNullOrEmpty()
+        ) {
+            gridState.scrollToItem(0)
         }
     }
 
@@ -384,6 +408,7 @@ internal fun DeviceGalleryScreen(onRequestAccess: () -> Unit) {
                 } else {
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(2),
+                        state = gridState,
                         modifier = Modifier.weight(1f),
                         horizontalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
                         verticalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
@@ -406,6 +431,27 @@ internal fun DeviceGalleryScreen(onRequestAccess: () -> Unit) {
                     }
                 }
             }
+        }
+    }
+}
+
+internal fun Modifier.galleryPhotoNavigation(
+    total: Int,
+    confirmingDelete: Boolean,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+): Modifier = onPreviewKeyEvent { event ->
+    if (event.type != KeyEventType.KeyDown || total < 2 || confirmingDelete) {
+        false
+    } else {
+        when (event.key) {
+            Key.DirectionLeft -> { onPrevious(); true }
+            Key.DirectionRight -> { onNext(); true }
+            Key.Tab -> {
+                if (event.isShiftPressed) onPrevious() else onNext()
+                true
+            }
+            else -> false
         }
     }
 }
@@ -449,17 +495,12 @@ private fun PhotoDetail(
                 )
             }
         },
-        modifier = Modifier.onPreviewKeyEvent { event ->
-            if (event.type != KeyEventType.KeyDown || total < 2) {
-                false
-            } else {
-                when (event.key) {
-                    Key.DirectionLeft -> { currentPrevious(); true }
-                    Key.DirectionRight -> { currentNext(); true }
-                    else -> false
-                }
-            }
-        },
+        modifier = Modifier.galleryPhotoNavigation(
+            total = total,
+            confirmingDelete = confirmingDelete,
+            onPrevious = currentPrevious,
+            onNext = currentNext,
+        ),
     ) {
         status?.let { (message, tone) -> ClaroInfoCard(text = message, tone = tone) }
         DevicePhotoImage(

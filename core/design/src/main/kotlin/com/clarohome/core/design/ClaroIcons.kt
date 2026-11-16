@@ -1,6 +1,10 @@
 package com.clarohome.core.design
 
+import android.graphics.ImageDecoder
+import android.net.Uri
+import android.util.Log
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -14,6 +18,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,6 +28,8 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
@@ -30,6 +38,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -40,6 +51,9 @@ import com.clarohome.core.model.BatteryStatus
 import com.clarohome.core.model.CellularAvailability
 import com.clarohome.core.model.CellularStatus
 import kotlin.math.abs
+import java.io.IOException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 enum class ClaroIconKind(
     val pathData: String,
@@ -141,6 +155,34 @@ enum class ClaroIconKind(
         "M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-9.5Z",
         filled = false,
     ),
+    MICROPHONE_OFF(
+        "M9 5a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0V5Zm-3 6v1a6 6 0 0 0 12 0v-1m-6 7v4m-4 0h8M3 3l18 18",
+        filled = false,
+    ),
+    KEYPAD(
+        "M3 2h3v3H3Z M10 2h3v3h-3Z M17 2h3v3h-3Z M3 8h3v3H3Z M10 8h3v3h-3Z M17 8h3v3h-3Z M3 14h3v3H3Z M10 14h3v3h-3Z M17 14h3v3h-3Z M3 20h3v3H3Z M10 20h3v3h-3Z M17 20h3v3h-3Z",
+        filled = true,
+    ),
+    PAUSE(
+        "M6 4h4v16H6Z M14 4h4v16h-4Z",
+        filled = true,
+    ),
+    PLAY(
+        "M7 4l13 8L7 20Z",
+        filled = true,
+    ),
+    SWAP(
+        "M3 7h16m-4-4 4 4-4 4M21 17H5m4-4-4 4 4 4",
+        filled = false,
+    ),
+    COMPOSE_MESSAGE(
+        "M13 4H3v16h16V10M8 16l1-4L19 2l3 3-10 10-4 1Zm9-12 3 3",
+        filled = false,
+    ),
+    CONTACT_ADD(
+        "M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM2 21v-3a7 7 0 0 1 14 0v3M20 5v8m-4-4h8",
+        filled = false,
+    ),
 }
 
 fun ClaroIconKind.imageVector(): ImageVector {
@@ -200,7 +242,50 @@ fun ClaroAvatar(
     size: Dp = 51.dp,
     paletteSeed: Int? = null,
     isUnassigned: Boolean = false,
+    photoUri: String? = null,
 ) {
+    val context = LocalContext.current
+    val pixels = with(LocalDensity.current) { size.roundToPx().coerceIn(1, 512) }
+    val photo by produceState<ImageBitmap?>(null, photoUri, pixels, context, isUnassigned) {
+        value = null
+        if (photoUri.isNullOrBlank() || isUnassigned) return@produceState
+        value = withContext(Dispatchers.IO) {
+            try {
+                ImageDecoder.decodeBitmap(
+                    ImageDecoder.createSource(context.contentResolver, Uri.parse(photoUri)),
+                ) { decoder, info, _ ->
+                    decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                    val scale = minOf(
+                        1f,
+                        pixels.toFloat() / info.size.width,
+                        pixels.toFloat() / info.size.height,
+                    )
+                    decoder.setTargetSize(
+                        (info.size.width * scale).toInt().coerceAtLeast(1),
+                        (info.size.height * scale).toInt().coerceAtLeast(1),
+                    )
+                }.asImageBitmap()
+            } catch (_: IOException) {
+                Log.w("ClaroAvatar", "The contact photo could not be decoded.")
+                null
+            } catch (_: SecurityException) {
+                Log.w("ClaroAvatar", "Access to the contact photo was denied.")
+                null
+            } catch (_: IllegalArgumentException) {
+                Log.w("ClaroAvatar", "The contact photo URI is unsupported.")
+                null
+            }
+        }
+    }
+    photo?.let { bitmap ->
+        Image(
+            bitmap = bitmap,
+            contentDescription = name,
+            contentScale = ContentScale.Crop,
+            modifier = modifier.size(size).clip(RoundedCornerShape(4.dp)),
+        )
+        return
+    }
     val unassignedLabel = stringResource(R.string.design_unassigned_person)
     val hasPerson = !isUnassigned &&
         !name.isNullOrBlank() &&
@@ -339,8 +424,9 @@ fun ClaroCellularBars(
     val available = cellular.availability == CellularAvailability.AVAILABLE
     val activeBars = if (available) (cellular.signalLevel ?: 0).coerceIn(0, 4) else 0
     val description = when (cellular.availability) {
-        CellularAvailability.AVAILABLE ->
-            stringResource(R.string.design_signal_available, cellular.signalLevel ?: 0)
+        CellularAvailability.AVAILABLE -> cellular.signalLevel?.let {
+            stringResource(R.string.design_signal_available, it)
+        } ?: stringResource(R.string.design_signal_unknown)
         CellularAvailability.NO_SIM -> stringResource(R.string.design_signal_no_sim)
         CellularAvailability.NO_SERVICE -> stringResource(R.string.design_signal_no_service)
         CellularAvailability.AIRPLANE_MODE -> stringResource(R.string.design_signal_airplane)
@@ -361,9 +447,16 @@ fun ClaroCellularBars(
                     .background(if (filled) activeColor else inactiveColor),
             )
         }
-        if (!available) {
+        if (!available || cellular.signalLevel == null) {
             Text(
-                text = " ×",
+                text = if (
+                    cellular.availability == CellularAvailability.UNKNOWN ||
+                    (available && cellular.signalLevel == null)
+                ) {
+                    " ?"
+                } else {
+                    " ×"
+                },
                 color = activeColor,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,

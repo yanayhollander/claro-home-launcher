@@ -1,5 +1,7 @@
 package com.clarohome.feature.launcher.home
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
@@ -8,8 +10,11 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.BatteryManager
 import android.provider.Settings
+import android.telephony.ServiceState
+import android.telephony.SubscriptionManager
 import android.telephony.TelephonyManager
 import android.text.format.DateFormat
+import android.util.Log
 import com.clarohome.core.domain.FeatureContract
 import com.clarohome.core.model.BadgeValue
 import com.clarohome.core.model.BatteryStatus
@@ -130,13 +135,43 @@ class AndroidLauncherStatusReader @Inject constructor(
         val telephony = context.getSystemService(TelephonyManager::class.java)
             ?: return CellularStatus(CellularAvailability.UNKNOWN)
         return try {
-            if (telephony.simState == TelephonyManager.SIM_STATE_ABSENT) {
-                CellularStatus(CellularAvailability.NO_SIM)
+            val subscriptionId = SubscriptionManager.getDefaultDataSubscriptionId()
+                .takeIf(SubscriptionManager::isValidSubscriptionId)
+                ?: SubscriptionManager.getDefaultSubscriptionId()
+            val activeTelephony = if (SubscriptionManager.isValidSubscriptionId(subscriptionId)) {
+                telephony.createForSubscriptionId(subscriptionId)
             } else {
-                // Voice service and signal require sensitive access on many devices.
-                CellularStatus(CellularAvailability.UNKNOWN)
+                telephony
             }
-        } catch (_: SecurityException) {
+            if (activeTelephony.simState == TelephonyManager.SIM_STATE_ABSENT) {
+                return CellularStatus(CellularAvailability.NO_SIM)
+            }
+            if (
+                context.checkSelfPermission(Manifest.permission.READ_PHONE_STATE) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                return CellularStatus(CellularAvailability.UNKNOWN)
+            }
+            // Location fields are excluded on 33+ and redacted without location access on 29-32.
+            @SuppressLint("MissingPermission")
+            val serviceState = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                activeTelephony.getServiceState(TelephonyManager.INCLUDE_LOCATION_DATA_NONE)
+            } else {
+                activeTelephony.serviceState
+            }
+            when (serviceState?.state) {
+                ServiceState.STATE_IN_SERVICE -> CellularStatus(
+                    availability = CellularAvailability.AVAILABLE,
+                    signalLevel = activeTelephony.signalStrength?.level,
+                )
+                ServiceState.STATE_OUT_OF_SERVICE,
+                ServiceState.STATE_EMERGENCY_ONLY,
+                ServiceState.STATE_POWER_OFF,
+                -> CellularStatus(CellularAvailability.NO_SERVICE)
+                else -> CellularStatus(CellularAvailability.UNKNOWN)
+            }
+        } catch (error: SecurityException) {
+            Log.w("LauncherStatusReader", "Android denied access to cellular status.", error)
             CellularStatus(CellularAvailability.UNKNOWN)
         }
     }
@@ -153,11 +188,11 @@ class PackageManagerInstalledAppCatalog @Inject constructor(
         val results = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             packageManager.queryIntentActivities(
                 query,
-                PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()),
+                PackageManager.ResolveInfoFlags.of(0L),
             )
         } else {
             @Suppress("DEPRECATION")
-            packageManager.queryIntentActivities(query, PackageManager.MATCH_DEFAULT_ONLY)
+            packageManager.queryIntentActivities(query, 0)
         }
         return results
             .asSequence()

@@ -49,6 +49,7 @@ import com.clarohome.core.model.HomeTile
 import com.clarohome.core.model.HomeTileKind
 import com.clarohome.core.model.InstalledApp
 import com.clarohome.feature.communication.ClaroContact
+import com.clarohome.feature.onboarding.settings.HomeTileVisibilityFields
 import com.clarohome.feature.communication.ContactNumber
 import com.clarohome.feature.communication.PhoneAssignment
 
@@ -76,6 +77,9 @@ fun PeopleSettingsScreen(
     onSetKey: (String, ClaroContact, ContactNumber) -> Unit,
     onClearKey: (String) -> Unit,
     onBack: () -> Unit,
+    onHomeTileVisibility: (HomeTileKind, Boolean) -> Unit,
+    onInstalledAppVisibility: (String, Boolean) -> Unit,
+    message: String? = null,
 ) {
     var target by rememberSaveable { mutableStateOf<String?>(null) }
     val picking = target
@@ -85,6 +89,10 @@ fun PeopleSettingsScreen(
             assignments = assignments,
             onPick = { target = it },
             onBack = onBack,
+            onHomeTileVisibility = onHomeTileVisibility,
+            message = message,
+            installedApps = installedApps,
+            onInstalledAppVisibility = onInstalledAppVisibility,
         )
     } else {
         PeoplePickerScreen(
@@ -119,6 +127,10 @@ private fun PeopleGridScreen(
     assignments: List<PhoneAssignment>,
     onPick: (String) -> Unit,
     onBack: () -> Unit,
+    onHomeTileVisibility: (HomeTileKind, Boolean) -> Unit,
+    message: String?,
+    installedApps: List<InstalledApp>,
+    onInstalledAppVisibility: (String, Boolean) -> Unit,
 ) {
     BackHandler(onBack = onBack)
 
@@ -126,6 +138,7 @@ private fun PeopleGridScreen(
         title = stringResource(R.string.app_home_tiles_and_speed_dial),
         scrollable = false,
         dockInSoftkeys = true,
+        bannerText = message,
         dock = {
             ClaroPrimaryButton(
                 label = stringResource(R.string.app_done),
@@ -140,6 +153,15 @@ private fun PeopleGridScreen(
                 .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
         ) {
+            item(key = "home-visibility") {
+                HomeTileVisibilityFields(
+                    homeTileKinds = homeSlots.filterNotNull().map { it.kind }.toSet(),
+                    onVisibilityChange = onHomeTileVisibility,
+                    installedApps = installedApps,
+                    homeAppPackages = homeSlots.mapNotNull { it?.packageName }.toSet(),
+                    onInstalledAppVisibility = onInstalledAppVisibility,
+                )
+            }
             items(HOME_SLOT_COUNT / SLOT_COLUMNS, key = { "slot-row-$it" }) { rowIndex ->
                 Row(horizontalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap)) {
                     for (column in 0 until SLOT_COLUMNS) {
@@ -352,7 +374,7 @@ private fun PeoplePickerScreen(
                     ClaroRowButton(
                         title = contact.displayName,
                         subtitle = "\u2066${number.label} · ${number.value}\u2069",
-                        leading = { ClaroAvatar(name = contact.displayName, size = 44.dp) },
+                        leading = { ClaroAvatar(name = contact.displayName, size = 44.dp, photoUri = contact.photoUri) },
                         onClick = {
                             if (isHomeTarget) {
                                 onSetSlot(
@@ -417,7 +439,7 @@ private fun SlotPickerCell(
             when (tile?.kind) {
                 null -> ClaroAvatar(name = null, size = 40.dp, isUnassigned = true)
                 HomeTileKind.INSTALLED_APP -> ClaroAppIcon(packageName = tile.packageName, size = 40.dp)
-                HomeTileKind.CONTACT -> ClaroAvatar(name = tile.label, size = 40.dp)
+                HomeTileKind.CONTACT -> ClaroAvatar(name = tile.label, size = 40.dp, photoUri = tile.photoUri)
                 else -> ClaroIcon(
                     kind = tile.kind.settingsIconKind(),
                     tint = ClaroColors.Blue,

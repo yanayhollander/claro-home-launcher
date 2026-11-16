@@ -26,6 +26,7 @@ object ClaroColors {
     val Blue = Color(0xFF075BD8)
     val Orange = Color(0xFFC45100)
     val Red = Color(0xFFCC1731)
+    val RedOnDark = Color(0xFFFF6B7D)
     val Violet = Color(0xFF7041C3)
     val AppsInk = Color(0xFF1F344E)
     val AppsPale = Color(0xFFEDF1F7)

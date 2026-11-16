@@ -5,6 +5,10 @@
     <string name="comm_notification_incoming_call_text">Llamada entrante</string>
     <string name="comm_notification_action_decline">Rechazar</string>
     <string name="comm_notification_action_answer">Contestar</string>
+    <string name="comm_notification_action_end">Colgar</string>
+    <string name="comm_channel_ongoing_calls_name">Llamadas en curso</string>
+    <string name="comm_channel_ongoing_calls_description">Llamadas en curso y controles para volver a la llamada</string>
+    <string name="comm_notification_return_to_call">Toca para volver a tu llamada</string>
     <string name="comm_caller_private_number">Número privado</string>
     <string name="comm_caller_unknown">Número desconocido</string>
     <string name="comm_contact_name_and_number_required">El nombre y el número son obligatorios</string>
@@ -15,7 +19,6 @@
     <string name="comm_channel_messages_name">Mensajes</string>
     <string name="comm_channel_messages_description">Mensajes de texto y multimedia entrantes</string>
     <string name="comm_notification_new_sms_title">Nuevo mensaje</string>
-    <string name="comm_notification_new_sms_text">Abre Claro para leerlo</string>
     <string name="comm_notification_new_mms_title">Nuevo mensaje multimedia</string>
     <string name="comm_notification_new_mms_text">Abre Claro para descargarlo o revisar el error</string>
     <string name="comm_mms_fallback_subject">Mensaje multimedia</string>

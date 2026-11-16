@@ -25,7 +25,6 @@ import com.clarohome.core.model.BatteryStatus
 import com.clarohome.core.model.CellularAvailability
 import com.clarohome.core.model.CellularStatus
 import com.clarohome.core.model.ClaroPreferences
-import com.clarohome.core.model.HandoverCheck
 import com.clarohome.core.model.HomeRoleState
 import com.clarohome.core.model.HomeSnapshot
 import com.clarohome.core.model.HomeTile
@@ -91,7 +90,7 @@ class LocalizationRegressionTest {
                                 onOpenPeopleSetup = {},
                                 onOpenSosSetup = {},
                                 onRequestCapability = {},
-                                onHandover = { _: HandoverCheck, _: Boolean -> },
+                                onHomeTileVisibility = { _, _ -> },
                             ),
                         )
                         showClassic -> ClassicPhoneScreen(

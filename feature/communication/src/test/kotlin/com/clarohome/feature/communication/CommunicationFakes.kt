@@ -1,7 +1,10 @@
 package com.clarohome.feature.communication
 
 import android.content.Intent
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
 class FakeDialerRoleGateway(
@@ -14,17 +17,29 @@ class FakeDialerRoleGateway(
 }
 
 class FakeTelecomGateway : TelecomGateway {
-    val mutableEvents = MutableStateFlow<TelecomEvent?>(null)
-    override val events: StateFlow<TelecomEvent?> = mutableEvents
+    class EventSource {
+        private val mutable = MutableSharedFlow<TelecomEvent?>(replay = 1, extraBufferCapacity = 64)
+        val flow: SharedFlow<TelecomEvent?> = mutable
+        var value: TelecomEvent?
+            get() = mutable.replayCache.lastOrNull()
+            set(event) {
+                check(mutable.tryEmit(event))
+            }
+    }
+
+    val mutableEvents = EventSource()
+    override val events: SharedFlow<TelecomEvent?> = mutableEvents.flow
     var placements = 0
     var emergencyHandoffs = 0
     var placementResult: CallPlacementResult = CallPlacementResult.SubmittedToTelecom
+    var placementGate: CompletableDeferred<Unit>? = null
     val emergencyNumbers = mutableSetOf<String>()
     val actions = mutableListOf<String>()
 
     override suspend fun placeCall(number: String): CallPlacementResult {
         placements += 1
         actions += "place:$number"
+        placementGate?.await()
         return placementResult
     }
 
@@ -73,6 +88,18 @@ class FakeContactsGateway(
 ) : ContactsGateway {
     private val values = contacts.associateByTo(linkedMapOf()) { it.lookupKey }
     var largestRequestedPage = 0
+    val matchingQueries = mutableListOf<String>()
+    var matchingGate: CompletableDeferred<Unit>? = null
+
+    override suspend fun matchingNumbers(digits: String, limit: Int): List<CallerIdentity> {
+        matchingQueries += digits
+        matchingGate?.await()
+        return values.values.flatMap { contact ->
+            contact.numbers.filter {
+                PhoneContactsCoordinator.normalizeDialString(it.value).contains(digits)
+            }.map { CallerIdentity(contact.displayName, it.value, photoUri = contact.photoUri) }
+        }.take(limit)
+    }
 
     override suspend fun page(query: String, offset: Int, limit: Int): ContactPage {
         largestRequestedPage = maxOf(largestRequestedPage, limit)
@@ -165,6 +192,7 @@ fun readyQualification() = DialerQualification(
     callPermissionGranted = true,
     callLogPermissionGranted = true,
     hasUsableCallingAccount = true,
+    phoneStatePermissionGranted = true,
 )
 
 fun contactFixture(index: Int): ClaroContact = ClaroContact(

@@ -27,9 +27,26 @@ class FakeMessageRepository(
         .mapValuesTo(mutableMapOf()) { it.value.toMutableList() }
     val updates = mutableListOf<Pair<String, MessageDeliveryState>>()
     var refreshes = 0
+    var conversationsOnRefresh: List<MessageConversation>? = null
+    val deletionRequests = mutableListOf<Long>()
+    var deletionResult = ConversationDeleteResult.DELETED
+
+    override suspend fun deleteConversation(conversationId: Long): ConversationDeleteResult {
+        deletionRequests += conversationId
+        if (deletionResult == ConversationDeleteResult.DELETED) {
+            messagesByConversation.remove(conversationId)
+            mutableConversations.value = mutableConversations.value.filterNot { it.id == conversationId }
+            mutableUnreadCount.value = mutableConversations.value.sumOf { it.unreadCount }
+        }
+        return deletionResult
+    }
 
     override suspend fun refresh(query: String) {
         refreshes += 1
+        conversationsOnRefresh?.let {
+            mutableConversations.value = it
+            conversationsOnRefresh = null
+        }
     }
 
     override suspend fun messages(conversationId: Long): List<ClaroMessage> =

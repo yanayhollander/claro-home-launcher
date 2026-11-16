@@ -3,7 +3,11 @@ package com.clarohome.feature.onboarding.settings
 import com.clarohome.core.domain.ClaroPreferencesRepository
 import com.clarohome.core.model.AppLanguage
 import com.clarohome.core.model.ClaroPreferences
+import com.clarohome.core.model.CapabilityStatus
+import com.clarohome.core.model.ReadinessCapability
+import com.clarohome.core.model.defaultAppCapabilities
 import com.clarohome.core.model.CriticalActivity
+import com.clarohome.core.model.OnboardingStep
 import com.clarohome.core.model.SecretVerifier
 import com.clarohome.core.model.SettingsAccessMode
 import com.clarohome.core.model.TextSize
@@ -16,6 +20,76 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
 class OnboardingSettingsManagerTest {
+    @Test
+    fun finishingSetupRequiresAllAvailableDefaultAppsToBeConfirmed() = runTest {
+        val repository = FakePreferencesRepository()
+        val manager = manager(repository)
+        manager.advanceOnboarding(OnboardingStep.ROLE_READINESS)
+        assertThat(manager.advanceOnboarding(OnboardingStep.COMPLETE)).isFalse()
+        for (missing in defaultAppCapabilities) {
+            val defaults = defaultAppCapabilities.associateWith {
+                if (it == missing) CapabilityStatus.NEEDS_ATTENTION else CapabilityStatus.READY
+            }
+            assertThat(manager.advanceOnboarding(OnboardingStep.COMPLETE, defaults)).isFalse()
+            assertThat(repository.current.onboarding.currentStep).isEqualTo(OnboardingStep.ROLE_READINESS)
+        }
+        assertThat(
+            manager.advanceOnboarding(
+                OnboardingStep.COMPLETE,
+                defaultAppCapabilities.associateWith { CapabilityStatus.READY },
+            ),
+        ).isTrue()
+        assertThat(repository.current.onboarding.currentStep).isEqualTo(OnboardingStep.COMPLETE)
+    }
+
+    @Test
+    fun setupDoesNotRequirePhoneRolesThatAndroidReportsUnavailable() = runTest {
+        val manager = manager(FakePreferencesRepository())
+        assertThat(
+            manager.advanceOnboarding(
+                OnboardingStep.COMPLETE,
+                mapOf(
+                    ReadinessCapability.HOME to CapabilityStatus.READY,
+                    ReadinessCapability.PHONE to CapabilityStatus.UNAVAILABLE,
+                    ReadinessCapability.MESSAGES to CapabilityStatus.UNAVAILABLE,
+                ),
+            ),
+        ).isTrue()
+    }
+
+    @Test
+    fun newHomeStepUsesFlowOrderInsteadOfPersistedEnumOrdinals() = runTest {
+        val repository = FakePreferencesRepository()
+        val manager = manager(repository)
+        manager.advanceOnboarding(OnboardingStep.LANGUAGE_AND_DISPLAY)
+        manager.advanceOnboarding(OnboardingStep.HOME_TILES)
+        manager.advanceOnboarding(OnboardingStep.LANGUAGE_AND_DISPLAY)
+        assertThat(repository.current.onboarding.completedSteps).doesNotContain(OnboardingStep.HOME_TILES)
+
+        manager.advanceOnboarding(OnboardingStep.HOME_TILES)
+        manager.advanceOnboarding(OnboardingStep.SETTINGS_ACCESS)
+        assertThat(repository.current.onboarding.completedSteps).contains(OnboardingStep.HOME_TILES)
+        manager.advanceOnboarding(OnboardingStep.HOME_TILES)
+        assertThat(repository.current.onboarding.currentStep).isEqualTo(OnboardingStep.HOME_TILES)
+        assertThat(repository.current.onboarding.completedSteps).doesNotContain(OnboardingStep.SETTINGS_ACCESS)
+    }
+
+    @Test
+    fun goingBackPersistsPreviousStepWithoutMarkingCurrentStepComplete() = runTest {
+        val repository = FakePreferencesRepository()
+        val manager = manager(repository)
+        manager.advanceOnboarding(OnboardingStep.PHONE_STYLE)
+        manager.chooseVisualMode(VisualMode.TOUCH)
+        manager.advanceOnboarding(OnboardingStep.LANGUAGE_AND_DISPLAY)
+
+        manager.advanceOnboarding(OnboardingStep.PHONE_STYLE)
+
+        assertThat(repository.current.onboarding.currentStep).isEqualTo(OnboardingStep.PHONE_STYLE)
+        assertThat(repository.current.onboarding.completedSteps)
+            .containsExactly(OnboardingStep.WELCOME, OnboardingStep.PHONE_STYLE)
+        assertThat(repository.current.visualMode).isEqualTo(VisualMode.TOUCH)
+    }
+
     @Test
     fun modeSwitchDefersForCriticalActivityThenAppliesWithoutChangingSharedPreferences() = runTest {
         val repository = FakePreferencesRepository(

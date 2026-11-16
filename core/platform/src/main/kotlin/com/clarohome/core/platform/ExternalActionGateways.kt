@@ -1,12 +1,17 @@
 package com.clarohome.core.platform
 
 import android.content.Context
+import android.app.role.RoleManager
+import android.content.ActivityNotFoundException
+import android.content.ComponentName
+import android.content.pm.ApplicationInfo
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.telecom.TelecomManager
 import android.telephony.PhoneNumberUtils
+import android.util.Log
 import com.clarohome.core.domain.EmergencyNumberDetector
 import com.clarohome.core.domain.ExternalAppLaunchResult
 import com.clarohome.core.domain.ExternalAppLauncher
@@ -33,6 +38,12 @@ class TelecomPhoneCallGateway @Inject constructor(
         if (!PhoneNumberUtils.isGlobalPhoneNumber(request.destination)) {
             return PhoneCallRequestResult.InvalidNumber
         }
+        val roles = context.getSystemService(RoleManager::class.java)
+        if (roles?.isRoleAvailable(RoleManager.ROLE_DIALER) != true ||
+            !roles.isRoleHeld(RoleManager.ROLE_DIALER)
+        ) {
+            return PhoneCallRequestResult.RoleOrPermissionLost
+        }
         if (
             context.checkSelfPermission(android.Manifest.permission.CALL_PHONE) !=
             PackageManager.PERMISSION_GRANTED ||
@@ -41,10 +52,10 @@ class TelecomPhoneCallGateway @Inject constructor(
         ) {
             return PhoneCallRequestResult.RoleOrPermissionLost
         }
-        if (telecomManager.callCapablePhoneAccounts.isEmpty()) {
-            return PhoneCallRequestResult.NoCallingAccount
-        }
         return try {
+            if (telecomManager.callCapablePhoneAccounts.isEmpty()) {
+                return PhoneCallRequestResult.NoCallingAccount
+            }
             telecomManager.placeCall(
                 Uri.fromParts("tel", request.destination, null),
                 Bundle.EMPTY,
@@ -72,11 +83,30 @@ class AndroidNativeEmergencyDialerGateway @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) : NativeEmergencyDialerGateway {
     override fun openEmergencyDialer(): Boolean {
-        val intent = Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", "", null))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (intent.resolveActivity(context.packageManager) == null) return false
-        context.startActivity(intent)
-        return true
+        return try {
+            val actions = listOf("com.android.phone.EmergencyDialer.DIAL", "android.intent.action.DIAL_EMERGENCY")
+            for (action in actions) {
+                val intent = Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                @Suppress("DEPRECATION")
+                val activity = context.packageManager.queryIntentActivities(intent, 0)
+                    .firstOrNull {
+                        it.activityInfo.exported &&
+                            it.activityInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM != 0 &&
+                            it.activityInfo.packageName != context.packageName
+                    }?.activityInfo ?: continue
+                intent.component = ComponentName(activity.packageName, activity.name)
+                context.startActivity(intent)
+                return true
+            }
+            Log.w("ClaroEmergency", "No system emergency dialer could be resolved.")
+            false
+        } catch (_: ActivityNotFoundException) {
+            Log.w("ClaroEmergency", "Android emergency dialer is unavailable.")
+            false
+        } catch (_: SecurityException) {
+            Log.w("ClaroEmergency", "Android denied opening the emergency dialer.")
+            false
+        }
     }
 }
 

@@ -5,6 +5,10 @@
     <string name="comm_notification_incoming_call_text">Incoming call</string>
     <string name="comm_notification_action_decline">Decline</string>
     <string name="comm_notification_action_answer">Answer</string>
+    <string name="comm_notification_action_end">Hang up</string>
+    <string name="comm_channel_ongoing_calls_name">Ongoing calls</string>
+    <string name="comm_channel_ongoing_calls_description">Calls in progress and return-to-call controls</string>
+    <string name="comm_notification_return_to_call">Tap to return to your call</string>
     <string name="comm_caller_private_number">Private number</string>
     <string name="comm_caller_unknown">Unknown caller</string>
     <string name="comm_contact_name_and_number_required">Name and number are required</string>
@@ -15,7 +19,6 @@
     <string name="comm_channel_messages_name">Messages</string>
     <string name="comm_channel_messages_description">Incoming text and multimedia messages</string>
     <string name="comm_notification_new_sms_title">New message</string>
-    <string name="comm_notification_new_sms_text">Open Claro to read it</string>
     <string name="comm_notification_new_mms_title">New multimedia message</string>
     <string name="comm_notification_new_mms_text">Open Claro to download or review the failure</string>
     <string name="comm_mms_fallback_subject">Multimedia message</string>
