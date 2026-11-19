@@ -1,0 +1,24 @@
+{
+  "fictional": true,
+  "portraitSource": "AI-generated fictional adults; no reference photographs",
+  "phoneNumberPolicy": "Reserved North American fictional 202-555-0100 through 202-555-0199 range; never call or message",
+  "contacts": [
+    {"id": "maya-brooks", "givenName": "Maya", "familyName": "Brooks", "phone": "+12025550101", "portraitCell": [0, 0]},
+    {"id": "daniel-reed", "givenName": "Daniel", "familyName": "Reed", "phone": "+12025550102", "portraitCell": [1, 0]},
+    {"id": "grace-wilson", "givenName": "Grace", "familyName": "Wilson", "phone": "+12025550103", "portraitCell": [2, 0]},
+    {"id": "robert-hayes", "givenName": "Robert", "familyName": "Hayes", "phone": "+12025550104", "portraitCell": [0, 1]},
+    {"id": "sofia-martin", "givenName": "Sofia", "familyName": "Martin", "phone": "+12025550105", "portraitCell": [1, 1]},
+    {"id": "alex-turner", "givenName": "Alex", "familyName": "Turner", "phone": "+12025550106", "portraitCell": [2, 1]}
+  ],
+  "home": [
+    {"kind": "CONTACT", "contactId": "maya-brooks", "label": "Maya"},
+    {"kind": "CONTACT", "contactId": "daniel-reed", "label": "Daniel"},
+    {"kind": "INSTALLED_APP", "packageName": "com.facebook.katana", "label": "Facebook"},
+    {"kind": "INSTALLED_APP", "packageName": "com.whatsapp", "label": "WhatsApp"},
+    {"kind": "PHONE", "label": "Dialer"},
+    {"kind": "CAMERA", "label": "Camera"},
+    {"kind": "SOS", "label": "SOS"}
+  ],
+  "captureStatus": "Five fresh native captures saved in marketing/store/captures. Genuine Facebook and WhatsApp installed; six fictional contacts imported device-only. Final creative approval and signed-release verification are pending.",
+  "safety": "Import on the designated emulator into device-only contacts, not a synced account. Add only these fictional contacts; never clear or replace existing contacts. Never activate direct-call or SOS tiles during capture."
+}

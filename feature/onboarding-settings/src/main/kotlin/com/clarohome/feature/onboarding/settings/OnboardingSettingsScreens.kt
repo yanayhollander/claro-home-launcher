@@ -3,6 +3,7 @@ package com.clarohome.feature.onboarding.settings
 import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -47,11 +49,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -68,7 +72,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.clarohome.core.design.ClaroAvatar
 import com.clarohome.core.design.ClaroAppIcon
 import com.clarohome.core.design.ClaroBannerTone
 import com.clarohome.core.design.ClaroColors
@@ -1503,411 +1506,31 @@ private fun VisualModeCard(
 
 @Composable
 private fun ModePreview(mode: VisualMode) {
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+    val preview = painterResource(
         if (mode == VisualMode.TOUCH) {
-            TouchShellPreview()
+            R.drawable.phone_style_touch
         } else {
-            ClassicShellPreview()
-        }
-    }
-}
-
-@Composable
-private fun TouchShellPreview() {
-    val tileRows = listOf(
-        listOf(
-            Triple(ClaroColors.PaleGreen, ClaroColors.Green, ClaroIconKind.PHONE),
-            Triple(ClaroColors.PaleBlue, ClaroColors.Blue, ClaroIconKind.MESSAGES),
-        ),
-        listOf(
-            Triple(ClaroColors.PaleOrange, ClaroColors.Orange, ClaroIconKind.CAMERA),
-            Triple(ClaroColors.PaleViolet, ClaroColors.Violet, ClaroIconKind.GALLERY),
-        ),
-        listOf(
-            Triple(ClaroColors.PaleRed, ClaroColors.Red, ClaroIconKind.SOS),
-            Triple(ClaroColors.AppsPale, ClaroColors.AppsInk, ClaroIconKind.APPS),
-        ),
+            R.drawable.phone_style_classic
+        },
     )
-
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(206.dp)
+            .height(270.dp)
             .clip(RoundedCornerShape(10.dp))
-            .border(3.dp, ClaroColors.Charcoal, RoundedCornerShape(10.dp))
-            .background(ClaroColors.Charcoal)
-            .padding(3.dp)
+            .background(Color(0xFFF0F3F8))
             .clearAndSetSemantics {},
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        Row(
+        Image(
+            painter = preview,
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
             modifier = Modifier
-                .fillMaxWidth()
-                .height(24.dp)
-                .background(ClaroColors.Charcoal)
-                .padding(horizontal = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(24.dp)
-                    .height(8.dp)
-                    .border(1.dp, Color.White)
-                    .padding(1.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .width(18.dp)
-                        .background(Color(0xFF3BE564)),
-                )
-            }
-            Text(
-                text = stringResource(R.string.onb_preview_sample_time),
-                color = Color.White,
-                fontSize = 11.sp,
-                lineHeight = 12.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            ClaroIcon(
-                kind = ClaroIconKind.SETTINGS,
-                tint = Color.White,
-                size = 12.dp,
-            )
-        }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(38.dp),
-            horizontalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            repeat(4) { index ->
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxSize()
-                        .background(Color(0xFFF0F3F8)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    ClaroAvatar(
-                        name = (index + 1).toString(),
-                        size = 28.dp,
-                        paletteSeed = index,
-                    )
-                }
-            }
-        }
-        tileRows.forEach { row ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(43.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                row.forEach { (bg, fg, iconKind) ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxSize()
-                            .background(bg),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        ClaroIcon(
-                            kind = iconKind,
-                            tint = fg,
-                            size = 24.dp,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ClassicShellPreview() {
-    val keypadRows = listOf(
-        listOf("1", "2", "3"),
-        listOf("4", "5", "6"),
-        listOf("7", "8", "9"),
-        listOf("*", "0", "#"),
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(206.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .border(3.dp, ClaroColors.Charcoal, RoundedCornerShape(10.dp))
-            .background(ClaroColors.Charcoal)
-            .padding(3.dp)
-            .clearAndSetSemantics {},
-        verticalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(84.dp)
-                .clip(RoundedCornerShape(topStart = 7.dp, topEnd = 7.dp))
-                .background(Color.White)
-                .padding(horizontal = 4.dp, vertical = 3.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.onb_preview_sample_time),
-                    color = ClaroColors.Ink,
-                    fontSize = 13.sp,
-                    lineHeight = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = stringResource(R.string.onb_classic_preview_date),
-                    color = ClaroColors.Muted,
-                    fontSize = 9.sp,
-                    lineHeight = 10.sp,
-                )
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(34.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                repeat(4) { index ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxSize()
-                            .background(Color(0xFFF0F3F8)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        ClaroAvatar(
-                            name = (index + 1).toString(),
-                            size = 24.dp,
-                            paletteSeed = index,
-                        )
-                    }
-                }
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(20.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxSize()
-                        .background(ClaroColors.PaleBlue, RoundedCornerShape(2.dp)),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterHorizontally),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    ClaroIcon(
-                        kind = ClaroIconKind.MESSAGES,
-                        tint = ClaroColors.Blue,
-                        size = 11.dp,
-                    )
-                    Text(
-                        text = stringResource(R.string.onb_classic_preview_sms),
-                        color = ClaroColors.Blue,
-                        fontSize = 8.sp,
-                        lineHeight = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxSize()
-                        .background(ClaroColors.Red, RoundedCornerShape(2.dp)),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterHorizontally),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    ClaroIcon(
-                        kind = ClaroIconKind.SOS,
-                        tint = Color.White,
-                        size = 11.dp,
-                    )
-                    Text(
-                        text = stringResource(R.string.onb_classic_preview_sos),
-                        color = Color.White,
-                        fontSize = 8.sp,
-                        lineHeight = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            }
-        }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(44.dp),
-            horizontalArrangement = Arrangement.spacedBy(3.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .background(Color(0xFF435066), RoundedCornerShape(3.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    ClaroIcon(
-                        kind = ClaroIconKind.ARROW_LEFT,
-                        tint = Color.White,
-                        size = 11.dp,
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .background(ClaroColors.Green, RoundedCornerShape(3.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    ClaroIcon(
-                        kind = ClaroIconKind.PHONE,
-                        tint = Color.White,
-                        size = 12.dp,
-                    )
-                }
-            }
-            Box(
-                modifier = Modifier
-                    .width(48.dp)
-                    .fillMaxHeight()
-                    .background(Color(0xFF3A4659), RoundedCornerShape(10.dp))
-                    .border(1.dp, Color(0xFF8997AA), RoundedCornerShape(10.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                ClaroIcon(
-                    kind = ClaroIconKind.ARROW_UP,
-                    tint = Color.White,
-                    size = 8.dp,
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 2.dp),
-                )
-                ClaroIcon(
-                    kind = ClaroIconKind.ARROW_DOWN,
-                    tint = Color.White,
-                    size = 8.dp,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 2.dp),
-                )
-                ClaroIcon(
-                    kind = ClaroIconKind.ARROW_LEFT,
-                    tint = Color.White,
-                    size = 8.dp,
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(start = 2.dp),
-                )
-                ClaroIcon(
-                    kind = ClaroIconKind.ARROW_RIGHT,
-                    tint = Color.White,
-                    size = 8.dp,
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(end = 2.dp),
-                )
-                Box(
-                    modifier = Modifier
-                        .width(22.dp)
-                        .height(16.dp)
-                        .background(Color(0xFF61738B), RoundedCornerShape(4.dp))
-                        .border(1.dp, Color(0xFFB6C4D6), RoundedCornerShape(4.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = stringResource(R.string.onb_classic_preview_ok),
-                        color = Color.White,
-                        fontSize = 8.sp,
-                        lineHeight = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            }
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .background(Color(0xFF435066), RoundedCornerShape(3.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    ClaroIcon(
-                        kind = ClaroIconKind.APPS,
-                        tint = Color.White,
-                        size = 11.dp,
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .background(ClaroColors.Red, RoundedCornerShape(3.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    ClaroIcon(
-                        kind = ClaroIconKind.HOME,
-                        tint = Color.White,
-                        size = 12.dp,
-                    )
-                }
-            }
-        }
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            keypadRows.forEach { row ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    row.forEach { digit ->
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxSize()
-                                .background(Color(0xFF344054), RoundedCornerShape(3.dp))
-                                .border(0.5.dp, Color(0xFF66758C), RoundedCornerShape(3.dp)),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = digit,
-                                color = Color.White,
-                                fontSize = 9.sp,
-                                lineHeight = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        }
-                    }
-                }
-            }
-        }
+                .fillMaxHeight()
+                .aspectRatio(preview.intrinsicSize.width / preview.intrinsicSize.height)
+                .clip(RoundedCornerShape(8.dp)),
+        )
     }
 }
 

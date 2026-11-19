@@ -1,0 +1,50 @@
+{
+  "brand": "03-big-and-simple",
+  "applicationId": "dev.hollander.claro",
+  "size": [1080, 1920],
+  "publicationReady": false,
+  "captureStatus": "Fresh native emulator captures with six fictional contacts and AI-generated portraits. Final creative approval and signed-release verification are still required before Play upload.",
+  "captureManifest": "marketing/store/captures/capture-manifest.json",
+  "boards": [
+    {
+      "id": "01-big-buttons",
+      "theme": "gold",
+      "headline": ["Big buttons.", "Less fuss."],
+      "caption": "A familiar home for everyday essentials.",
+      "source": "marketing/store/captures/classic-home.png",
+      "angle": -2
+    },
+    {
+      "id": "02-your-people",
+      "theme": "navy",
+      "headline": ["Your people.", "Front and center."],
+      "caption": "Keep your everyday people and apps close.",
+      "source": "marketing/store/captures/touch-home.png",
+      "angle": 2
+    },
+    {
+      "id": "03-contacts",
+      "theme": "cream",
+      "headline": ["Familiar faces.", "Easy to find."],
+      "caption": "Your contacts, with names and photos.",
+      "source": "marketing/store/captures/contacts.png",
+      "angle": -2
+    },
+    {
+      "id": "04-dialer",
+      "theme": "gold",
+      "headline": ["Dial with ease.", "See every key."],
+      "caption": "A clear number pad for everyday calls.",
+      "source": "marketing/store/captures/dialer.png",
+      "angle": 2
+    },
+    {
+      "id": "05-settings",
+      "theme": "navy",
+      "headline": ["Fewer accidental", "changes."],
+      "caption": "Choose a date question or caregiver PIN.",
+      "source": "marketing/store/captures/protected-settings.png",
+      "angle": -2
+    }
+  ]
+}

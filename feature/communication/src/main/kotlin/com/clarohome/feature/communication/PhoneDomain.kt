@@ -4,6 +4,13 @@ import android.content.Intent
 import android.database.sqlite.SQLiteException
 import android.util.Log
 import com.clarohome.core.model.VisualMode
+import com.clarohome.core.domain.ClaroEvent
+import com.clarohome.core.domain.CrashReporter
+import com.clarohome.core.domain.DiagnosticOperation
+import com.clarohome.core.domain.EventOutcome
+import com.clarohome.core.domain.EventTask
+import com.clarohome.core.domain.NoOpProductAnalytics
+import com.clarohome.core.domain.ProductAnalytics
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
@@ -425,6 +432,8 @@ class PhoneContactsCoordinator(
     private val clock: ElapsedRealtimeClock,
     scope: CoroutineScope,
     savedState: PhoneSavedState = PhoneSavedState(),
+    private val analytics: ProductAnalytics = NoOpProductAnalytics,
+    private val crashReporter: CrashReporter? = null,
 ) {
     private val recentDialerMatches = LinkedHashMap<String, List<CallerIdentity>>()
     private val placingCall = AtomicBoolean(false)
@@ -729,6 +738,7 @@ class PhoneContactsCoordinator(
             return
         }
         if (!placingCall.compareAndSet(false, true)) return
+        trackPlacement(EventOutcome.STARTED)
         pendingCallNumber = number
         cancelPendingCall = false
         update {
@@ -747,6 +757,7 @@ class PhoneContactsCoordinator(
         }
         launchAction {
             if (cancelPendingCall) {
+                trackPlacement(EventOutcome.CANCELED)
                 placingCall.set(false)
                 clearPendingCall()
                 update {
@@ -771,9 +782,10 @@ class PhoneContactsCoordinator(
                 placingCall.set(false)
             }
             when (result) {
-                CallPlacementResult.SubmittedToTelecom -> Unit
+                CallPlacementResult.SubmittedToTelecom -> trackPlacement(EventOutcome.SUBMITTED)
 
                 CallPlacementResult.EmergencyHandoffStarted -> {
+                    trackPlacement(EventOutcome.SUBMITTED)
                     clearPendingCall()
                     update {
                         copy(
@@ -786,6 +798,13 @@ class PhoneContactsCoordinator(
                 }
 
                 is CallPlacementResult.Rejected -> {
+                    trackPlacement(EventOutcome.FAILED)
+                    if (result.failure == CallFailure.UNKNOWN) {
+                        crashReporter?.record(
+                            IllegalStateException("Unexpected call placement failure"),
+                            DiagnosticOperation.CALL_PLACEMENT,
+                        )
+                    }
                     clearPendingCall()
                     update { copy(awaitingOutgoingCall = false) }
                     fail(result.failure, failureMessage(result.failure))
@@ -1111,6 +1130,10 @@ class PhoneContactsCoordinator(
 
     private fun launchAction(block: suspend () -> Unit) {
         actionScope.launch { block() }
+    }
+
+    private fun trackPlacement(outcome: EventOutcome) {
+        analytics.track(ClaroEvent.TaskFlowResult(EventTask.CALL_PLACEMENT, outcome))
     }
 
     private val actionScope = scope

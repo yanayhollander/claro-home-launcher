@@ -90,6 +90,14 @@ multi-tap remain English, unlike the localized Android app. All configuration
 and drafts reset when the page reloads. Changing style **inside Settings** keeps
 this in-memory state; the external version/comparison links reload the preview.
 
+### Native phone-style previews
+
+The onboarding and Settings style cards use native example captures, not a second
+hand-drawn implementation of Home. Whenever either home layout changes, refresh
+both `classic-home.png` and `touch-home.png` in `marketing/store/captures/` using
+fictional, privacy-reviewed data, then run `python3 scripts/render-style-previews.py`.
+The generated Android resources and source hashes must be updated together.
+
 ### Native Home widgets (Android only)
 
 Unlock Settings, open **Home tiles**, choose a slot, then tap
@@ -252,8 +260,11 @@ The modular Kotlin/Jetpack Compose app implements persisted Touch/Classic
 presentation, onboarding, protected settings, Home customization, Telecom calls,
 contacts, SMS/MMS, gallery, allowed apps and SOS integration. Native production
 debug builds do not seed storyboard people or invented entitlements.
-RevenueCat, Mixpanel, Firebase Analytics and Crashlytics adapters are
-configuration-gated, with separate default-off diagnostics consent. Unconfigured
+RevenueCat, Mixpanel, Firebase Analytics, Crashlytics and Meta App Events adapters
+are configuration-gated, with separate default-off usage analytics, crash reporting
+and advertising measurement consent. Meta receives only approved activation and
+conversion events, never calls, SMS, contacts or SOS activity; it also requires an
+explicit build-time enablement after consent/queue review. Unconfigured
 billing is explicitly unavailable rather than supplying fake plans.
 
 See [Android foundation](docs/android-foundation.md) for the module graph,

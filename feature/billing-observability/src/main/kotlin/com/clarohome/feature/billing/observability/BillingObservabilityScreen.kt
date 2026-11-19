@@ -1,6 +1,7 @@
 package com.clarohome.feature.billing.observability
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.compose.foundation.BorderStroke
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
@@ -34,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -70,6 +73,22 @@ fun BillingObservabilityScreen(
     onResetDiagnostics: () -> Unit = {},
 ) {
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
+    val privacyUrl = stringResource(R.string.bill_privacy_url)
+    val termsUrl = stringResource(R.string.bill_terms_url)
+    val supportUrl = stringResource(R.string.bill_support_url)
+    var failedPublicPage by rememberSaveable { mutableStateOf<String?>(null) }
+    val openPublicPage: (String) -> Unit = { url ->
+        try {
+            uriHandler.openUri(url)
+        } catch (_: ActivityNotFoundException) {
+            failedPublicPage = url
+        } catch (_: SecurityException) {
+            failedPublicPage = url
+        } catch (_: IllegalArgumentException) {
+            failedPublicPage = url
+        }
+    }
     var selectedPlanId by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingPlan by remember { mutableStateOf<StorePlan?>(null) }
 
@@ -109,6 +128,21 @@ fun BillingObservabilityScreen(
         ClaroSecondaryButton(
             label = stringResource(R.string.bill_restore_purchases),
             onClick = onRestore,
+        )
+        ClaroSecondaryButton(
+            label = stringResource(R.string.bill_privacy_policy),
+            modifier = Modifier.testTag("billing-privacy-policy"),
+            onClick = { openPublicPage(privacyUrl) },
+        )
+        ClaroSecondaryButton(
+            label = stringResource(R.string.bill_terms_of_use),
+            modifier = Modifier.testTag("billing-terms-of-use"),
+            onClick = { openPublicPage(termsUrl) },
+        )
+        ClaroSecondaryButton(
+            label = stringResource(R.string.bill_support),
+            modifier = Modifier.testTag("billing-support"),
+            onClick = { openPublicPage(supportUrl) },
         )
 
         HorizontalDivider(
@@ -150,11 +184,20 @@ fun BillingObservabilityScreen(
             text = stringResource(R.string.bill_diagnostics_privacy_disclosure),
             tone = ClaroBannerTone.INFO,
         )
+        ConsentToggleRow(
+            label = stringResource(R.string.bill_consent_marketing),
+            checked = state.consent.marketing,
+            onCheckedChange = { onConsentChange(state.consent.copy(marketing = it)) },
+        )
+        ClaroInfoCard(
+            text = stringResource(R.string.bill_marketing_disclosure),
+            tone = ClaroBannerTone.INFO,
+        )
         ClaroSecondaryButton(
             label = stringResource(R.string.bill_withdraw_consent),
             onClick = onWithdrawConsent,
         )
-        if (state.consent.analytics || state.consent.crashReports) {
+        if (state.consent.analytics || state.consent.crashReports || state.consent.marketing) {
             ClaroSecondaryButton(
                 label = stringResource(R.string.bill_reset_diagnostics),
                 onClick = onResetDiagnostics,
@@ -176,6 +219,12 @@ fun BillingObservabilityScreen(
                     Text(plan.localizedRenewalText())
                     Text(stringResource(R.string.bill_dialog_manage_in_play))
                     Text(stringResource(R.string.bill_dialog_core_remain_free))
+                    TextButton(onClick = { openPublicPage(privacyUrl) }) {
+                        Text(stringResource(R.string.bill_privacy_policy))
+                    }
+                    TextButton(onClick = { openPublicPage(termsUrl) }) {
+                        Text(stringResource(R.string.bill_terms_of_use))
+                    }
                 }
             },
             confirmButton = {
@@ -200,6 +249,23 @@ fun BillingObservabilityScreen(
             dismissButton = {
                 TextButton(onClick = { pendingPlan = null }) {
                     Text(stringResource(R.string.bill_dialog_cancel))
+                }
+            },
+        )
+    }
+    failedPublicPage?.let { url ->
+        AlertDialog(
+            onDismissRequest = { failedPublicPage = null },
+            title = { Text(stringResource(R.string.bill_public_page_error_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.bill_public_page_error_detail))
+                    SelectionContainer { Text(url) }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { failedPublicPage = null }) {
+                    Text(stringResource(R.string.bill_dialog_close))
                 }
             },
         )

@@ -3,6 +3,15 @@ package com.clarohome.feature.billing.observability
 import android.app.Activity
 import android.content.Context
 import androidx.core.content.edit
+import android.util.Log
+import com.clarohome.core.domain.ClaroEvent
+import com.clarohome.core.domain.CrashReporter
+import com.clarohome.core.domain.DiagnosticOperation
+import com.clarohome.core.domain.EventOutcome
+import com.clarohome.core.domain.EventTask
+import com.clarohome.core.domain.ProductAnalytics
+import com.clarohome.core.domain.TelemetryMoney
+import com.clarohome.core.domain.TelemetryProduct
 import com.clarohome.core.model.EntitlementState
 import com.revenuecat.purchases.CustomerInfo
 import com.revenuecat.purchases.EntitlementInfo
@@ -14,6 +23,10 @@ import com.revenuecat.purchases.Purchases
 import com.revenuecat.purchases.PurchasesConfiguration
 import com.revenuecat.purchases.PurchasesError
 import com.revenuecat.purchases.PurchasesErrorCode
+import com.revenuecat.purchases.VerificationResult
+import com.revenuecat.purchases.models.GoogleStoreProduct
+import com.revenuecat.purchases.models.Price
+import com.revenuecat.purchases.models.PurchaseState
 import com.revenuecat.purchases.interfaces.PurchaseCallback
 import com.revenuecat.purchases.interfaces.ReceiveCustomerInfoCallback
 import com.revenuecat.purchases.interfaces.ReceiveOfferingsCallback
@@ -22,6 +35,8 @@ import com.revenuecat.purchases.models.StoreTransaction
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Instant
 import java.time.Period
+import java.math.BigDecimal
+import java.util.Currency
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.resume
@@ -34,6 +49,9 @@ import kotlinx.coroutines.flow.asStateFlow
 class RevenueCatBillingRepository @Inject constructor(
     @ApplicationContext context: Context,
     configuration: VendorConfiguration,
+    private val analytics: ProductAnalytics,
+    private val crashReporter: CrashReporter,
+    private val purchaseTelemetry: PurchaseTelemetry,
 ) : BillingRepository, com.clarohome.core.domain.BillingGateway {
     private val cache = context.getSharedPreferences("billing_entitlement_cache", Context.MODE_PRIVATE)
     private val purchases: Purchases = if (Purchases.isConfigured) {
@@ -92,6 +110,9 @@ class RevenueCatBillingRepository @Inject constructor(
             },
             onFailure = { error ->
                 mutablePlans.value = PlansState.Unavailable(error.toPlansReason())
+                if (error.toPlansReason() == PlansUnavailableReason.ERROR) {
+                    crashReporter.record(IllegalStateException("Unexpected offerings failure"), DiagnosticOperation.BILLING)
+                }
             },
         )
         refreshCustomerInfo()
@@ -104,6 +125,9 @@ class RevenueCatBillingRepository @Inject constructor(
                 PurchaseResult.Failed(PurchaseFailureReason.CONFIGURATION_MISSING)
             return
         }
+        val telemetryProduct = selectedPackage.telemetryProduct()
+        if (telemetryProduct != null) analytics.track(ClaroEvent.CheckoutStarted(telemetryProduct))
+        trackBilling(EventTask.PURCHASE, EventOutcome.STARTED)
         mutablePurchaseResult.value = PurchaseResult.Purchasing
         suspendCancellableCoroutine<Unit> { continuation ->
             purchases.purchase(
@@ -115,6 +139,11 @@ class RevenueCatBillingRepository @Inject constructor(
                     ) {
                         val membership = applyCustomerInfo(customerInfo)
                         mutablePurchaseResult.value = PurchaseResult.Verified(membership)
+                        trackBilling(
+                            EventTask.PURCHASE,
+                            if (membership.premiumAvailable) EventOutcome.VERIFIED else EventOutcome.NEEDS_ATTENTION,
+                        )
+                        recordConversion(selectedPackage, storeTransaction, customerInfo)
                         if (continuation.isActive) continuation.resume(Unit)
                     }
 
@@ -126,6 +155,12 @@ class RevenueCatBillingRepository @Inject constructor(
                                 PurchaseResult.Pending
                             else -> PurchaseResult.Failed(error.toPurchaseFailure())
                         }
+                        trackBilling(EventTask.PURCHASE, when (mutablePurchaseResult.value) {
+                            PurchaseResult.Canceled -> EventOutcome.CANCELED
+                            PurchaseResult.Pending -> EventOutcome.PENDING
+                            else -> EventOutcome.FAILED
+                        })
+                        if (!userCancelled) reportUnexpectedError(error)
                         if (continuation.isActive) continuation.resume(Unit)
                     }
                 },
@@ -134,18 +169,22 @@ class RevenueCatBillingRepository @Inject constructor(
     }
 
     override suspend fun restore() {
+        trackBilling(EventTask.RESTORE_PURCHASES, EventOutcome.STARTED)
         mutablePurchaseResult.value = PurchaseResult.Purchasing
         suspendCancellableCoroutine<Unit> { continuation ->
             purchases.restorePurchases(object : ReceiveCustomerInfoCallback {
                 override fun onReceived(customerInfo: CustomerInfo) {
                     val membership = applyCustomerInfo(customerInfo)
                     mutablePurchaseResult.value = PurchaseResult.Verified(membership)
+                    trackBilling(EventTask.RESTORE_PURCHASES, EventOutcome.COMPLETED)
                     if (continuation.isActive) continuation.resume(Unit)
                 }
 
                 override fun onError(error: PurchasesError) {
                     mutablePurchaseResult.value =
                         PurchaseResult.Failed(error.toPurchaseFailure())
+                    trackBilling(EventTask.RESTORE_PURCHASES, EventOutcome.FAILED)
+                    reportUnexpectedError(error)
                     if (continuation.isActive) continuation.resume(Unit)
                 }
             })
@@ -154,6 +193,72 @@ class RevenueCatBillingRepository @Inject constructor(
 
     override suspend fun resetPurchaseResult() {
         mutablePurchaseResult.value = PurchaseResult.Idle
+    }
+
+    private fun trackBilling(task: EventTask, outcome: EventOutcome) {
+        analytics.track(ClaroEvent.TaskFlowResult(task, outcome))
+    }
+
+    private fun reportUnexpectedError(error: PurchasesError) {
+        if (error.toPurchaseFailure() == PurchaseFailureReason.UNKNOWN &&
+            error.code != PurchasesErrorCode.PaymentPendingError
+        ) {
+            crashReporter.record(IllegalStateException("Unexpected billing failure"), DiagnosticOperation.BILLING)
+        }
+    }
+
+    private fun recordConversion(item: Package, transaction: StoreTransaction, info: CustomerInfo) {
+        val product = item.telemetryProduct() ?: return
+        val orderId = transaction.orderId
+        val storeProduct = item.product as? GoogleStoreProduct
+        val entitlement = info.entitlements[PREMIUM_ENTITLEMENT]
+        if (transaction.purchaseState != PurchaseState.PURCHASED || orderId.isNullOrBlank() ||
+            storeProduct == null || storeProduct.productId !in transaction.productIds ||
+            entitlement?.isActive != true || entitlement.productIdentifier != storeProduct.productId ||
+            entitlement.verification == VerificationResult.FAILED
+        ) {
+            Log.w("ClaroTelemetry", "Conversion omitted: matching verified transaction unavailable")
+            return
+        }
+        val subscription = info.subscriptionsByProductIdentifier[storeProduct.productId]
+        val nonSubscription = info.nonSubscriptionTransactions.firstOrNull {
+            it.storeTransactionId == orderId && it.productIdentifier == storeProduct.productId
+        }
+        val price: Price?
+        val trial: Boolean
+        if (product == TelemetryProduct.LIFETIME) {
+            if (nonSubscription == null || (nonSubscription.isSandbox &&
+                    BuildConfig.TELEMETRY_ENVIRONMENT == "production")
+            ) {
+                Log.w("ClaroTelemetry", "Conversion omitted: non-subscription transaction mismatch or sandbox")
+                return
+            }
+            price = nonSubscription.price
+            trial = false
+        } else {
+            if (subscription == null || subscription.storeTransactionId != orderId ||
+                (subscription.isSandbox && BuildConfig.TELEMETRY_ENVIRONMENT == "production")
+            ) {
+                Log.w("ClaroTelemetry", "Conversion omitted: subscription transaction mismatch")
+                return
+            }
+            price = subscription.price
+            trial = subscription.periodType == PeriodType.TRIAL
+        }
+        val money = price?.let {
+            if (it.amountMicros < 0) {
+                Log.e("ClaroTelemetry", "Conversion omitted: invalid charged amount")
+                return
+            }
+            val currency = try {
+                Currency.getInstance(it.currencyCode)
+            } catch (_: IllegalArgumentException) {
+                Log.e("ClaroTelemetry", "Conversion omitted: invalid charged currency")
+                return
+            }
+            TelemetryMoney(BigDecimal.valueOf(it.amountMicros, 6), currency)
+        }
+        purchaseTelemetry.record(VerifiedPurchaseEvidence(orderId, product, trial, money))
     }
 
     private suspend fun refreshCustomerInfo() {
@@ -274,6 +379,13 @@ class RevenueCatBillingRepository @Inject constructor(
         const val LAST_VERIFIED_AT = "last_verified_at"
         const val REQUIRED_TRIAL_DAYS = 7
     }
+}
+
+private fun Package.telemetryProduct(): TelemetryProduct? = when (packageType) {
+    PackageType.MONTHLY -> TelemetryProduct.MONTHLY
+    PackageType.ANNUAL -> TelemetryProduct.YEARLY
+    PackageType.LIFETIME -> TelemetryProduct.LIFETIME
+    else -> null
 }
 
 private class RevenueCatFailure(val error: PurchasesError) : RuntimeException()

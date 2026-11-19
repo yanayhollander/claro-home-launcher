@@ -1,6 +1,10 @@
 package com.clarohome.feature.communication
 
 import com.clarohome.core.model.VisualMode
+import com.clarohome.core.domain.ClaroEvent
+import com.clarohome.core.domain.EventOutcome
+import com.clarohome.core.domain.EventTask
+import com.clarohome.core.domain.ProductAnalytics
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -508,6 +512,10 @@ class PhoneContactsCoordinatorTest {
 
         assertThat(fixture.telecom.placements).isEqualTo(1)
         assertThat(fixture.telecom.actions).containsExactly("place:2025550101")
+        assertThat(fixture.events).containsExactly(
+            ClaroEvent.TaskFlowResult(EventTask.CALL_PLACEMENT, EventOutcome.STARTED),
+            ClaroEvent.TaskFlowResult(EventTask.CALL_PLACEMENT, EventOutcome.SUBMITTED),
+        ).inOrder()
     }
 
     @Test
@@ -840,6 +848,7 @@ class PhoneContactsCoordinatorTest {
     ): Fixture {
         val role = FakeDialerRoleGateway()
         val history = FakeCallHistoryStore()
+        val events = mutableListOf<ClaroEvent>()
         val coordinator = PhoneContactsCoordinator(
             roleGateway = role,
             telecomGateway = telecom,
@@ -849,6 +858,9 @@ class PhoneContactsCoordinatorTest {
             clock = clock,
             scope = TestScope(StandardTestDispatcher(testScheduler)),
             savedState = savedState,
+            analytics = object : ProductAnalytics {
+                override fun track(event: ClaroEvent) { events += event }
+            },
         )
         runCurrent()
         return Fixture(
@@ -857,6 +869,7 @@ class PhoneContactsCoordinatorTest {
             telecom = telecom,
             contacts = contacts,
             history = history,
+            events = events,
         )
     }
 
@@ -866,5 +879,6 @@ class PhoneContactsCoordinatorTest {
         val telecom: FakeTelecomGateway,
         val contacts: FakeContactsGateway,
         val history: FakeCallHistoryStore,
+        val events: List<ClaroEvent>,
     )
 }

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Claro — Big buttons. Less fuss.</title>
+  <style>
+    :root { color-scheme: light; font-family: "Avenir Next", sans-serif; color: #172d42; background: #fffaec; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 48px max(24px, 5vw); }
+    header { max-width: 1000px; margin-bottom: 48px; }
+    .eyebrow { font-size: 13px; font-weight: 700; letter-spacing: .16em; }
+    h1 { font-family: "Arial Rounded MT Bold", "Avenir Next", sans-serif; font-size: clamp(36px, 5vw, 72px); letter-spacing: -.04em; margin: 14px 0; }
+    p { line-height: 1.65; }
+    .notice { border-left: 4px solid #ffd166; padding-left: 18px; max-width: 800px; }
+    main { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 28px; }
+    figure { margin: 0; }
+    img { display: block; width: 100%; height: auto; box-shadow: 0 12px 35px #172d4217; }
+    figcaption { margin-top: 16px; font-weight: 600; }
+    a { color: inherit; }
+    footer { margin-top: 56px; padding-top: 24px; border-top: 1px solid #172d4225; }
+    code { background: #ffd16666; padding: 3px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">CLARO HOME LAUNCHER / SELECTED BRAND 03</div>
+    <h1>Big buttons. Less fuss.</h1>
+    <p>A coordinated screenshot system: warm gold, confident navy, generous typography and a clean, original phone mockup.</p>
+    <p class="notice"><strong>Fresh native captures for creative review.</strong> These are real emulator screens with six fictional contacts and AI-generated portraits. Facebook and WhatsApp show their genuine installed-app icons. The app's style-selection images have also been refreshed from these captures. Final creative approval and signed-release verification are required before publication.</p>
+  </header>
+  <main>
+    <figure><a href="previews/01-big-buttons.png"><img src="previews/01-big-buttons.png" alt="Gold Claro screenshot template with a Classic Phone screen inside a phone frame"></a><figcaption>01 / Big buttons</figcaption></figure>
+    <figure><a href="previews/02-your-people.png"><img src="previews/02-your-people.png" alt="Navy Claro screenshot template with Touch Home inside a phone frame"></a><figcaption>02 / Your people</figcaption></figure>
+    <figure><a href="previews/03-contacts.png"><img src="previews/03-contacts.png" alt="Cream Claro composition showing six fictional contacts with realistic generated portraits"></a><figcaption>03 / Familiar faces</figcaption></figure>
+    <figure><a href="previews/04-dialer.png"><img src="previews/04-dialer.png" alt="Gold Claro composition showing the current large native dialer keypad"></a><figcaption>04 / Dial with ease</figcaption></figure>
+    <figure><a href="previews/05-settings.png"><img src="previews/05-settings.png" alt="Navy Claro screenshot template showing the date-question settings gate"></a><figcaption>05 / Settings</figcaption></figure>
+  </main>
+  <footer>
+    <p>Editable source: <a href="templates.json"><code>templates.json</code></a>. Regenerate with <code>python3 scripts/render-play-screenshots.py</code> from the repository root.</p>
+    <p>Reusable assets: gold, navy and cream backgrounds in SVG/PNG; transparent phone frame and screen mask in <code>theme/</code>. Portrait exports are 1080 × 1920.</p>
+  </footer>
+</body>
+</html>

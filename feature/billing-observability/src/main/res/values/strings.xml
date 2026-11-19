@@ -59,13 +59,24 @@
     <string name="bill_plan_renewal_lifetime">One-time purchase; no renewal. Existing subscriptions are managed separately.</string>
     <string name="bill_plan_renewal_subscription">Automatically renews until canceled in Google Play</string>
     <string name="bill_restore_purchases">Restore purchases</string>
+    <string name="bill_privacy_policy">Privacy policy</string>
+    <string name="bill_terms_of_use">Terms of use</string>
+    <string name="bill_support">Support</string>
+    <string name="bill_privacy_url" translatable="false">https://yanayhollander.github.io/claro-public/privacy/</string>
+    <string name="bill_terms_url" translatable="false">https://yanayhollander.github.io/claro-public/terms/</string>
+    <string name="bill_support_url" translatable="false">https://yanayhollander.github.io/claro-public/support/</string>
+    <string name="bill_public_page_error_title">Could not open page</string>
+    <string name="bill_public_page_error_detail">You can copy this address into a web browser:</string>
+    <string name="bill_dialog_close">Close</string>
     <string name="bill_diagnostics_header">Optional diagnostics</string>
     <string name="bill_diagnostics_subtitle">Off by default. Change your choices anytime.</string>
     <string name="bill_consent_analytics">Usage analytics</string>
     <string name="bill_consent_crash_reports">Crash reports</string>
-    <string name="bill_diagnostics_privacy_disclosure">Diagnostics never include names, phone numbers, messages, contacts, photos, dialed digits, recovery values or SOS destinations.</string>
-    <string name="bill_withdraw_consent">Turn both off</string>
-    <string name="bill_reset_diagnostics">Reset diagnostics settings</string>
+    <string name="bill_diagnostics_privacy_disclosure">Usage events omit names, numbers, message content, contacts, photos and recovery values. Crash reports contain technical diagnostic data; automatic crash details may include information supplied by Android or third-party libraries. Turning sharing off does not erase data already sent.</string>
+    <string name="bill_withdraw_consent">Turn all sharing off</string>
+    <string name="bill_reset_diagnostics">Reset sharing choices</string>
+    <string name="bill_consent_marketing">Advertising measurement (Meta)</string>
+    <string name="bill_marketing_disclosure">Optional and off by default. Share app activations and selected setup and membership events with Meta to measure and improve Facebook and Instagram ads. Calls, messages, contacts and SOS activity are not shared with Meta. Turning this off stops new events; it does not erase data already sent or necessarily cancel SDK uploads already queued.</string>
     <string name="bill_dialog_confirm_plan_title">Confirm %1$s</string>
     <string name="bill_dialog_trial_eligibility">%1$d-day trial when Google Play shows eligibility.</string>
     <string name="bill_dialog_manage_in_play">Cancel or manage subscriptions in Google Play.</string>

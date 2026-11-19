@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2048" height="2048" viewBox="0 0 108 108">
+<rect width="108" height="108" fill="#FFF3DE"/>
+<circle cx="54" cy="49" r="15" fill="#E7A836"/>
+<rect x="32" y="54" width="44" height="13" rx="0" fill="#FFF3DE"/>
+<polyline points="22,61 86,61" fill="none" stroke="#9D3F2B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="22" cy="61" r="3.0" fill="#9D3F2B"/>
+<circle cx="86" cy="61" r="3.0" fill="#9D3F2B"/>
+<polyline points="36,76 72,76" fill="none" stroke="#9D3F2B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="36" cy="76" r="3.0" fill="#9D3F2B"/>
+<circle cx="72" cy="76" r="3.0" fill="#9D3F2B"/>
+<polyline points="54,18 54,12" fill="none" stroke="#9D3F2B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="54" cy="18" r="2.0" fill="#9D3F2B"/>
+<circle cx="54" cy="12" r="2.0" fill="#9D3F2B"/>
+<polyline points="31,26 27,22" fill="none" stroke="#9D3F2B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="31" cy="26" r="2.0" fill="#9D3F2B"/>
+<circle cx="27" cy="22" r="2.0" fill="#9D3F2B"/>
+<polyline points="77,26 81,22" fill="none" stroke="#9D3F2B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="77" cy="26" r="2.0" fill="#9D3F2B"/>
+<circle cx="81" cy="22" r="2.0" fill="#9D3F2B"/>
+<polyline points="22,44 16,44" fill="none" stroke="#9D3F2B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="22" cy="44" r="2.0" fill="#9D3F2B"/>
+<circle cx="16" cy="44" r="2.0" fill="#9D3F2B"/>
+<polyline points="86,44 92,44" fill="none" stroke="#9D3F2B" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="86" cy="44" r="2.0" fill="#9D3F2B"/>
+<circle cx="92" cy="44" r="2.0" fill="#9D3F2B"/>
+</svg>

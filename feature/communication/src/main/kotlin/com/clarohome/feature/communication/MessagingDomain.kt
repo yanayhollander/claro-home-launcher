@@ -1,5 +1,13 @@
 package com.clarohome.feature.communication
 
+import com.clarohome.core.domain.ClaroEvent
+import com.clarohome.core.domain.CrashReporter
+import com.clarohome.core.domain.DiagnosticOperation
+import com.clarohome.core.domain.EventOutcome
+import com.clarohome.core.domain.EventTask
+import com.clarohome.core.domain.NoOpProductAnalytics
+import com.clarohome.core.domain.ProductAnalytics
+
 import android.content.Intent
 import com.clarohome.core.model.VisualMode
 import java.util.UUID
@@ -277,6 +285,32 @@ interface SmsTransport {
     ): SmsSubmissionResult
 }
 
+fun observeSmsDeliveryTelemetry(
+    transport: SmsTransport,
+    analytics: ProductAnalytics,
+    crashReporter: CrashReporter?,
+    scope: CoroutineScope,
+) = scope.launch {
+    val observed = linkedSetOf<Pair<String, kotlin.reflect.KClass<out SmsTransportEvent>>>()
+    transport.events.collect { event ->
+        if (event == null || !observed.add(event.clientMessageId to event::class)) return@collect
+        if (observed.size > 512) observed.remove(observed.first())
+        val outcome = when (event) {
+            is SmsTransportEvent.Sent -> EventOutcome.COMPLETED
+            is SmsTransportEvent.Delivered -> EventOutcome.VERIFIED
+            is SmsTransportEvent.Failed ->
+                if (event.outcomeMayBeUnknown) EventOutcome.UNCERTAIN else EventOutcome.FAILED
+        }
+        analytics.track(ClaroEvent.TaskFlowResult(EventTask.MESSAGE_DELIVERY, outcome))
+        if (event is SmsTransportEvent.Failed && event.failure == MessageFailure.UNKNOWN) {
+            crashReporter?.record(
+                IllegalStateException("Unexpected SMS transport failure"),
+                DiagnosticOperation.MESSAGE_DELIVERY,
+            )
+        }
+    }
+}
+
 interface MessagingClock {
     fun nowMillis(): Long
 }
@@ -379,6 +413,8 @@ class MessagingCoordinator(
     private val logger: SensitiveDataSafeLogger,
     private val scope: CoroutineScope,
     savedState: MessagingSavedState = MessagingSavedState(),
+    private val analytics: ProductAnalytics = NoOpProductAnalytics,
+    private val crashReporter: CrashReporter? = null,
 ) {
     private val sendInFlight = AtomicBoolean(false)
     private val handledEvents = mutableSetOf<String>()
@@ -704,6 +740,7 @@ class MessagingCoordinator(
         }
         val recipient = requireNotNull(current.draft.recipient)
         if (!sendInFlight.compareAndSet(false, true)) return
+        trackSubmission(EventOutcome.STARTED)
         mutableState.value = current.copy(
             route = MessagingRoute.SENDING,
             statusMessage = "Sending message",
@@ -720,6 +757,7 @@ class MessagingCoordinator(
                 )
             ) {
                 is SmsSubmissionResult.Submitted -> {
+                    trackSubmission(EventOutcome.SUBMITTED)
                     repository.updateOutgoingState(
                         clientMessageId,
                         result.providerId,
@@ -729,6 +767,7 @@ class MessagingCoordinator(
                 }
 
                 is SmsSubmissionResult.NeedsDefaultAccountSetup -> {
+                    trackSubmission(EventOutcome.NEEDS_ATTENTION)
                     sendInFlight.set(false)
                     mutableState.value = mutableState.value.copy(
                         route = MessagingRoute.COMPOSE,
@@ -738,6 +777,8 @@ class MessagingCoordinator(
                 }
 
                 is SmsSubmissionResult.Rejected -> {
+                    trackSubmission(EventOutcome.FAILED)
+                    reportUnexpectedFailure(result.failure)
                     sendInFlight.set(false)
                     showFailure(result.failure, outcomeUnknown = false)
                 }
@@ -897,6 +938,19 @@ class MessagingCoordinator(
             "sms_send_result",
             if (outcomeUnknown) "unknown" else failure.name.lowercase(),
         )
+    }
+
+    private fun trackSubmission(outcome: EventOutcome) {
+        analytics.track(ClaroEvent.TaskFlowResult(EventTask.MESSAGE_SUBMISSION, outcome))
+    }
+
+    private fun reportUnexpectedFailure(failure: MessageFailure) {
+        if (failure == MessageFailure.UNKNOWN) {
+            crashReporter?.record(
+                IllegalStateException("Unexpected message transport failure"),
+                DiagnosticOperation.MESSAGE_SUBMISSION,
+            )
+        }
     }
 
     private fun persistDraft(draft: MessageDraft) {

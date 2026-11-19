@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 data class DiagnosticsConsent(
     val analytics: Boolean = false,
     val crashReports: Boolean = false,
+    val marketing: Boolean = false,
 )
 
 interface ConsentController {
@@ -20,96 +21,7 @@ interface ConsentController {
 enum class AnalyticsDestination {
     MIXPANEL,
     FIREBASE,
-}
-
-enum class ClaroEventName(val wireName: String) {
-    SETUP_STEP_RESULT("setup_step_result"),
-    ROLE_READINESS("role_readiness"),
-    TASK_FLOW_RESULT("task_flow_result"),
-    MEMBERSHIP_SCREEN_VIEW("membership_screen_view"),
-    ACCESSIBILITY_PRESET_SELECTED("accessibility_preset_selected"),
-}
-
-enum class EventOutcome(val wireValue: String) {
-    STARTED("started"),
-    COMPLETED("completed"),
-    CANCELED("canceled"),
-    FAILED("failed"),
-    READY("ready"),
-    NEEDS_ATTENTION("needs_attention"),
-    UNAVAILABLE("unavailable"),
-}
-
-enum class EventStep(val wireValue: String) {
-    WELCOME("welcome"),
-    VISUAL_MODE("visual_mode"),
-    FAVORITES("favorites"),
-    SOS("sos"),
-    PERMISSIONS("permissions"),
-    HANDOVER("handover"),
-}
-
-enum class EventCapability(val wireValue: String) {
-    HOME("home"),
-    PHONE("phone"),
-    MESSAGES("messages"),
-    CONTACTS("contacts"),
-    NOTIFICATIONS("notifications"),
-    MEDIA("media"),
-}
-
-enum class EventTask(val wireValue: String) {
-    OPEN_PHONE("open_phone"),
-    OPEN_MESSAGES("open_messages"),
-    OPEN_SOS("open_sos"),
-    OPEN_MEMBERSHIP("open_membership"),
-    RESTORE_PURCHASES("restore_purchases"),
-}
-
-enum class AccessibilityPreset(val wireValue: String) {
-    STANDARD("standard"),
-    LARGE("large"),
-    HUGE("huge"),
-    HIGH_CONTRAST("high_contrast"),
-}
-
-sealed interface ClaroEvent {
-    val name: ClaroEventName
-    val outcome: EventOutcome
-
-    data class SetupStepResult(
-        val step: EventStep,
-        override val outcome: EventOutcome,
-    ) : ClaroEvent {
-        override val name = ClaroEventName.SETUP_STEP_RESULT
-    }
-
-    data class RoleReadiness(
-        val capability: EventCapability,
-        override val outcome: EventOutcome,
-    ) : ClaroEvent {
-        override val name = ClaroEventName.ROLE_READINESS
-    }
-
-    data class TaskFlowResult(
-        val task: EventTask,
-        override val outcome: EventOutcome,
-    ) : ClaroEvent {
-        override val name = ClaroEventName.TASK_FLOW_RESULT
-    }
-
-    data class MembershipScreenView(
-        override val outcome: EventOutcome = EventOutcome.COMPLETED,
-    ) : ClaroEvent {
-        override val name = ClaroEventName.MEMBERSHIP_SCREEN_VIEW
-    }
-
-    data class AccessibilityPresetSelected(
-        val preset: AccessibilityPreset,
-        override val outcome: EventOutcome = EventOutcome.COMPLETED,
-    ) : ClaroEvent {
-        override val name = ClaroEventName.ACCESSIBILITY_PRESET_SELECTED
-    }
+    META,
 }
 
 enum class ProductKind {

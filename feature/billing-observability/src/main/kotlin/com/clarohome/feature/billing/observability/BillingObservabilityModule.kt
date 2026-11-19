@@ -18,6 +18,9 @@ abstract class BillingObservabilityBindings {
     abstract fun bindConsentStore(store: SharedPreferencesConsentStore): ConsentStore
 
     @Binds
+    abstract fun bindTelemetryIdentityStore(store: SharedPreferencesTelemetryIdentityStore): TelemetryIdentityStore
+
+    @Binds
     abstract fun bindConsentController(controller: DefaultConsentController): ConsentController
 
     @Binds
@@ -42,6 +45,11 @@ object BillingObservabilityProviders {
         firebaseApiKey = BuildConfig.FIREBASE_API_KEY,
         firebaseProjectId = BuildConfig.FIREBASE_PROJECT_ID,
         firebaseSenderId = BuildConfig.FIREBASE_SENDER_ID,
+        mixpanelServerUrl = BuildConfig.MIXPANEL_SERVER_URL,
+        metaAppId = BuildConfig.META_APP_ID,
+        metaClientToken = BuildConfig.META_CLIENT_TOKEN,
+        metaEnabled = BuildConfig.META_ENABLED,
+        environment = BuildConfig.TELEMETRY_ENVIRONMENT,
     )
 
     @Provides
@@ -51,6 +59,10 @@ object BillingObservabilityProviders {
     @Provides
     @IntoSet
     fun provideFirebaseVendor(vendor: FirebaseAnalyticsVendorAdapter): AnalyticsVendor = vendor
+
+    @Provides
+    @IntoSet
+    fun provideMetaVendor(vendor: MetaVendorAdapter): AnalyticsVendor = vendor
 
     @Provides
     @Singleton

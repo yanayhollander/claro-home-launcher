@@ -1,0 +1,67 @@
+[
+  {
+    "id": "01-familiar-home",
+    "name": "Familiar Home",
+    "background": "#075BD8",
+    "foreground": "#FFFFFF",
+    "accent": "#FFCE66",
+    "tagline": [
+      "Your phone.",
+      "Familiar again."
+    ],
+    "character": "Familiar, clear, reassuring",
+    "type": "modern"
+  },
+  {
+    "id": "02-clear-connection",
+    "name": "Clear Connection",
+    "background": "#115E59",
+    "foreground": "#FFFBF2",
+    "accent": "#FFC49A",
+    "tagline": [
+      "Closer to",
+      "what matters."
+    ],
+    "character": "Calm, personal, connected",
+    "type": "serif"
+  },
+  {
+    "id": "03-big-and-simple",
+    "name": "Big & Simple",
+    "background": "#FFD166",
+    "foreground": "#172D42",
+    "accent": "#FFFFFF",
+    "tagline": [
+      "Big buttons.",
+      "Less fuss."
+    ],
+    "character": "Bold, practical, unmistakable",
+    "type": "rounded"
+  },
+  {
+    "id": "04-human-touch",
+    "name": "Human Touch",
+    "background": "#56366F",
+    "foreground": "#FFF8F2",
+    "accent": "#FFBFCB",
+    "tagline": [
+      "Simple to use.",
+      "Easy to love."
+    ],
+    "character": "Warm, friendly, expressive",
+    "type": "rounded"
+  },
+  {
+    "id": "05-a-brighter-day",
+    "name": "A Brighter Day",
+    "background": "#FFF3DE",
+    "foreground": "#9D3F2B",
+    "accent": "#E7A836",
+    "tagline": [
+      "A clearer start,",
+      "every day."
+    ],
+    "character": "Optimistic, spacious, welcoming",
+    "type": "serif"
+  }
+]

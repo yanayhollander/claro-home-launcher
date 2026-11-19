@@ -1,6 +1,7 @@
 .gradle/
 **/build/
 local.properties
+telemetry.local.properties
 .idea/
 *.iml
 captures/

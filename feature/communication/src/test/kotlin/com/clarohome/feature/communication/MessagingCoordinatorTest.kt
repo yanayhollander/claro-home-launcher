@@ -5,6 +5,10 @@ import java.time.Instant
 import java.time.ZoneId
 import java.util.Locale
 import com.clarohome.core.model.VisualMode
+import com.clarohome.core.domain.ClaroEvent
+import com.clarohome.core.domain.EventOutcome
+import com.clarohome.core.domain.EventTask
+import com.clarohome.core.domain.ProductAnalytics
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -15,6 +19,30 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MessagingCoordinatorTest {
+    @Test
+    fun deliveryTelemetryDoesNotRequireAMessagingScreenAndDeduplicatesCallbacks() = runTest {
+        val transport = FakeSmsTransport()
+        val events = mutableListOf<ClaroEvent>()
+        observeSmsDeliveryTelemetry(transport, object : ProductAnalytics {
+            override fun track(event: ClaroEvent) { events += event }
+        }, null, backgroundScope)
+        runCurrent()
+
+        val sent = SmsTransportEvent.Sent("local-operation", 42)
+        transport.mutableEvents.value = sent
+        runCurrent()
+        transport.mutableEvents.value = SmsTransportEvent.Delivered("local-operation", 42)
+        runCurrent()
+        transport.mutableEvents.value = sent
+        runCurrent()
+
+        assertThat(events).containsExactly(
+            ClaroEvent.TaskFlowResult(EventTask.MESSAGE_DELIVERY, EventOutcome.COMPLETED),
+            ClaroEvent.TaskFlowResult(EventTask.MESSAGE_DELIVERY, EventOutcome.VERIFIED),
+        ).inOrder()
+        assertThat(events.toString()).doesNotContain("local-operation")
+    }
+
     @Test
     fun sendFromEditorSubmitsDirectlyAndRepeatedTapsDoNotDuplicate() = runTest {
         val fixture = fixture()
@@ -27,6 +55,10 @@ class MessagingCoordinatorTest {
         runCurrent()
         assertThat(fixture.transport.submissions).isEqualTo(1)
         assertThat(fixture.transport.sentBodies).containsExactly("Hello")
+        assertThat(fixture.events).containsExactly(
+            ClaroEvent.TaskFlowResult(EventTask.MESSAGE_SUBMISSION, EventOutcome.STARTED),
+            ClaroEvent.TaskFlowResult(EventTask.MESSAGE_SUBMISSION, EventOutcome.SUBMITTED),
+        ).inOrder()
     }
 
     @Test
@@ -342,6 +374,10 @@ class MessagingCoordinatorTest {
 
         assertThat(fixture.repository.updates.count { it.second == MessageDeliveryState.SENT })
             .isEqualTo(1)
+        assertThat(fixture.events.count {
+            it == ClaroEvent.TaskFlowResult(EventTask.MESSAGE_DELIVERY, EventOutcome.COMPLETED)
+        }).isEqualTo(1)
+        assertThat(fixture.events.toString()).doesNotContain("+15550101")
     }
 
     @Test
@@ -400,6 +436,11 @@ class MessagingCoordinatorTest {
         savedState: MessagingSavedState = MessagingSavedState(),
     ): Fixture {
         val logger = FakeSensitiveDataSafeLogger()
+        val events = mutableListOf<ClaroEvent>()
+        val analytics = object : ProductAnalytics {
+            override fun track(event: ClaroEvent) { events += event }
+        }
+        observeSmsDeliveryTelemetry(transport, analytics, null, backgroundScope)
         val coordinator = MessagingCoordinator(
             roleGateway = role,
             repository = repository,
@@ -410,9 +451,10 @@ class MessagingCoordinatorTest {
             logger = logger,
             scope = TestScope(StandardTestDispatcher(testScheduler)),
             savedState = savedState,
+            analytics = analytics,
         )
         runCurrent()
-        return Fixture(coordinator, role, repository, transport, logger)
+        return Fixture(coordinator, role, repository, transport, logger, events)
     }
 
     private data class Fixture(
@@ -421,5 +463,6 @@ class MessagingCoordinatorTest {
         val repository: FakeMessageRepository,
         val transport: FakeSmsTransport,
         val logger: FakeSensitiveDataSafeLogger,
+        val events: List<ClaroEvent>,
     )
 }

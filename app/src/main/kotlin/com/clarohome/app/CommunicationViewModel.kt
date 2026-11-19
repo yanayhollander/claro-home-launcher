@@ -4,6 +4,8 @@ import android.content.Intent
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.clarohome.core.domain.ProductAnalytics
+import com.clarohome.core.domain.CrashReporter
 import com.clarohome.feature.communication.AudioRoute
 import com.clarohome.feature.communication.AndroidTelecomGateway
 import com.clarohome.feature.communication.CallHistoryStore
@@ -34,6 +36,8 @@ class CommunicationViewModel @Inject constructor(
     assignmentStore: PhoneAssignmentStore,
     historyStore: CallHistoryStore,
     clock: ElapsedRealtimeClock,
+    analytics: ProductAnalytics,
+    crashReporter: CrashReporter,
 ) : ViewModel() {
     private val coordinator = PhoneContactsCoordinator(
         roleGateway = roleGateway,
@@ -44,6 +48,8 @@ class CommunicationViewModel @Inject constructor(
         clock = clock,
         scope = viewModelScope,
         savedState = restoredState(),
+        analytics = analytics,
+        crashReporter = crashReporter,
     )
     val state: StateFlow<CommunicationUiState> = coordinator.state
     private val mutableOpenPhoneRequests = MutableStateFlow(0L)

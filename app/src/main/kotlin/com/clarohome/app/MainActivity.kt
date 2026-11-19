@@ -106,6 +106,7 @@ import com.clarohome.core.design.toLocale
 import com.clarohome.core.design.withClaroLanguage
 import java.util.Locale
 import com.clarohome.core.domain.StartupRecoveryState
+import com.clarohome.core.domain.TelemetryScreen
 import com.clarohome.core.model.AppLanguage
 import com.clarohome.core.model.BatteryStatus
 import com.clarohome.core.model.CapabilityStatus
@@ -192,6 +193,36 @@ private const val TARGET_SOS_SETTINGS = "sos_settings"
 private const val TARGET_APPS_CUSTOMIZE = "apps_customize"
 private const val TARGET_CONTACTS = "contacts"
 
+private class NavControllerTelemetryListener(
+    private val viewModel: MainViewModel,
+) : androidx.navigation.NavController.OnDestinationChangedListener {
+    override fun onDestinationChanged(
+        controller: androidx.navigation.NavController,
+        destination: androidx.navigation.NavDestination,
+        arguments: Bundle?,
+    ) {
+        val screen = when {
+            destination.hasRoute<TouchHomeRoute>() || destination.hasRoute<ClassicHomeRoute>() -> TelemetryScreen.HOME
+            destination.hasRoute<OnboardingRoute>() -> TelemetryScreen.ONBOARDING
+            destination.hasRoute<RecoveryRoute>() -> TelemetryScreen.RECOVERY
+            destination.hasRoute<PhoneRoute>() -> TelemetryScreen.PHONE
+            destination.hasRoute<MessagesRoute>() -> TelemetryScreen.MESSAGES
+            destination.hasRoute<MembershipRoute>() -> TelemetryScreen.MEMBERSHIP
+            destination.hasRoute<AppsRoute>() -> TelemetryScreen.APPS
+            destination.hasRoute<LauncherMenuRoute>() -> TelemetryScreen.MENU
+            destination.hasRoute<PeopleSettingsRoute>() -> TelemetryScreen.HOME_TILES
+            destination.hasRoute<HomeWidgetPickerRoute>() -> TelemetryScreen.WIDGET_PICKER
+            destination.hasRoute<SafetyRoute>() -> TelemetryScreen.MEDIA
+            destination.hasRoute<SettingsRoute>() || destination.hasRoute<PhoneStyleRoute>() ||
+                destination.hasRoute<DisplayLanguageRoute>() || destination.hasRoute<AccessMethodRoute>() ||
+                destination.hasRoute<ReadinessRoute>() || destination.hasRoute<CallAudioRoute>() ||
+                destination.hasRoute<MenuOrderRoute>() || destination.hasRoute<ResetRoute>() -> TelemetryScreen.SETTINGS
+            else -> return
+        }
+        controller.currentBackStackEntry?.let { viewModel.screenViewed(it.id, screen) }
+    }
+}
+
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     @SuppressLint("RestrictedApi")
@@ -216,6 +247,7 @@ class MainActivity : ComponentActivity() {
                         mainViewModel.isSettingsUnlocked())
             },
             onSetSlot = mainViewModel::setHomeSlot,
+            onOutcome = mainViewModel::widgetSetupResult,
             onFinished = { widgetSetupCompletions++ },
             onNotice = { message ->
                 val context = withClaroLanguage(mainViewModel.uiState.value.preferences.language)
@@ -594,6 +626,11 @@ private fun ClaroApp(
     val dialerScrollState = rememberScrollState()
     var dialerOptionsOpen by rememberSaveable { mutableStateOf(false) }
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    DisposableEffect(navController, viewModel) {
+        val listener = NavControllerTelemetryListener(viewModel)
+        navController.addOnDestinationChangedListener(listener)
+        onDispose { navController.removeOnDestinationChangedListener(listener) }
+    }
     val context = LocalContext.current
     LaunchedEffect(state.startup, state.home?.homeSlots) {
         if (state.startup is StartupRecoveryState.Ready) {
@@ -702,6 +739,7 @@ private fun ClaroApp(
         resumeTick, projectedHome?.homeRole,
         communication.qualification.roleHeld, messaging.qualification.roleHeld,
     ) { context.defaultAppReadiness() }
+    LaunchedEffect(defaultApps) { viewModel.trackReadiness(defaultApps) }
     DisposableEffect(lifecycleOwner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -1253,7 +1291,6 @@ private fun ClaroApp(
                         )
                     }
                     framedComposable<MembershipRoute>(destinationFrame) {
-                        LaunchedEffect(Unit) { viewModel.membershipOpened() }
                         BillingObservabilityScreen(
                             state = state.billingObservability,
                             classicShell = state.preferences.visualMode == VisualMode.CLASSIC,

@@ -521,6 +521,8 @@ Before merging scaffold, re-check official release notes, transitive compatibili
 
 **Firebase Analytics:** minimal operational events needed for Firebase/Google release diagnostics, implemented through the same event abstraction. Do not send duplicate business events to both systems by default; maintain an explicit routing table.
 
+**Meta App Events:** selected app activation, setup completion and membership conversions for Facebook/Instagram campaign measurement, not in-app advertising. Requires separate default-off marketing consent and explicit configuration/enablement. Selected conversions may intentionally fan out from the shared event contract to Mixpanel and Meta under their independent consent gates; do not mirror the product stream. No call/SMS/SOS activity, contacts, settings-access inputs or accessibility/readiness context goes to Meta. Keep automatic events, matching and advertising-ID collection off. Verify buffering/withdrawal behavior and provider policy eligibility before production enablement; local reset cannot claim to erase already sent or SDK-queued data.
+
 **Crashlytics:** disabled before consent except where the final privacy policy and platform rules explicitly allow strictly necessary crash reporting. Remove message/phone/contact data from exceptions and custom keys. Use release/build/visual-mode/role-state booleans only.
 
 **RevenueCat:** entitlement source for monthly/yearly premium and separate lifetime product. Purchases use Play Billing through RevenueCat; localized product/pricing/trial terms come from the store. Entitlement uncertainty defaults to retaining currently safe configuration and withholding only creation of new premium conveniences. Core features never query billing to proceed.

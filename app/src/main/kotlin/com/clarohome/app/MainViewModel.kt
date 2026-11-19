@@ -35,7 +35,12 @@ import com.clarohome.core.model.TextSize
 import com.clarohome.core.model.VisualMode
 import com.clarohome.feature.billing.observability.BillingObservabilityUiState
 import com.clarohome.feature.billing.observability.BillingRepository
-import com.clarohome.feature.billing.observability.ClaroEvent
+import com.clarohome.core.domain.ClaroEvent
+import com.clarohome.core.domain.DiagnosticOperation
+import com.clarohome.core.domain.EventOutcome
+import com.clarohome.core.domain.EventTask
+import com.clarohome.core.domain.HomeAction
+import com.clarohome.core.domain.TelemetryScreen
 import com.clarohome.feature.billing.observability.ConsentAwareObservability
 import com.clarohome.feature.billing.observability.ConsentController
 import com.clarohome.feature.billing.observability.DiagnosticsConsent
@@ -63,6 +68,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -101,6 +107,8 @@ class MainViewModel @Inject constructor(
     private val sosCoordinator = SosCoordinator(phoneCallGateway, emergencyNumberDetector)
     private val mutableSosState = MutableStateFlow<SosState>(SosState.Unset())
     private val sosPreferences = appContext.getSharedPreferences("claro_sos_contact", Context.MODE_PRIVATE)
+    private var lastReadiness: Map<ReadinessCapability, CapabilityStatus> = emptyMap()
+    private var lastSosOutcome: EventOutcome? = null
 
     val sosState: StateFlow<SosState> = mutableSosState
     private val billingObservability = combine(
@@ -139,7 +147,15 @@ class MainViewModel @Inject constructor(
         restoreSos()
         viewModelScope.launch {
             syncLauncherState()
-            startup.value = recoveryCoordinator.recover()
+            val recovered = recoveryCoordinator.recover()
+            startup.value = recovered
+            observability.track(ClaroEvent.TaskFlowResult(
+                EventTask.STARTUP_RECOVERY,
+                if (recovered is StartupRecoveryState.Ready) EventOutcome.COMPLETED else EventOutcome.FAILED,
+            ))
+            if (recovered is StartupRecoveryState.Failed) {
+                observability.record(IllegalStateException("Startup recovery failed"), DiagnosticOperation.STARTUP)
+            }
         }
         viewModelScope.launch { billingRepository.refresh() }
         viewModelScope.launch {
@@ -154,6 +170,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             val applied = settingsManager.advanceOnboarding(next, appContext.defaultAppReadiness())
             if (!applied) {
+                observability.track(ClaroEvent.SetupStepResult(next, EventOutcome.NEEDS_ATTENTION))
                 message.value = localizedContext().getString(R.string.app_default_apps_required)
             } else if (next == OnboardingStep.COMPLETE) {
                 onCompleted()
@@ -226,6 +243,32 @@ class MainViewModel @Inject constructor(
 
     fun setReadiness(capability: ReadinessCapability, status: CapabilityStatus) =
         launch { settingsManager.setReadiness(capability, status) }
+
+    fun trackReadiness(readiness: Map<ReadinessCapability, CapabilityStatus>) {
+        readiness.filter { (capability, status) -> lastReadiness[capability] != status }
+            .forEach { (capability, status) ->
+                observability.track(ClaroEvent.RoleReadiness(
+                    capability,
+                    when (status) {
+                        CapabilityStatus.READY -> EventOutcome.READY
+                        CapabilityStatus.UNAVAILABLE -> EventOutcome.UNAVAILABLE
+                        else -> EventOutcome.NEEDS_ATTENTION
+                    },
+                ))
+            }
+        lastReadiness = readiness.toMap()
+    }
+
+    fun screenViewed(entryId: String, screen: TelemetryScreen) {
+        if (savedStateHandle.get<String>("telemetry_last_entry") == entryId) return
+        savedStateHandle["telemetry_last_entry"] = entryId
+        observability.track(ClaroEvent.ScreenView(screen))
+        if (screen == TelemetryScreen.MEMBERSHIP) membershipOpened()
+    }
+
+    fun widgetSetupResult(outcome: EventOutcome) {
+        observability.track(ClaroEvent.TaskFlowResult(EventTask.WIDGET_SETUP, outcome))
+    }
 
     fun setHandover(check: HandoverCheck, checked: Boolean) =
         launch { settingsManager.setHandoverCheck(check, checked) }
@@ -364,13 +407,19 @@ class MainViewModel @Inject constructor(
 
     fun setHomeSlot(slot: Int, tile: HomeTile) {
         viewModelScope.launch {
+            val before = homeRepository.home.first().homeSlots
             homeRepository.setHomeSlot(slot, tile)
+            if (homeRepository.home.first().homeSlots != before) {
+                observability.track(ClaroEvent.HomeChanged(HomeAction.SET, tile.kind))
+            }
         }
     }
 
     fun setHomeTileVisibility(kind: HomeTileKind, visible: Boolean) {
         viewModelScope.launch {
-            message.value = when (homeRepository.setHomeTileVisibility(kind, visible)) {
+            val result = homeRepository.setHomeTileVisibility(kind, visible)
+            trackHomeVisibility(kind, result)
+            message.value = when (result) {
                 HomeTileVisibilityResult.APPLIED -> null
                 HomeTileVisibilityResult.APP_UNAVAILABLE ->
                     localizedContext().getString(R.string.app_missing_or_disabled_notice)
@@ -380,13 +429,21 @@ class MainViewModel @Inject constructor(
 
     fun clearHomeSlot(slot: Int) {
         viewModelScope.launch {
+            val before = homeRepository.home.first().homeSlots
             homeRepository.clearHomeSlot(slot)
+            if (homeRepository.home.first().homeSlots != before) {
+                observability.track(ClaroEvent.HomeChanged(HomeAction.REMOVE, before.getOrNull(slot)?.kind))
+            }
         }
     }
 
     fun moveHomeTile(slot: Int, moveUp: Boolean) {
         viewModelScope.launch {
+            val before = homeRepository.home.first().homeSlots
             homeRepository.moveHomeTile(slot, moveUp)
+            if (homeRepository.home.first().homeSlots != before) {
+                observability.track(ClaroEvent.HomeChanged(HomeAction.REORDER, before.getOrNull(slot)?.kind))
+            }
         }
     }
 
@@ -425,7 +482,9 @@ class MainViewModel @Inject constructor(
 
     fun setAppOnHome(packageName: String, onHome: Boolean) {
         viewModelScope.launch {
-            message.value = when (homeRepository.setInstalledAppHomeTile(packageName, onHome)) {
+            val result = homeRepository.setInstalledAppHomeTile(packageName, onHome)
+            trackHomeVisibility(HomeTileKind.INSTALLED_APP, result)
+            message.value = when (result) {
                 HomeTileVisibilityResult.APPLIED -> null
                 HomeTileVisibilityResult.APP_UNAVAILABLE ->
                     localizedContext().getString(R.string.app_missing_or_disabled_notice)
@@ -506,10 +565,19 @@ class MainViewModel @Inject constructor(
         publishSos()
     }
 
-    fun openEmergencyDialer(): Boolean = emergencyDialerGateway.openEmergencyDialer()
+    fun openEmergencyDialer(): Boolean = emergencyDialerGateway.openEmergencyDialer().also {
+        observability.track(ClaroEvent.TaskFlowResult(
+            EventTask.EMERGENCY_DIALER, if (it) EventOutcome.SUBMITTED else EventOutcome.FAILED,
+        ))
+    }
 
     fun launchAllowedApp(packageName: String): ExternalAppLaunchResult =
-        externalAppLauncher.launch(packageName)
+        externalAppLauncher.launch(packageName).also {
+            observability.track(ClaroEvent.TaskFlowResult(
+                EventTask.EXTERNAL_APP,
+                if (it == ExternalAppLaunchResult.Launched) EventOutcome.SUBMITTED else EventOutcome.UNAVAILABLE,
+            ))
+        }
 
     fun membershipOpened() {
         observability.track(ClaroEvent.MembershipScreenView())
@@ -520,7 +588,9 @@ class MainViewModel @Inject constructor(
     }
 
     fun purchase(activity: Activity, planId: String) {
-        viewModelScope.launch { billingRepository.purchase(activity, planId) }
+        viewModelScope.launch {
+            billingRepository.purchase(activity, planId)
+        }
     }
 
     fun restorePurchases() {
@@ -544,6 +614,30 @@ class MainViewModel @Inject constructor(
 
     private fun publishSos() {
         mutableSosState.value = sosCoordinator.state
+        val outcome = when (val state = sosCoordinator.state) {
+            is SosState.CountingDown -> EventOutcome.STARTED
+            is SosState.Canceled -> EventOutcome.CANCELED
+            is SosState.Interrupted -> EventOutcome.UNCERTAIN
+            is SosState.Calling -> when (state.outcome) {
+                SosCallOutcome.DIALING, SosCallOutcome.RINGING -> EventOutcome.SUBMITTED
+                SosCallOutcome.CONNECTED, SosCallOutcome.ENDED -> EventOutcome.COMPLETED
+                else -> EventOutcome.FAILED
+            }
+            is SosState.Failed -> EventOutcome.FAILED
+            else -> null
+        }
+        if (outcome != null && outcome != lastSosOutcome) {
+            val testMode = when (val state = sosCoordinator.state) {
+                is SosState.CountingDown -> state.testMode
+                is SosState.Canceled -> state.testMode
+                is SosState.Interrupted -> state.testMode
+                is SosState.Calling -> state.testMode
+                is SosState.Failed -> state.testMode
+                else -> false
+            }
+            observability.track(ClaroEvent.TaskFlowResult(EventTask.SOS_HANDOFF, outcome, testMode))
+        }
+        lastSosOutcome = outcome
         val snapshot = sosCoordinator.snapshot()
         savedStateHandle["sos_name"] = snapshot.contact?.displayName
         savedStateHandle["sos_number"] = snapshot.contact?.destination
@@ -553,6 +647,13 @@ class MainViewModel @Inject constructor(
         savedStateHandle["sos_deadline"] = snapshot.countdownDeadlineElapsedMillis
         savedStateHandle["sos_activation"] = snapshot.activationId
         savedStateHandle["sos_test"] = snapshot.testMode
+    }
+
+    private fun trackHomeVisibility(kind: HomeTileKind, result: HomeTileVisibilityResult) {
+        observability.track(ClaroEvent.HomeChanged(
+            HomeAction.VISIBILITY, kind,
+            if (result == HomeTileVisibilityResult.APPLIED) EventOutcome.COMPLETED else EventOutcome.UNAVAILABLE,
+        ))
     }
 
     private fun restoreSos() {

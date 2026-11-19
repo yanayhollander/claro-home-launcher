@@ -1,0 +1,62 @@
+{
+  "publicationReady": false,
+  "captureStatus": "Fresh native emulator captures with six fictional contacts and AI-generated portraits. Final creative approval and signed-release verification are still required before Play upload.",
+  "captureManifest": "marketing/store/captures/capture-manifest.json",
+  "exports": [
+    {
+      "id": "01-big-buttons",
+      "source": "marketing/store/captures/classic-home.png",
+      "sourceSha256": "424473a2efc5c5f39d5a352a7ac37fa45a9d4716223ef441715e20fb42bb9471",
+      "output": "marketing/store/screenshot-templates/previews/01-big-buttons.png",
+      "size": [
+        1080,
+        1920
+      ],
+      "publicationReady": false
+    },
+    {
+      "id": "02-your-people",
+      "source": "marketing/store/captures/touch-home.png",
+      "sourceSha256": "d9cf8333b9c9d2f1faedd2bcd525a5e342cfea349a99f7488b082cbcab793097",
+      "output": "marketing/store/screenshot-templates/previews/02-your-people.png",
+      "size": [
+        1080,
+        1920
+      ],
+      "publicationReady": false
+    },
+    {
+      "id": "03-contacts",
+      "source": "marketing/store/captures/contacts.png",
+      "sourceSha256": "6e4896bf52644a2b4f4640ee1d305f2369dafefb15d22a05716802e7ae4f45dd",
+      "output": "marketing/store/screenshot-templates/previews/03-contacts.png",
+      "size": [
+        1080,
+        1920
+      ],
+      "publicationReady": false
+    },
+    {
+      "id": "04-dialer",
+      "source": "marketing/store/captures/dialer.png",
+      "sourceSha256": "bce3861afcc81f200c100641bffb93d34702f6922d15661d045391ae6bf340ce",
+      "output": "marketing/store/screenshot-templates/previews/04-dialer.png",
+      "size": [
+        1080,
+        1920
+      ],
+      "publicationReady": false
+    },
+    {
+      "id": "05-settings",
+      "source": "marketing/store/captures/protected-settings.png",
+      "sourceSha256": "6df5ad7a0cbc58895bf422732192f976f8f5ef97f9b947ea2a42ac8f8233c194",
+      "output": "marketing/store/screenshot-templates/previews/05-settings.png",
+      "size": [
+        1080,
+        1920
+      ],
+      "publicationReady": false
+    }
+  ]
+}

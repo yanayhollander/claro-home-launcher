@@ -10,6 +10,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import com.clarohome.core.data.homeSlotTile
+import com.clarohome.core.domain.EventOutcome
 import com.clarohome.core.model.HomeTile
 import com.clarohome.core.model.HomeTileKind
 
@@ -19,6 +20,7 @@ internal class HomeWidgetSetup(
     private val onSetSlot: (Int, HomeTile) -> Unit,
     private val onFinished: () -> Unit,
     private val onNotice: (Int) -> Unit,
+    private val onOutcome: (EventOutcome) -> Unit = {},
 ) {
     val host = AppWidgetHost(activity.applicationContext, HOST_ID)
     private val manager = AppWidgetManager.getInstance(activity)
@@ -63,6 +65,7 @@ internal class HomeWidgetSetup(
         pendingId = host.allocateAppWidgetId()
         pendingSlot = slot
         pendingProvider = provider.provider.flattenToString()
+        onOutcome(EventOutcome.STARTED)
         try {
             if (manager.bindAppWidgetIdIfAllowed(pendingId, provider.profile, provider.provider, null)) {
                 configureOrCommit()
@@ -146,6 +149,7 @@ internal class HomeWidgetSetup(
             .mapNotNull { it.appWidgetId }.toSet()
         if (committing) {
             if (pendingId in savedIds) {
+                onOutcome(EventOutcome.COMPLETED)
                 clearPending()
                 onFinished()
             } else if (!commitRequested) {
@@ -164,6 +168,7 @@ internal class HomeWidgetSetup(
     }
 
     private fun cancel(notice: Int) {
+        onOutcome(if (notice == R.string.app_widget_cancelled) EventOutcome.CANCELED else EventOutcome.UNAVAILABLE)
         if (pendingId != AppWidgetManager.INVALID_APPWIDGET_ID) host.deleteAppWidgetId(pendingId)
         clearPending()
         onNotice(notice)
@@ -171,6 +176,7 @@ internal class HomeWidgetSetup(
 
     fun destroy() {
         if (activity.isFinishing && pendingId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+            onOutcome(EventOutcome.CANCELED)
             host.deleteAppWidgetId(pendingId)
             clearPending()
         }

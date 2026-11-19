@@ -101,19 +101,6 @@ class DefaultProtectedRouteGuard : ProtectedRouteGuard {
         if (isUnlocked) AccessDecision.Allowed else AccessDecision.ChallengeRequired(route)
 }
 
-data class AnalyticsEvent(
-    val name: String,
-    val outcome: String,
-)
-
-interface ProductAnalytics {
-    fun track(event: AnalyticsEvent)
-}
-
-interface CrashReporter {
-    fun record(exception: Throwable)
-}
-
 interface BillingGateway {
     val entitlement: Flow<EntitlementState>
 }

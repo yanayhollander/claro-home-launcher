@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -7,20 +9,58 @@ plugins {
     alias(libs.plugins.firebase.crashlytics)
 }
 
+val localTelemetry = Properties().apply {
+    val file = rootProject.file("telemetry.local.properties")
+    if (file.isFile) file.inputStream().use { load(it) }
+}
+
+fun telemetryValue(name: String, defaultEnvironment: String = "staging"): String {
+    val environment = providers.environmentVariable("CLARO_TELEMETRY_ENVIRONMENT").orNull
+        ?: providers.gradleProperty("claro.telemetryEnvironment").orNull ?: defaultEnvironment
+    if (name == "CLARO_TELEMETRY_ENVIRONMENT") return environment
+    val localTest = defaultEnvironment == "staging" &&
+        providers.gradleProperty("claro.localInstrumentation").orNull == "true"
+    check(!localTest || environment != "production") { "Local-test builds must not use production telemetry" }
+    val key = if (localTest && name in setOf("CLARO_FIREBASE_APPLICATION_ID", "CLARO_FIREBASE_API_KEY")) {
+        name.replace("CLARO_FIREBASE_", "CLARO_FIREBASE_LOCALTEST_")
+    } else name
+    return providers.environmentVariable(key).orNull ?: providers.environmentVariable(name).orNull
+        ?: localTelemetry.getProperty("$environment.$key").orEmpty()
+}
+
 android {
     namespace = "com.clarohome.app"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.clarohome.launcher"
+        applicationId = "dev.hollander.claro"
         minSdk = 29
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        val requestedVersionCode = providers.gradleProperty("claro.versionCode").orNull
+        val releaseVersionCode = requestedVersionCode?.toIntOrNull()
+            ?: if (requestedVersionCode == null) 1 else error("claro.versionCode must be an integer")
+        require(releaseVersionCode in 1..2_100_000_000) { "claro.versionCode must be between 1 and 2100000000" }
+        versionCode = releaseVersionCode
+        versionName = providers.gradleProperty("claro.versionName").orNull?.also {
+            require(it.isNotBlank()) { "claro.versionName must not be blank" }
+        } ?: "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
+        configureEach {
+            val defaultEnvironment = if (name == "release") "production" else "staging"
+            mapOf(
+                "google_app_id" to "CLARO_FIREBASE_APPLICATION_ID",
+                "google_api_key" to "CLARO_FIREBASE_API_KEY",
+                "project_id" to "CLARO_FIREBASE_PROJECT_ID",
+                "gcm_defaultSenderId" to "CLARO_FIREBASE_SENDER_ID",
+            ).forEach { (resource, variable) ->
+                telemetryValue(variable, defaultEnvironment).takeIf(String::isNotBlank)?.let {
+                    resValue("string", resource, it)
+                }
+            }
+        }
         debug {
             if (providers.gradleProperty("claro.localInstrumentation").orNull == "true") {
                 applicationIdSuffix = ".localtest"
@@ -28,7 +68,10 @@ android {
         }
     }
 
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        resValues = true
+    }
     bundle {
         language {
             enableSplit = false
@@ -45,6 +88,36 @@ android {
         disable += setOf("AndroidGradlePluginVersion", "GradleDependency")
     }
     packaging.resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+}
+
+val verifyTelemetryConfiguration = tasks.register("verifyTelemetryConfiguration") {
+    val names = listOf(
+        "CLARO_FIREBASE_APPLICATION_ID", "CLARO_FIREBASE_API_KEY",
+        "CLARO_FIREBASE_PROJECT_ID", "CLARO_FIREBASE_SENDER_ID", "CLARO_MIXPANEL_TOKEN",
+        "CLARO_TELEMETRY_ENVIRONMENT",
+    ) + if (providers.environmentVariable("CLARO_META_ENABLED").orNull == "true") {
+        listOf("CLARO_META_APP_ID", "CLARO_META_CLIENT_TOKEN")
+    } else {
+        emptyList()
+    }
+    val values = names.associateWith { telemetryValue(it) }
+    val mixpanelEndpoint = telemetryValue("CLARO_MIXPANEL_SERVER_URL").ifBlank { "https://api.mixpanel.com" }
+    doLast {
+        val missing = values.filterValues(String::isBlank).keys
+        check(missing.isEmpty()) { "Missing telemetry configuration: ${missing.joinToString()}" }
+        check(values["CLARO_TELEMETRY_ENVIRONMENT"] in setOf("development", "staging", "production")) {
+            "CLARO_TELEMETRY_ENVIRONMENT must be development, staging or production"
+        }
+        check(mixpanelEndpoint in setOf("https://api.mixpanel.com", "https://api-eu.mixpanel.com", "https://api-in.mixpanel.com")) {
+            "CLARO_MIXPANEL_SERVER_URL must match a supported Mixpanel region"
+        }
+        values["CLARO_META_APP_ID"]?.let { appId ->
+            check(appId.all { it in '0'..'9' }) { "CLARO_META_APP_ID must be numeric" }
+        }
+    }
+}
+if (providers.gradleProperty("claro.requireTelemetry").orNull == "true") {
+    tasks.named("preBuild").configure { dependsOn(verifyTelemetryConfiguration) }
 }
 
 dependencies {

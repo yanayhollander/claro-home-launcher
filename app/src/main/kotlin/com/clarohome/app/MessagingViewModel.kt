@@ -4,6 +4,8 @@ import android.content.Intent
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.clarohome.core.domain.ProductAnalytics
+import com.clarohome.core.domain.CrashReporter
 import com.clarohome.feature.communication.ClaroContact
 import com.clarohome.feature.communication.ACTION_OPEN_MESSAGES
 import com.clarohome.feature.communication.EXTRA_CONVERSATION_ID
@@ -36,6 +38,8 @@ class MessagingViewModel @Inject constructor(
     contactsGateway: ContactsGateway,
     clock: MessagingClock,
     logger: SensitiveDataSafeLogger,
+    analytics: ProductAnalytics,
+    crashReporter: CrashReporter,
 ) : ViewModel() {
     private val coordinator = MessagingCoordinator(
         roleGateway = roleGateway,
@@ -47,6 +51,8 @@ class MessagingViewModel @Inject constructor(
         logger = logger,
         scope = viewModelScope,
         savedState = restoredState(),
+        analytics = analytics,
+        crashReporter = crashReporter,
     )
     val state: StateFlow<MessagingUiState> = coordinator.state
     private var externalNavigationRequested = false

@@ -452,8 +452,33 @@ accessibility.
 
 ## Billing and diagnostics configuration
 
+The membership/privacy screen links to the public
+[privacy policy](https://yanayhollander.github.io/claro-public/privacy/),
+[terms of use](https://yanayhollander.github.io/claro-public/terms/) and
+[support page](https://yanayhollander.github.io/claro-public/support/).
+Privacy and terms are also accessible from purchase review. These pages are
+hosted separately in `yanayhollander/claro-public`; publishing them does not
+enable telemetry or replace the documented SDK/privacy release review.
+
 The app is safe to build with no commercial or telemetry configuration. Empty
 values keep RevenueCat unavailable and analytics/crash collection disabled:
+
+Mobile telemetry client values can also be stored in the gitignored,
+owner-readable `telemetry.local.properties` at the repository root. Prefix keys
+with `staging.` or `production.`, for example
+`staging.CLARO_FIREBASE_APPLICATION_ID`. Debug builds select staging and release
+builds select production. Environment variables override local values;
+`CLARO_TELEMETRY_ENVIRONMENT` or `-Pclaro.telemetryEnvironment=staging` can select an
+explicit environment. RevenueCat and Meta retain their separate environment-only
+configuration; this local file must never contain admin credentials.
+
+The registered Firebase projects are `claro-home-launcher` (production) and
+`claro-home-launcher-staging`. Both register `dev.hollander.claro`. Staging also
+registers `dev.hollander.claro.localtest`; `-Pclaro.localInstrumentation=true`
+selects its `staging.CLARO_FIREBASE_LOCALTEST_APPLICATION_ID` and
+`staging.CLARO_FIREBASE_LOCALTEST_API_KEY`. A local-test build rejects production
+telemetry. Firebase app registration alone does not enable/link a GA4 property
+or prove event/report delivery.
 
 ```sh
 export CLARO_REVENUECAT_PUBLIC_KEY='public_sdk_key'
@@ -462,14 +487,197 @@ export CLARO_FIREBASE_APPLICATION_ID='firebase_application_id'
 export CLARO_FIREBASE_API_KEY='firebase_public_api_key'
 export CLARO_FIREBASE_PROJECT_ID='firebase_project_id'
 export CLARO_FIREBASE_SENDER_ID='firebase_sender_id'
+export CLARO_TELEMETRY_ENVIRONMENT='staging' # development, staging, production
+# Choose the endpoint matching the Mixpanel project's region:
+export CLARO_MIXPANEL_SERVER_URL='https://api-eu.mixpanel.com'
+# Optional Meta App Events (public Android client configuration only):
+export CLARO_META_APP_ID='meta_app_id'
+export CLARO_META_CLIENT_TOKEN='meta_client_token'
+# Leave unset until SDK consent/queue behavior and policy have been reviewed:
+# export CLARO_META_ENABLED='true'
 ```
 
 Only public Android client values are supported. Do not add RevenueCat secret
-keys, service credentials or `google-services.json`. Firebase manifest defaults
-disable Analytics and Crashlytics before startup; runtime collection additionally
-requires the matching explicit consent toggle. The event API accepts only
-allowlisted coarse events and enum outcomes, never contact, call, message, media,
-recovery or SOS content.
+keys, Meta app secrets/server access tokens, service credentials or
+`google-services.json`. App-level Firebase resources are generated from these
+environment values, while a shared bootstrap initializes Firebase programmatically.
+Firebase and Meta initialization providers are removed so they cannot initialize
+ahead of the application consent controller. Meta uses the minimal `facebook-core`
+artifact, not Facebook Login, Audience Network, or sharing.
+
+Separate persisted consent toggles control usage analytics (Mixpanel/Firebase),
+crash reports, and advertising measurement (Meta). All default to false, including
+the new marketing choice on existing installations. Withdraw/reset turns all three
+off. Consent is applied at application startup, including service-only launches;
+features never wait for event delivery. SDK failures are logged locally by vendor
+and exception class without exception text or user content.
+
+Mixpanel, Firebase Analytics and Crashlytics use the same persisted random
+installation UUID, assigned through each SDK's native identity API only when its
+own consent is enabled. It is not a person/account ID, contains no contact or
+hardware identifiers, and does not identify a person across devices or reinstalls.
+Meta and RevenueCat keep separate identities. The shared ID is removed atomically
+with saved consent when both usage analytics and crash reporting are off, so a
+later grant gets a new ID; this does not delete records already sent to providers.
+Failure to persist an ID disables new analytics/diagnostics collection rather
+than sending mismatched IDs or interrupting core app features.
+
+Normal unconfigured builds still work. For a build that must have telemetry
+configuration, use `-Pclaro.requireTelemetry=true`; its pre-build check requires
+Firebase and Mixpanel for the selected environment, plus Meta credentials if Meta
+is enabled. The standalone check defaults to staging; explicitly select
+production when checking release configuration. It does not build, run tests,
+or upload events:
+
+```sh
+./gradlew :app:verifyTelemetryConfiguration
+./gradlew :app:verifyTelemetryConfiguration -Pclaro.telemetryEnvironment=production
+```
+
+Register the actual `applicationId` from `app/build.gradle.kts` and its `.localtest`
+variant in the appropriate nonproduction/production vendor apps. Never point
+developer/test purchases at production Meta reporting. Separate projects/datasets
+provide isolation; an `environment` event property alone does not.
+
+### Event routing and semantics
+
+The shared typed API is `core/domain/.../Telemetry.kt`. Feature modules depend on
+`ProductAnalytics` / `CrashReporter`, never on a vendor SDK. Serialization/routing
+is centralized in `TelemetryEnvelope.kt` and `ConsentAwareObservability`.
+
+| Events | Primary destination | Additional Meta event, with marketing consent |
+|---|---|---|
+| `session_started` | Mixpanel | Activate App plus the SDK's supported install publication |
+| `setup_step_result`, `setup_completed` | Mixpanel | Complete Tutorial for completed setup only |
+| `screen_view`, `visual_mode_selected`, `accessibility_preset_selected` | Mixpanel | None |
+| `home_changed`, widget/call/SMS/SOS/external-action task outcomes | Mixpanel | None |
+| `membership_screen_view` | Mixpanel | View Content |
+| `checkout_started` | Mixpanel | Initiate Checkout |
+| `conversion` trial/subscription/purchase | Mixpanel | Start Trial / Subscribe / Purchase |
+| `role_readiness`, startup recovery task outcome | Firebase Analytics | None |
+| Unexpected technical failures, safe breadcrumbs | Crashlytics | None |
+
+Foreground sessions begin on first foreground or after 30 minutes in the
+background; activity recreation and repeated foreground callbacks do not create
+another session. Session emission is deduplicated per destination, so newly
+granted marketing consent does not duplicate Mixpanel activation. Screen views
+come from navigation entries rather than recomposition. Persisted setup/display
+changes are observed without replaying old preferences on process start.
+Diagnostics are offered after onboarding, so initial setup coverage is limited
+to events that actually occur after consent; no historical funnel is backfilled.
+
+Call placement means submitted to Telecom, not connected. SMS submission, carrier
+sent, and delivery confirmation are separate outcomes. SOS telemetry contains
+only coarse outcomes and a test-mode boolean, never a destination or a claim that
+help arrived. Role snapshots are deduplicated until the state changes. Widgets
+complete only after their slot is persisted; cancellation/unavailability are
+separate outcomes. No arbitrary strings, contact/phone/message/media content,
+PIN/recovery values or provider identifiers are accepted by the public event API.
+SMS delivery callbacks are observed once at application scope, independently of
+the messaging screen, with a bounded 512-callback process-local deduplication
+window. Reopening a screen does not replay delivery telemetry.
+
+Meta receives no visual mode, text size, readiness, screen arguments, or
+call/SMS/SOS events. It has no Complete Registration event because Claro has no
+registration flow. Automatic Meta events, metadata, product-improvement events
+and advertising-ID collection are disabled; the merged AD_ID permission is
+removed along with the SDK-added AdServices advertising-ID, attribution,
+custom-audience and topics permissions. Mixpanel's typed initialization options
+disable automatic events, autocapture and feature flags and set the correct
+regional endpoint before SDK construction. IP geolocation is off; its SDK still
+emits its documented `$opt_in` consent event. Firebase may emit its own automatic
+events after analytics consent. SDK/device/network identifiers still require
+disclosure; advertising-ID absence does not make these integrations anonymous.
+
+### Verified billing conversions
+
+The purchase callback matches a purchased Google transaction/order against
+RevenueCat's active matching entitlement and transaction data. Only a new
+verified callback can produce acquisition/revenue events; refresh/restore never
+does. Monetary values come from the matching RevenueCat transaction's structured
+charged price, converted from micros using `BigDecimal`, not displayed strings
+or a subscription's advertised future renewal price. Missing/mismatched evidence
+is logged and the conversion is omitted, without affecting billing.
+
+Trial activation emits Start Trial only. A paid subscription emits Subscribe for
+acquisition and Purchase for its actual positive charge; count only Purchase as
+revenue, not both as two orders. A lifetime charge emits Purchase only. Hashed
+transaction markers are persisted locally before emission to prefer a missed
+conversion over duplicated revenue after process death. Raw order IDs/tokens
+never leave the billing mapper. Markers are not erased by diagnostics/local Claro
+reset, preventing an old purchase from becoming a new conversion.
+
+Sandbox transactions are excluded when `CLARO_TELEMETRY_ENVIRONMENT=production`.
+Client reporting does not reliably cover renewals, refunds, trial-to-paid charges,
+or purchases completed while the app is absent. Do not also enable automatic IAP,
+RevenueCat-to-Meta partner reporting or a server integration for the same events
+without a supported and verified deduplication design.
+
+### Release gates and known SDK limits
+
+Crashlytics automatic uploads remain disabled. A process started with persisted
+crash consent explicitly sends its previous pending reports; granting consent
+inside a process deletes earlier pending reports instead of backfilling them.
+Withdrawal stops wrapper recording and requests deletion of unsent reports.
+Firebase may still store automatic crashes locally while uploads are disabled,
+and requests already in flight cannot be recalled. The application wrapper strips
+handled exception messages/causes/suppressed data; automatically captured fatal
+crashes and ANRs bypass it and need a separate sensitive-data audit.
+Repeated handled failures with the same operation, exception type and top frame
+are recorded at most once per foreground session.
+
+Meta remains unavailable unless `CLARO_META_ENABLED=true` as well as valid public
+configuration and user marketing consent. This flag is a release gate, not a
+claim that consent/network behavior has been verified. Its SDK has no supported
+public API that guarantees erasing all manually queued events or fully shutting
+down initialized SDK work. Withdrawal closes the application event gate and
+disables the applicable settings, but cannot promise to cancel already queued
+uploads. Keep Meta disabled until the approved privacy policy and real-device
+review accept this limitation or a supported stronger design is available.
+Keep codeless/suggested-event features off in Meta's dashboard and include
+remote SDK feature behavior in that review; manual event gates are not proof
+that an initialized SDK has stopped all internal work.
+
+Before enabling production collection: inspect real SDK traffic for fresh install,
+all eight consent combinations, restart, offline/reconnect, withdrawal and
+re-consent; verify the merged manifest and readable release crash reports; inspect
+Meta Test Events/Events Manager, Firebase DebugView and Mixpanel receipt with
+synthetic data. Wrapper inspection and fake-vendor tests do not prove SDK delivery
+or absence of background requests. Tests run only on request.
+
+### Basic report definitions
+
+These are definitions for saved console reports, not a claim that dashboards or
+data ingestion have already been configured. Keep staging and production
+separate, use a consistent reporting time zone, and describe users as consenting
+installations rather than people. Do not register the shared UUID as a custom
+event dimension; use the SDK-native user-ID fields.
+
+| Report | Destination | Definition |
+|---|---|---|
+| Daily and 28-day active installations | Mixpanel | Unique IDs with `session_started`, daily trend over 28 days; optional `visual_mode` breakdown. |
+| Core feature outcomes | Mixpanel | `task_flow_result` counts grouped by `task` and `outcome`; keep started, submitted, sent and verified outcomes distinct instead of claiming call connections or assistance. |
+| Membership funnel | Mixpanel | Completed `membership_screen_view` to `checkout_started` to `conversion`; break verified results into trial, subscription and purchase instead of counting all three as payments. |
+| Client-observed charged amounts | Mixpanel | Sum numeric `amount` on `conversion` where `kind=purchase`, grouped by `currency`; never sum different currencies or count Subscribe as a second payment. Excludes unobserved renewals, refunds and trial-to-paid charges. |
+| Readiness and startup health | Firebase Analytics / GA4 | `role_readiness` grouped by `capability` and `outcome`; `task_flow_result` filtered to `task=startup_recovery`, grouped by outcome. Register the corresponding event-scoped dimensions plus `environment` before expecting historical custom-dimension reports. |
+| Reliability | Crashlytics | Built-in crash-free users, fatal/nonfatal issues and ANRs, segmented by app version over 7/28 days. Coverage and latency depend on diagnostics consent and the explicit next-start upload policy. |
+
+Use the shared installation UUID to correlate permitted Mixpanel activity with
+Crashlytics diagnostics and Firebase native user IDs; it is not a replacement for
+an authenticated cross-device account identity. GA4 custom-dimension registration
+is not retroactive, and aggregated reports can lag DebugView/realtime receipt.
+Do not treat setup events as a complete first-install funnel: consent may only
+be granted after setup, and the app does not backfill earlier activity.
+
+In the vendor consoles, configure data retention/deletion, access roles, Meta
+Business Portfolio/ad account and optimization eligibility, dashboard definitions,
+and alert owners. Start with new/regressed fatal, ANR and crash-velocity alerts.
+Monitor consented sessions/retention, task success vs uncertain outcomes, purchase
+funnel and purchase-only revenue; use the PRD's provisional 99.5% crash-free
+sessions beta target only with a meaningful consented sample. These delayed tools
+are not emergency monitoring. Update privacy policy and Play Data Safety based on
+verified SDK behavior before release. No project provisioning, dashboard setup or
+live event ingestion is implied by a successful local build.
 
 ## Toolchain and dependency policy
 
@@ -511,7 +719,7 @@ scripts/android-local all --device emulator-5554
 
 `jvm` and `lint` need no device. `all` checks the debug build, runs the JVM suites
 and lint across modules, and runs unfiltered connected debug instrumentation on
-the selected device. The runner uses `com.clarohome.launcher.localtest` for
+the selected device. The runner uses `dev.hollander.claro.localtest` for
 instrumentation so Gradle does not install over or remove the regular Claro app.
 It does not wipe the device or automatically change Android default apps. The
 reports are under each module's `build/reports/`, including
@@ -523,8 +731,10 @@ expose their local commands here too.
 
 ### Play Internal Testing
 
-Update the release `versionCode` in `app/build.gradle.kts` if Play already has
-that version. Use the private Play upload keystore from outside the repository;
+Inspect all Play tracks and artifacts before choosing a version code greater
+than every previously used code; a local version choice does not reserve it.
+Use the existing private Play upload keystore from outside the repository and
+Copilot session storage. Never replace an established upload identity.
 `jarsigner` prompts locally for passwords. Run:
 
 ```sh
@@ -534,7 +744,23 @@ scripts/android-local internal --device emulator-5554
 ```
 
 This runs the full local validation before building and signing the release AAB.
-It stops on a failed check or an unavailable test device. Only upload the AAB
+It stops on a failed check or an unavailable test device. To prepare a bundle
+without running tests or interacting with a device, use:
+
+```sh
+export CLARO_VERSION_CODE=2 # Example only: inspect the live store first.
+export CLARO_VERSION_NAME=0.1.0
+scripts/android-local bundle
+```
+
+The version overrides map to Gradle properties `claro.versionCode` and
+`claro.versionName`; omitting them preserves the app defaults. For unattended
+local signing, inject **both** `CLARO_UPLOAD_STORE_PASSWORD` and
+`CLARO_UPLOAD_KEY_PASSWORD` from the approved password manager into the process
+environment. Do not put their values in command arguments, chat, logs, Git, or
+GitHub secrets for this local workflow. Supplying only one password fails.
+
+Only upload the AAB
 path printed by the successful invocation to **Play Console → Internal testing**;
 do not upload a prior or unsigned Gradle output. The script does not upload or
 publish anything. Do not edit the checkout during preparation; if the candidate

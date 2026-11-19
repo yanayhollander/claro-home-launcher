@@ -11,10 +11,15 @@ Usage:
   scripts/android-local ui [--device <serial>] [--class <class[#method]>]
   scripts/android-local all [--device <serial>]
   scripts/android-local internal [--device <serial>]
+  scripts/android-local bundle
 
 Device commands require --device or ANDROID_SERIAL for a designated test device.
-internal requires CLARO_UPLOAD_KEYSTORE and CLARO_UPLOAD_KEY_ALIAS. It runs the
-full suite, then builds and signs a release bundle for manual Play Console upload.
+internal runs the full suite before signing; bundle builds and signs without
+running tests or using a device. Both require CLARO_UPLOAD_KEYSTORE outside the
+repository and CLARO_UPLOAD_KEY_ALIAS. Passwords are prompted locally, or supply
+both CLARO_UPLOAD_STORE_PASSWORD and CLARO_UPLOAD_KEY_PASSWORD through a secure
+environment. Optional CLARO_VERSION_CODE and CLARO_VERSION_NAME select the build
+version. Neither command uploads or publishes anything.
 EOF
 }
 
@@ -26,7 +31,7 @@ fail() {
 mode=${1:-}
 case "$mode" in
     -h|--help) usage; exit 0 ;;
-    jvm|lint|ui|all|internal) shift ;;
+    jvm|lint|ui|all|internal|bundle) shift ;;
     *) usage >&2; exit 2 ;;
 esac
 
@@ -64,19 +69,45 @@ run_all() {
     run_ui
 }
 
-prepare_internal() {
+prepare_bundle() {
     : "${CLARO_UPLOAD_KEYSTORE:?Set CLARO_UPLOAD_KEYSTORE to the Play upload keystore path.}"
     : "${CLARO_UPLOAD_KEY_ALIAS:?Set CLARO_UPLOAD_KEY_ALIAS to the Play upload key alias.}"
     [[ -f "$CLARO_UPLOAD_KEYSTORE" && -r "$CLARO_UPLOAD_KEYSTORE" ]] ||
         fail "The Play upload keystore is not a readable file."
+    local keystore_directory repository_directory session_directory
+    keystore_directory=$(cd "$(dirname "$CLARO_UPLOAD_KEYSTORE")" && pwd -P)
+    repository_directory=$(pwd -P)
+    session_directory="$HOME/.copilot/session-state"
+    case "$keystore_directory/" in
+        "$repository_directory/"*|"$session_directory/"*)
+            fail "Keep the Play upload keystore outside the repository and Copilot session storage."
+            ;;
+    esac
+    [[ ! -L "$CLARO_UPLOAD_KEYSTORE" ]] ||
+        fail "Use the upload keystore's actual private path, not a symbolic link."
+    if [[ -n "${CLARO_UPLOAD_STORE_PASSWORD:-}" || -n "${CLARO_UPLOAD_KEY_PASSWORD:-}" ]]; then
+        [[ -n "${CLARO_UPLOAD_STORE_PASSWORD:-}" && -n "${CLARO_UPLOAD_KEY_PASSWORD:-}" ]] ||
+            fail "Provide both upload passwords through the environment, or neither for local prompts."
+    fi
     local jarsigner=jarsigner
     if [[ -n "${JAVA_HOME:-}" ]]; then
         jarsigner="$JAVA_HOME/bin/jarsigner"
     fi
     command -v "$jarsigner" >/dev/null || fail "Use a JDK with jarsigner."
 
-    run_all
-    ./gradlew :app:bundleRelease
+    local gradle_args=(:app:bundleRelease)
+    if [[ -n "${CLARO_VERSION_CODE:-}" ]]; then
+        [[ "$CLARO_VERSION_CODE" =~ ^[0-9]+$ ]] ||
+            fail "CLARO_VERSION_CODE must be an integer."
+        gradle_args+=("-Pclaro.versionCode=$CLARO_VERSION_CODE")
+    fi
+    if [[ -n "${CLARO_VERSION_NAME:-}" ]]; then
+        gradle_args+=("-Pclaro.versionName=$CLARO_VERSION_NAME")
+    fi
+    if [[ "$mode" == internal ]]; then
+        run_all
+    fi
+    ./gradlew "${gradle_args[@]}"
 
     local unsigned=app/build/outputs/bundle/release/app-release.aab
     [[ -f "$unsigned" ]] || fail "Gradle did not produce the release bundle at $unsigned."
@@ -85,14 +116,18 @@ prepare_internal() {
     local candidate
     candidate=$(mktemp -d "$result_root/candidate.XXXXXXXX")
     local bundle="$candidate/claro-internal.aab"
-    if ! "$jarsigner" -keystore "$CLARO_UPLOAD_KEYSTORE" \
-        -signedjar "$bundle" "$unsigned" "$CLARO_UPLOAD_KEY_ALIAS" ||
+    local signing_args=(-keystore "$CLARO_UPLOAD_KEYSTORE" -signedjar "$bundle")
+    if [[ -n "${CLARO_UPLOAD_STORE_PASSWORD:-}" ]]; then
+        signing_args+=(-storepass:env CLARO_UPLOAD_STORE_PASSWORD -keypass:env CLARO_UPLOAD_KEY_PASSWORD)
+    fi
+    if ! "$jarsigner" "${signing_args[@]}" "$unsigned" "$CLARO_UPLOAD_KEY_ALIAS" ||
         ! "$jarsigner" -verify "$bundle"; then
         rm -f -- "$bundle"
         rmdir -- "$candidate"
         fail "Signing or signature verification failed; do not upload this build."
     fi
-    printf '\nValidated and signed for manual Play Console Internal Testing upload:\n%s/%s\n' "$PWD" "$bundle"
+    printf '\nSigned bundle for manual Play Console Internal Testing upload:\n%s/%s\n' "$PWD" "$bundle"
+    printf 'Verify the registered upload certificate, package and version before uploading. Nothing was published.\n'
 }
 
 case "$mode" in
@@ -107,6 +142,10 @@ case "$mode" in
     lint)
         [[ $# -eq 0 ]] || fail "lint does not accept additional arguments."
         exec ./gradlew lint
+        ;;
+    bundle)
+        [[ $# -eq 0 ]] || fail "bundle does not accept additional arguments."
+        prepare_bundle
         ;;
     ui|all|internal)
         while [[ $# -gt 0 ]]; do
@@ -128,7 +167,7 @@ case "$mode" in
         case "$mode" in
             ui) run_ui ;;
             all) run_all ;;
-            internal) prepare_internal ;;
+            internal) prepare_bundle ;;
         esac
         ;;
 esac

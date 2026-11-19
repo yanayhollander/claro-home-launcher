@@ -1,10 +1,13 @@
 package com.clarohome.feature.billing.observability
 
 import android.content.Context
-import androidx.core.content.edit
-import com.clarohome.core.domain.AnalyticsEvent
+import android.annotation.SuppressLint
+import com.clarohome.core.domain.ClaroEvent
 import com.clarohome.core.domain.CrashReporter
+import com.clarohome.core.domain.DiagnosticOperation
 import com.clarohome.core.domain.ProductAnalytics
+import com.clarohome.core.model.TextSize
+import com.clarohome.core.model.VisualMode
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -24,41 +27,52 @@ class SharedPreferencesConsentStore @Inject constructor(
     @ApplicationContext context: Context,
 ) : ConsentStore {
     private val preferences =
-        context.getSharedPreferences("billing_observability_consent", Context.MODE_PRIVATE)
+        context.getSharedPreferences(OBSERVABILITY_PREFERENCES, Context.MODE_PRIVATE)
 
     override fun read() = DiagnosticsConsent(
         analytics = preferences.getBoolean(ANALYTICS, false),
         crashReports = preferences.getBoolean(CRASH_REPORTS, false),
+        marketing = preferences.getBoolean(MARKETING, false),
     )
 
+    // KTX edit returns Unit; consent persistence must check the commit result.
+    @SuppressLint("UseKtx")
     override fun write(consent: DiagnosticsConsent) {
-        preferences.edit {
-            putBoolean(ANALYTICS, consent.analytics)
-            putBoolean(CRASH_REPORTS, consent.crashReports)
-        }
+        check(preferences.edit()
+            .putBoolean(ANALYTICS, consent.analytics)
+            .putBoolean(CRASH_REPORTS, consent.crashReports)
+            .putBoolean(MARKETING, consent.marketing)
+            .apply {
+                if (!consent.analytics && !consent.crashReports) remove(TELEMETRY_IDENTITY_KEY)
+            }
+            .commit()) { "Diagnostics consent could not be saved" }
     }
 
+    @SuppressLint("UseKtx")
     override fun clear() {
-        preferences.edit { clear() }
+        check(preferences.edit().clear().commit()) { "Diagnostics consent could not be cleared" }
     }
 
     private companion object {
         const val ANALYTICS = "analytics"
         const val CRASH_REPORTS = "crash_reports"
+        const val MARKETING = "marketing"
     }
 }
 
 interface AnalyticsVendor {
     val destination: AnalyticsDestination
-    fun setCollectionEnabled(enabled: Boolean)
+    fun setCollectionEnabled(enabled: Boolean, userId: String? = null)
     fun track(name: String, properties: Map<String, String>)
     fun reset()
 }
 
 interface CrashVendor {
-    fun setCollectionEnabled(enabled: Boolean)
+    fun setCollectionEnabled(enabled: Boolean, userId: String? = null)
     fun record(exception: Throwable)
     fun deleteUnsentReports()
+    fun breadcrumb(name: String, properties: Map<String, String>) = Unit
+    fun context(properties: Map<String, String>) = Unit
 }
 
 data class InspectedVendorEnvelope(
@@ -80,6 +94,7 @@ class DefaultConsentController @Inject constructor(
     private val store: ConsentStore,
     private val analyticsVendors: Set<@JvmSuppressWildcards AnalyticsVendor>,
     private val crashVendor: CrashVendor,
+    private val identityStore: TelemetryIdentityStore,
 ) : ConsentController {
     private val mutableConsent = MutableStateFlow(store.read())
     override val consent: StateFlow<DiagnosticsConsent> = mutableConsent.asStateFlow()
@@ -90,14 +105,21 @@ class DefaultConsentController @Inject constructor(
 
     override suspend fun update(consent: DiagnosticsConsent) {
         store.write(consent)
-        mutableConsent.value = consent
+        // Close withdrawals immediately, but publish grants only after the SDKs are ready.
+        val previous = mutableConsent.value
+        mutableConsent.value = DiagnosticsConsent(
+            analytics = previous.analytics && consent.analytics,
+            crashReports = previous.crashReports && consent.crashReports,
+            marketing = previous.marketing && consent.marketing,
+        )
         applyCollectionState(consent)
-        if (!consent.analytics) {
-            analyticsVendors.forEach(AnalyticsVendor::reset)
+        analyticsVendors.filterNot { consent.allows(it.destination) }.forEach {
+            it.reset()
         }
         if (!consent.crashReports) {
             crashVendor.deleteUnsentReports()
         }
+        mutableConsent.value = consent
     }
 
     override suspend fun withdrawAll() {
@@ -110,8 +132,19 @@ class DefaultConsentController @Inject constructor(
     }
 
     private fun applyCollectionState(consent: DiagnosticsConsent) {
-        analyticsVendors.forEach { it.setCollectionEnabled(consent.analytics) }
-        crashVendor.setCollectionEnabled(consent.crashReports)
+        val identity = if (consent.analytics || consent.crashReports) identityStore.getOrCreate() else null
+        analyticsVendors.forEach { vendor ->
+            val usesIdentity = vendor.destination != AnalyticsDestination.META
+            vendor.setCollectionEnabled(
+                consent.allows(vendor.destination) && (!usesIdentity || identity != null),
+                identity.takeIf { consent.analytics && usesIdentity },
+            )
+        }
+        crashVendor.setCollectionEnabled(
+            consent.crashReports && identity != null,
+            identity.takeIf { consent.crashReports },
+        )
+        if (!consent.analytics && !consent.crashReports) identityStore.clear()
     }
 }
 
@@ -122,34 +155,70 @@ class ConsentAwareObservability @Inject constructor(
     private val crashVendor: CrashVendor,
     private val networkInspector: VendorNetworkInspector,
 ) : ProductAnalytics, CrashReporter {
-    fun track(event: ClaroEvent) {
-        if (!consentController.consent.value.analytics) return
-        val properties = event.properties()
-        destinationsFor(event.name).forEach { destination ->
+    @Volatile private var context: Map<String, String> = emptyMap()
+    private val lastSessions = mutableMapOf<AnalyticsDestination, Long>()
+    private val reportedFailures = mutableSetOf<Triple<DiagnosticOperation, String, StackTraceElement?>>()
+    private var session = 0L
+
+    fun initialize() {
+        consentController.consent.value
+    }
+
+    fun updateContext(mode: VisualMode, textSize: TextSize) {
+        context = mapOf("visual_mode" to mode.wireValue(), "text_size" to textSize.wireValue())
+        if (consentController.consent.value.crashReports) crashVendor.context(context)
+    }
+
+    @Synchronized
+    fun foregroundSession(id: Long) {
+        if (session != id) reportedFailures.clear()
+        session = id
+        track(ClaroEvent.SessionStarted)
+    }
+
+    @Synchronized
+    override fun track(event: ClaroEvent) {
+        val consent = consentController.consent.value
+        val envelope = event.envelope()
+        val destinations = buildSet {
+            if (consent.analytics) add(event.primaryDestination())
+            if (consent.marketing && event.isMarketingConversion()) add(AnalyticsDestination.META)
+        }
+        destinations.forEach { destination ->
+            if (event == ClaroEvent.SessionStarted && session != 0L) {
+                if (lastSessions[destination] == session) return@forEach
+                lastSessions[destination] = session
+            }
+            val properties = if (destination == AnalyticsDestination.META) {
+                envelope.properties
+            } else {
+                context + envelope.properties + mapOf(
+                    "schema_version" to "1", "environment" to BuildConfig.TELEMETRY_ENVIRONMENT,
+                )
+            }
             analyticsVendors.firstOrNull { it.destination == destination }?.let { vendor ->
                 networkInspector.onEnvelope(
                     InspectedVendorEnvelope(
                         destination = destination.name,
-                        name = event.name.wireName,
+                        name = envelope.name,
                         properties = properties,
                     ),
                 )
-                vendor.track(event.name.wireName, properties)
+                vendor.track(envelope.name, properties)
             }
         }
-    }
-
-    override fun track(event: AnalyticsEvent) {
-        val outcome = EventOutcome.entries.firstOrNull { it.wireValue == event.outcome } ?: return
-        when (event.name) {
-            ClaroEventName.MEMBERSHIP_SCREEN_VIEW.wireName ->
-                track(ClaroEvent.MembershipScreenView(outcome))
-            else -> Unit
+        if (consent.crashReports) {
+            crashVendor.context(context)
+            crashVendor.breadcrumb(envelope.name, envelope.properties.filterKeys {
+                it != "amount" && it != "currency"
+            })
         }
     }
 
-    override fun record(exception: Throwable) {
+    @Synchronized
+    override fun record(exception: Throwable, operation: DiagnosticOperation) {
         if (!consentController.consent.value.crashReports) return
+        if (!reportedFailures.add(Triple(operation, exception.javaClass.name, exception.stackTrace.firstOrNull()))) return
         val sanitized = SanitizedException(exception::class.java.name).also {
             it.stackTrace = exception.stackTrace
         }
@@ -157,19 +226,11 @@ class ConsentAwareObservability @Inject constructor(
             InspectedVendorEnvelope(
                 destination = "CRASHLYTICS",
                 name = "exception",
-                properties = mapOf("type" to sanitized.originalType),
+                properties = mapOf("type" to sanitized.originalType, "operation" to operation.wireValue()),
             ),
         )
+        crashVendor.context(context + ("operation" to operation.wireValue()))
         crashVendor.record(sanitized)
-    }
-
-    private fun destinationsFor(name: ClaroEventName): Set<AnalyticsDestination> = when (name) {
-        ClaroEventName.ROLE_READINESS -> setOf(AnalyticsDestination.FIREBASE)
-        ClaroEventName.SETUP_STEP_RESULT,
-        ClaroEventName.TASK_FLOW_RESULT,
-        ClaroEventName.MEMBERSHIP_SCREEN_VIEW,
-        ClaroEventName.ACCESSIBILITY_PRESET_SELECTED,
-        -> setOf(AnalyticsDestination.MIXPANEL)
     }
 }
 
@@ -177,16 +238,8 @@ class SanitizedException(
     val originalType: String,
 ) : RuntimeException("Sanitized exception: $originalType")
 
-private fun ClaroEvent.properties(): Map<String, String> = buildMap {
-    put("outcome", outcome.wireValue)
-    when (this@properties) {
-        is ClaroEvent.SetupStepResult -> put("step", step.wireValue)
-        is ClaroEvent.RoleReadiness -> put("capability", capability.wireValue)
-        is ClaroEvent.TaskFlowResult -> put("task", task.wireValue)
-        is ClaroEvent.AccessibilityPresetSelected -> put("preset", preset.wireValue)
-        is ClaroEvent.MembershipScreenView -> Unit
-    }
-}
+private fun DiagnosticsConsent.allows(destination: AnalyticsDestination): Boolean =
+    if (destination == AnalyticsDestination.META) marketing else analytics
 
 fun InspectedVendorEnvelope.toJson(): String = JSONObject().apply {
     put("destination", destination)
