@@ -1,3 +1,4 @@
+import com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension
 import java.util.Properties
 
 plugins {
@@ -64,6 +65,17 @@ android {
         debug {
             if (providers.gradleProperty("claro.localInstrumentation").orNull == "true") {
                 applicationIdSuffix = ".localtest"
+            }
+        }
+        release {
+            optimization {
+                enable = true
+            }
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
+            configure<CrashlyticsExtension> {
+                mappingFileUploadEnabled = false
             }
         }
     }

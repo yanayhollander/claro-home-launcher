@@ -1,0 +1,25 @@
+{
+  "refreshCommand": "python3 scripts/render-style-previews.py",
+  "exports": [
+    {
+      "source": "marketing/store/captures/classic-home.png",
+      "sourceSha256": "424473a2efc5c5f39d5a352a7ac37fa45a9d4716223ef441715e20fb42bb9471",
+      "resource": "feature/onboarding-settings/src/main/res/drawable-nodpi/phone_style_classic.png",
+      "resourceSha256": "97f0c0f6865de663f28496a060319ad0b99fc06092ca9e293e95502d1f8fae43",
+      "size": [
+        360,
+        803
+      ]
+    },
+    {
+      "source": "marketing/store/captures/touch-home.png",
+      "sourceSha256": "d9cf8333b9c9d2f1faedd2bcd525a5e342cfea349a99f7488b082cbcab793097",
+      "resource": "feature/onboarding-settings/src/main/res/drawable-nodpi/phone_style_touch.png",
+      "resourceSha256": "7b2cdc4f6d6ecfc18b23effe0c7a3900b023ce8707d2ef7985752d31d948e1e7",
+      "size": [
+        360,
+        803
+      ]
+    }
+  ]
+}

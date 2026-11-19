@@ -232,7 +232,7 @@ def feature(concept, icon):
     label(image, concept, (126, 260), "H O M E  L A U N C H E R", 25, foreground)
     for y, line in zip((425, 575), concept["tagline"]):
         label(image, concept, (120, y), line, 112, foreground, True)
-    label(image, concept, (126, 825), "CLASSIC KEYPAD  /  TOUCH HOME", 27, foreground)
+    label(image, concept, (126, 825), "CHOOSE YOUR FAVORITE THEME", 27, foreground)
     return image.resize((1024, 500), Image.Resampling.LANCZOS)
 
 

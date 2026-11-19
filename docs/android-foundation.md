@@ -480,6 +480,15 @@ selects its `staging.CLARO_FIREBASE_LOCALTEST_APPLICATION_ID` and
 telemetry. Firebase app registration alone does not enable/link a GA4 property
 or prove event/report delivery.
 
+Mixpanel uses one US-region project named `Claro` for all environments. Set
+`staging.CLARO_MIXPANEL_TOKEN` and `production.CLARO_MIXPANEL_TOKEN` to that
+project's same public mobile token, with `https://api.mixpanel.com` as both
+endpoints. Application events include the build-selected `environment` property.
+Production reports must explicitly filter `environment=production`; staging
+reports must filter `environment=staging`. Do not include events missing that
+property. These filters separate reporting, not storage, access, or project-wide
+quotas; native SDK-generated events may not have application event context.
+
 ```sh
 export CLARO_REVENUECAT_PUBLIC_KEY='public_sdk_key'
 export CLARO_MIXPANEL_TOKEN='public_project_token'
@@ -536,8 +545,10 @@ or upload events:
 
 Register the actual `applicationId` from `app/build.gradle.kts` and its `.localtest`
 variant in the appropriate nonproduction/production vendor apps. Never point
-developer/test purchases at production Meta reporting. Separate projects/datasets
-provide isolation; an `environment` event property alone does not.
+developer/test purchases at production Meta reporting. Firebase projects and Meta
+apps/datasets remain separate by environment. Mixpanel intentionally shares one
+project, using the explicit environment filters described above rather than
+claiming project-level isolation.
 
 ### Event routing and semantics
 
@@ -648,8 +659,11 @@ or absence of background requests. Tests run only on request.
 ### Basic report definitions
 
 These are definitions for saved console reports, not a claim that dashboards or
-data ingestion have already been configured. Keep staging and production
-separate, use a consistent reporting time zone, and describe users as consenting
+data ingestion have already been configured. In the shared Claro Mixpanel project,
+use separate production and staging boards, with matching `environment` filters on
+every saved query and the board itself. Keep active-installation, funnel, retention,
+and amount calculations within one environment, not just visually broken down
+after aggregation. Use a consistent reporting time zone and describe users as consenting
 installations rather than people. Do not register the shared UUID as a custom
 event dimension; use the SDK-native user-ID fields.
 
@@ -730,6 +744,24 @@ When screenshot comparisons, UI Automator, or performance suites are added,
 expose their local commands here too.
 
 ### Play Internal Testing
+
+Release builds enable AGP 9.5 app optimization: R8 code shrinking, optimization,
+obfuscation and resource shrinking, with the platform's default optimized keep
+rules. Debug builds remain unminified. Dependencies supply their consumer keep
+rules; add narrowly scoped application rules under `app/src/release/keepRules/`
+only when an actual reflective entry point requires them.
+
+The release AAB includes the generated R8 mapping for Play deobfuscation. Native
+debug symbol level is `FULL`; AGP packages symbols when the input libraries
+contain them. Already-stripped third-party native libraries may still trigger a
+Play symbol warning and require matching symbols from their publisher. Preserve
+the mapping and available native symbols alongside the exact signed candidate;
+never reuse diagnostic files from a different build.
+
+Automatic Crashlytics mapping upload is disabled: this app injects Firebase
+resource values directly instead of applying the Google Services plugin required
+by that upload task. This does not disable crash reporting or Play's bundled
+mapping, but Firebase deobfuscation requires a separate matching-map upload.
 
 Inspect all Play tracks and artifacts before choosing a version code greater
 than every previously used code; a local version choice does not reserve it.

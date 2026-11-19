@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Export Claro review compositions from hash-verified native demo captures."""
+"""Export Claro review compositions or clean store candidates from native captures."""
 
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -11,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BASE = ROOT / "marketing/store/screenshot-templates"
 ASSETS = BASE / "theme"
 PREVIEWS = BASE / "previews"
+SCREENSHOTS = ROOT / "marketing/store/screenshots"
 GOLD = "#FFD166"
 NAVY = "#172D42"
 CREAM = "#FFFAEC"
@@ -99,7 +101,7 @@ def fit_font(lines, max_width, starting=91):
     raise ValueError(f"Headline does not fit: {lines}")
 
 
-def render(board, config, backgrounds, logo):
+def render(board, config, backgrounds, logo, review=True):
     theme = THEMES[board["theme"]]
     image = backgrounds[board["theme"]].convert("RGBA")
     badge = logo.resize((60, 60), Image.Resampling.LANCZOS)
@@ -130,8 +132,9 @@ def render(board, config, backgrounds, logo):
     shadow = shadow.filter(ImageFilter.GaussianBlur(25))
     image.alpha_composite(shadow)
     image.alpha_composite(device, (x, y))
-    text(image, (82, 1885), "CREATIVE REVIEW / NATIVE DEMO CAPTURE", 18, theme["ink"], True)
-    output = PREVIEWS / f"{board['id']}.png"
+    if review:
+        text(image, (82, 1885), "CREATIVE REVIEW / NATIVE DEMO CAPTURE", 18, theme["ink"], True)
+    output = (PREVIEWS if review else SCREENSHOTS) / f"{board['id']}.png"
     image.convert("RGB").save(output, optimize=True)
     return {
         "id": board["id"],
@@ -139,11 +142,13 @@ def render(board, config, backgrounds, logo):
         "sourceSha256": hashlib.sha256(source_path.read_bytes()).hexdigest(),
         "output": str(output.relative_to(ROOT)),
         "size": list(SIZE),
+        "sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
+        "reviewWatermark": review,
         "publicationReady": False,
     }
 
 
-def contact_sheet(config):
+def contact_sheet(config, review=True):
     sheet = Image.new("RGB", (1920, 2500), CREAM)
     text(sheet, (70, 50), "Big buttons. Less fuss.", 66, NAVY, True)
     text(sheet, (74, 145), "CLARO / GOLD & NAVY SCREENSHOT SYSTEM", 27, NAVY)
@@ -151,14 +156,22 @@ def contact_sheet(config):
         columns = min(3, len(config["boards"]) - index // 3 * 3)
         x = 70 + (3 - columns) * 605 // 2 + (index % 3) * 605
         y = 225 + (index // 3) * 1120
-        with Image.open(PREVIEWS / f"{board['id']}.png") as preview:
+        with Image.open((PREVIEWS if review else SCREENSHOTS) / f"{board['id']}.png") as preview:
             sheet.paste(preview.resize((570, 1013), Image.Resampling.LANCZOS), (x, y))
         text(sheet, (x, y + 1035), f"0{index+1}  {board['id'][3:].replace('-', ' ').title()}", 25, NAVY, True)
-    text(sheet, (74, 2460), "FRESH NATIVE CAPTURES / fictional contacts / final publication review pending", 22, NAVY)
-    sheet.save(BASE / "screenshot-system-review.png", optimize=True)
+    label = "FRESH NATIVE CAPTURES" if review else "CLEAN STORE CANDIDATES"
+    text(sheet, (74, 2460), f"{label} / fictional contacts / final publication review pending", 22, NAVY)
+    sheet.save(BASE / ("screenshot-system-review.png" if review else "store-candidates-review.png"), optimize=True)
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--clean", action="store_true",
+        help="Export watermark-free store candidates; does not approve or publish them",
+    )
+    args = parser.parse_args()
+    review = not args.clean
     config = json.loads((BASE / "templates.json").read_text())
     selected = json.loads((ROOT / "marketing/brand/selected.json").read_text())
     if config["brand"] != selected["concept"] or tuple(config["size"]) != SIZE:
@@ -176,27 +189,30 @@ def main():
             raise ValueError(f"Native capture is missing or outside the repository: {source}")
         if hashlib.sha256(source.read_bytes()).hexdigest() != captures.get(board["source"]):
             raise ValueError(f"Native capture is not recorded or its hash changed: {board['source']}")
-    for directory in (ASSETS, PREVIEWS):
+    for directory in (ASSETS, PREVIEWS if review else SCREENSHOTS):
         directory.mkdir(parents=True, exist_ok=True)
     backgrounds = {name: background(name) for name in THEMES}
     with Image.open(ROOT / "marketing/brand/concepts/03-big-and-simple/icon-512.png") as original:
         logo = original.convert("RGBA")
-    outputs = [render(board, config, backgrounds, logo) for board in config["boards"]]
+    outputs = [render(board, config, backgrounds, logo, review) for board in config["boards"]]
     for result in outputs:
         path = ROOT / result["output"]
         with Image.open(path) as image:
             if image.size != SIZE or image.mode != "RGB" or path.stat().st_size > 8 * 1024 * 1024:
                 raise ValueError(f"Invalid Play image dimensions, format or size: {path}")
-    (BASE / "export-manifest.json").write_text(
+    manifest_output = (BASE if review else SCREENSHOTS) / "export-manifest.json"
+    manifest_output.write_text(
         json.dumps({
             "publicationReady": False,
+            "reviewWatermark": review,
             "captureStatus": config["captureStatus"],
             "captureManifest": config["captureManifest"],
             "exports": outputs,
         }, indent=2) + "\n"
     )
-    contact_sheet(config)
-    print(f"Rendered {len(outputs)} screenshot design previews, backgrounds and reusable phone frame to {BASE}")
+    contact_sheet(config, review)
+    destination = PREVIEWS if review else SCREENSHOTS
+    print(f"Rendered {len(outputs)} {'review compositions' if review else 'clean store candidates'} to {destination}")
 
 
 if __name__ == "__main__":

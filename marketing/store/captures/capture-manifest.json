@@ -1,0 +1,105 @@
+{
+  "applicationId": "dev.hollander.claro.localtest",
+  "releaseApplicationId": "dev.hollander.claro",
+  "versionName": "0.1.0",
+  "versionCode": 1,
+  "sourceCommit": "da2d9ffdf1c0ca42f4eb1bdb4a4cc54883903f23",
+  "sourceChanges": [
+    "Selected launch package and Big & Simple launcher icon",
+    "Debug-only Claro Demo label",
+    "Subsequent build replaces in-app style-selection illustrations with the captured home images"
+  ],
+  "excludedChanges": "Concurrent uncommitted telemetry, billing and communication work",
+  "captureMethod": "Android Studio Running Devices screenshot dialog, rectangular PNG at 100% native resolution",
+  "device": "Existing Pixel 9 Pro emulator, Android API 36; physical phone untouched; no device wipe",
+  "nativeSize": [1280, 2856],
+  "fictionalContacts": 6,
+  "contactPortraits": "AI-generated fictional adults, imported into device-only contacts",
+  "homeTiles": ["Maya Brooks", "Daniel Reed", "Facebook", "WhatsApp", "Phone", "Camera", "SOS"],
+  "callsOrMessagesSent": false,
+  "sosConfigured": false,
+  "publicationReady": false,
+  "studioScreenshotPreferences": {
+    "temporarySaveLocation": "marketing/store/captures",
+    "temporaryAfterSaving": "Do nothing",
+    "previousSaveLocation": "~/Desktop",
+    "previousAfterSaving": "Open",
+    "restorationStatus": "Pending: macOS background-control guard blocked further UI actions"
+  },
+  "pending": [
+    "Exact final creative approval",
+    "Signed-release verification",
+    "Post-update visual inspection of the in-app style-selection cards: macOS background-control guard blocked further actions",
+    "Optional refreshed Hebrew/RTL and style-choice captures"
+  ],
+  "builds": [
+    {
+      "id": "native-capture",
+      "apkSha256": "bd823c7301b8f03102a3bdceed61a0538e6cb98695b3baa874ae83f9b9c3db41",
+      "description": "Approved committed baseline plus package/icon changes and debug label"
+    },
+    {
+      "id": "refreshed-style-previews",
+      "apkSha256": "8e47e34f1a3bea62d7d7c2890512a3d0c2cad740a2f2dc7eca632ebb14143d08",
+      "description": "Same isolated source plus new in-app Classic and Touch preview resources; built and installed successfully",
+      "resourceVerification": "Both compiled APK PNGs were decoded and compared pixel-for-pixel against the generated Android resources"
+    }
+  ],
+  "installedThirdPartyApps": [
+    {
+      "package": "com.facebook.katana",
+      "versionName": "588.0.0.42.55",
+      "versionCode": 707615134,
+      "downloadSource": "https://d.apkpure.net/b/XAPK/com.facebook.katana?version=latest",
+      "publisherVerification": "Every split APK verified by apksigner; every APK signer matched Meta certificates published at https://www.facebook.com/.well-known/assetlinks.json",
+      "baseApkSha256": "a6cfc28ca40c355aeb81fe6639165fadae5144939939a4228b850465eeb825f3",
+      "densitySplitSha256": "c0c3b5532821778e9e0100ca295617ba734760ed9422dfb7651503cf0fb260d0",
+      "accountCreatedOrUsed": false
+    },
+    {
+      "package": "com.whatsapp",
+      "versionName": "2.26.46.70",
+      "versionCode": 264607049,
+      "downloadSource": "https://www.whatsapp.com/android/current/WhatsApp.apk",
+      "apkSha256": "4d10d551dcff7c308ff3a5dc798b69f1ad63b3c2ce01bc3ebda6bb70997e6948",
+      "accountCreatedOrUsed": false
+    }
+  ],
+  "captures": [
+    {
+      "path": "marketing/store/captures/classic-home.png",
+      "sha256": "424473a2efc5c5f39d5a352a7ac37fa45a9d4716223ef441715e20fb42bb9471",
+      "size": [1280, 2856],
+      "savedAtUtc": "2026-11-19T13:13:22.988436+00:00",
+      "build": "native-capture"
+    },
+    {
+      "path": "marketing/store/captures/touch-home.png",
+      "sha256": "d9cf8333b9c9d2f1faedd2bcd525a5e342cfea349a99f7488b082cbcab793097",
+      "size": [1280, 2856],
+      "savedAtUtc": "2026-11-19T13:06:17.397840+00:00",
+      "build": "native-capture"
+    },
+    {
+      "path": "marketing/store/captures/contacts.png",
+      "sha256": "6e4896bf52644a2b4f4640ee1d305f2369dafefb15d22a05716802e7ae4f45dd",
+      "size": [1280, 2856],
+      "savedAtUtc": "2026-11-19T13:09:47.609427+00:00",
+      "build": "native-capture"
+    },
+    {
+      "path": "marketing/store/captures/dialer.png",
+      "sha256": "bce3861afcc81f200c100641bffb93d34702f6922d15661d045391ae6bf340ce",
+      "size": [1280, 2856],
+      "savedAtUtc": "2026-11-19T13:08:45.680555+00:00",
+      "build": "native-capture"
+    },
+    {
+      "path": "marketing/store/captures/protected-settings.png",
+      "sha256": "6df5ad7a0cbc58895bf422732192f976f8f5ef97f9b947ea2a42ac8f8233c194",
+      "size": [1280, 2856],
+      "savedAtUtc": "2026-11-19T13:10:29.840723+00:00",
+      "build": "native-capture"
+    }
+  ]
+}

@@ -90,6 +90,15 @@ multi-tap remain English, unlike the localized Android app. All configuration
 and drafts reset when the page reloads. Changing style **inside Settings** keeps
 this in-memory state; the external version/comparison links reload the preview.
 
+### Reusable native demo kit
+
+For future requests to install Claro with demo assets, reuse the saved
+[demo kit and setup instructions](marketing/store/demo/README.md). It contains
+fictional contacts, AI-generated portraits, an importable vCard and the Home tile
+recipe. Native capture sources, store artwork and clean screenshots are also
+preserved in `marketing/store/`; do not recreate the portraits or export a
+device/account backup. Installing an APK alone does not import the demo data.
+
 ### Native phone-style previews
 
 The onboarding and Settings style cards use native example captures, not a second
@@ -97,6 +106,13 @@ hand-drawn implementation of Home. Whenever either home layout changes, refresh
 both `classic-home.png` and `touch-home.png` in `marketing/store/captures/` using
 fictional, privacy-reviewed data, then run `python3 scripts/render-style-previews.py`.
 The generated Android resources and source hashes must be updated together.
+
+For store artwork, `python3 scripts/render-play-screenshots.py` regenerates
+watermarked review compositions. Use `--clean` to export the five watermark-free
+PNG candidates into `marketing/store/screenshots/`, with source/output hashes.
+Clean exports do not constitute publication approval. Review
+`marketing/store/screenshot-templates/store-candidates-review.png` before upload;
+never upload the review boards or watermarked previews as store screenshots.
 
 ### Native Home widgets (Android only)
 

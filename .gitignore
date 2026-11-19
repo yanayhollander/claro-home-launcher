@@ -5,4 +5,14 @@ telemetry.local.properties
 .idea/
 *.iml
 captures/
+# Preserve reviewed fictional demo captures, not arbitrary device screenshots.
+!/marketing/store/captures/
+/marketing/store/captures/*
+!/marketing/store/captures/capture-manifest.json
+!/marketing/store/captures/style-preview-manifest.json
+!/marketing/store/captures/classic-home.png
+!/marketing/store/captures/touch-home.png
+!/marketing/store/captures/contacts.png
+!/marketing/store/captures/dialer.png
+!/marketing/store/captures/protected-settings.png
 .DS_Store
