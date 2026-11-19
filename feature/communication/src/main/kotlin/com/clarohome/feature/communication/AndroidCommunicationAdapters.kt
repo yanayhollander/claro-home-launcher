@@ -15,6 +15,8 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.database.ContentObserver
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -39,6 +41,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -744,6 +748,10 @@ class AndroidContactsGateway @Inject constructor(
                 .withValue(ContactsContract.CommonDataKinds.Phone.LABEL, number.label)
                 .build()
         }
+        if (mutation.photoUri != null) {
+            val photo = readContactPhoto(mutation.photoUri) ?: return contactPhotoFailure()
+            operations += photoInsert(photo).withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0).build()
+        }
         return runCatching {
             val result = resolver.applyBatch(ContactsContract.AUTHORITY, operations)
             val rawContactId = result.firstOrNull()?.uri?.let(ContentUris::parseId)
@@ -784,6 +792,7 @@ class AndroidContactsGateway @Inject constructor(
         } ?: return ContactWriteResult.Failed(
             context.getString(R.string.comm_contact_not_found),
         )
+        val photo = mutation.photoUri?.let { readContactPhoto(it) ?: return contactPhotoFailure() }
         return runCatching {
             val rawContactId = firstWritableRawContactId(contactId)
                 ?: return ContactWriteResult.AccountReadOnly
@@ -828,10 +837,57 @@ class AndroidContactsGateway @Inject constructor(
                     .withValue(ContactsContract.CommonDataKinds.Phone.LABEL, number.label)
                     .build()
             }
+            if (photo != null) {
+                operations += ContentProviderOperation.newDelete(ContactsContract.Data.CONTENT_URI)
+                    .withSelection(
+                        "${ContactsContract.Data.RAW_CONTACT_ID} = ? AND ${ContactsContract.Data.MIMETYPE} = ?",
+                        arrayOf(rawContactId.toString(), ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE),
+                    )
+                    .build()
+                operations += photoInsert(photo)
+                    .withValue(ContactsContract.Data.RAW_CONTACT_ID, rawContactId)
+                    .build()
+            }
             resolver.applyBatch(ContactsContract.AUTHORITY, operations)
-            ContactWriteResult.Saved(lookupKey)
+            ContactWriteResult.Saved(lookupKeyForRawContact(rawContactId) ?: lookupKey)
         }.contactWriteFailure()
     }
+
+    private fun photoInsert(photo: ByteArray): ContentProviderOperation.Builder =
+        ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+            .withValue(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE)
+            .withValue(ContactsContract.CommonDataKinds.Photo.PHOTO, photo)
+            .withValue(ContactsContract.Data.IS_SUPER_PRIMARY, 1)
+
+    private suspend fun readContactPhoto(photoUri: String): ByteArray? = withContext(Dispatchers.IO) {
+        try {
+            val bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(resolver, Uri.parse(photoUri))) {
+                    decoder, info, _ ->
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                val width = info.size.width
+                val height = info.size.height
+                val longest = maxOf(width, height)
+                // Keep the photo small enough for the Contacts provider's batch transaction.
+                if (longest > 512) {
+                    decoder.setTargetSize((width * 512L / longest).toInt().coerceAtLeast(1),
+                        (height * 512L / longest).toInt().coerceAtLeast(1))
+                }
+            }
+            try {
+                val bytes = ByteArrayOutputStream()
+                if (bitmap.compress(Bitmap.CompressFormat.JPEG, 85, bytes)) bytes.toByteArray() else null
+            } finally {
+                bitmap.recycle()
+            }
+        } catch (_: IOException) {
+            null
+        } catch (_: SecurityException) {
+            null
+        }
+    }
+
+    private fun contactPhotoFailure(): ContactWriteResult =
+        ContactWriteResult.Failed(context.getString(R.string.comm_contact_photo_unreadable))
 
     override suspend fun delete(lookupKey: String): ContactWriteResult {
         if (!context.hasPermission(Manifest.permission.WRITE_CONTACTS)) {

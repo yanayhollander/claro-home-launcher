@@ -260,6 +260,7 @@ private fun InboxRoute(
                             size = 48.dp,
                             paletteSeed = index,
                             isUnassigned = conversation.recipient.displayName.isNullOrBlank(),
+                            contactNumber = conversation.recipient.number,
                         )
                     },
                     onClick = { onOpenConversation(conversation.id) },
@@ -426,6 +427,7 @@ private fun RecipientsRoute(
                                 size = 48.dp,
                                 paletteSeed = contactIndex,
                                 photoUri = contact.photoUri,
+                                contactLookupKey = contact.lookupKey,
                             )
                         },
                         onClick = { onChooseContactNumber(contact, number) },
@@ -843,6 +845,7 @@ private fun RecipientSummaryBar(recipient: MessageRecipient?) {
             name = displayName,
             size = 56.dp,
             isUnassigned = displayName == null,
+            contactNumber = number,
         )
         Column(modifier = Modifier.weight(1f)) {
             if (displayName == null && number != null) {

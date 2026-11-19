@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.clarohome.core.design.ClaroAvatar
 import com.clarohome.core.design.ClaroAppIcon
+import com.clarohome.core.design.ClaroAppWidget
 import com.clarohome.core.design.ClaroBannerTone
 import com.clarohome.core.design.ClaroBatteryMeter
 import com.clarohome.core.design.ClaroCellularBars
@@ -154,28 +156,40 @@ private fun TouchStatusHeader(
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            ClaroBatteryMeter(battery = home.battery)
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
             Row(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 32.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
+                Text(
+                    text = brandName,
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
                 ClaroCellularBars(cellular = home.cellular)
-                home.cellular.unavailableLabel()?.let { networkLabel ->
-                    Text(
-                        text = networkLabel,
-                        color = Color.White,
-                        fontSize = 15.sp,
-                        lineHeight = 18.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                    )
-                }
+                Text(
+                    text = stringResource(R.string.touch_battery_percentage, home.battery.percentage),
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                )
+                ClaroBatteryMeter(battery = home.battery, compact = true)
             }
+        }
+        home.cellular.unavailableLabel()?.let { networkLabel ->
+            Text(
+                text = networkLabel,
+                color = Color.White,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.align(Alignment.End),
+            )
         }
         Row(
             modifier = Modifier
@@ -194,12 +208,6 @@ private fun TouchStatusHeader(
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = stringResource(R.string.touch_battery_percentage, home.battery.percentage),
-                    color = Color(0xFFE0E6F0),
-                    fontSize = 15.sp,
-                    lineHeight = 20.sp,
                 )
             }
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
@@ -303,6 +311,15 @@ private fun HomeTileCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    if (tile.kind == HomeTileKind.WIDGET) {
+        ClaroAppWidget(
+            appWidgetId = tile.appWidgetId,
+            provider = tile.appWidgetProvider,
+            label = tile.label,
+            modifier = modifier.height(124.dp).clip(RoundedCornerShape(1.dp)),
+        )
+        return
+    }
     val haptics = LocalClaroHaptics.current
     val displayLabel = tile.kind.localizedLabel(tile.label)
     val accessibleLabel = when (tile.kind) {
@@ -364,7 +381,9 @@ private fun HomeTileCard(
                         size = 52.dp,
                         fallbackTint = tile.kind.tileIconTint(),
                     )
-                    HomeTileKind.CONTACT -> ClaroAvatar(name = tile.label, size = 52.dp, photoUri = tile.photoUri)
+                    HomeTileKind.CONTACT -> ClaroAvatar(
+                        name = tile.label, size = 52.dp, photoUri = tile.photoUri, contactNumber = tile.phoneNumber,
+                    )
                     else -> ClaroIcon(
                         kind = tile.kind.iconKind(),
                         tint = tile.kind.tileIconTint(),
@@ -434,7 +453,7 @@ private fun HomeTileKind.tileBackgroundColor(): Color = when (this) {
     HomeTileKind.GALLERY -> ClaroColors.PaleViolet
     HomeTileKind.SOS -> ClaroColors.PaleRed
     HomeTileKind.APPS -> ClaroColors.AppsPale
-    HomeTileKind.INSTALLED_APP -> Color(0xFFF2F4F8)
+    HomeTileKind.INSTALLED_APP, HomeTileKind.WIDGET -> Color(0xFFF2F4F8)
     HomeTileKind.CONTACT -> ClaroColors.PaleBlue
     HomeTileKind.ALARM -> ClaroColors.PaleOrange
 }
@@ -446,7 +465,7 @@ private fun HomeTileKind.tileIconTint(): Color = when (this) {
     HomeTileKind.GALLERY -> ClaroColors.Violet
     HomeTileKind.SOS -> ClaroColors.Red
     HomeTileKind.APPS -> ClaroColors.AppsInk
-    HomeTileKind.INSTALLED_APP -> ClaroColors.Blue
+    HomeTileKind.INSTALLED_APP, HomeTileKind.WIDGET -> ClaroColors.Blue
     HomeTileKind.CONTACT -> ClaroColors.Blue
     HomeTileKind.ALARM -> ClaroColors.Orange
 }
@@ -458,7 +477,7 @@ private fun HomeTileKind.iconKind(): ClaroIconKind = when (this) {
     HomeTileKind.GALLERY -> ClaroIconKind.GALLERY
     HomeTileKind.SOS -> ClaroIconKind.SOS
     HomeTileKind.APPS -> ClaroIconKind.APPS
-    HomeTileKind.INSTALLED_APP -> ClaroIconKind.APPS
+    HomeTileKind.INSTALLED_APP, HomeTileKind.WIDGET -> ClaroIconKind.APPS
     HomeTileKind.CONTACT -> ClaroIconKind.CONTACT
     HomeTileKind.ALARM -> ClaroIconKind.CLOCK
 }
@@ -471,6 +490,6 @@ private fun HomeTileKind.localizedLabel(fallback: String): String = when (this) 
     HomeTileKind.GALLERY -> stringResource(R.string.touch_tile_gallery)
     HomeTileKind.SOS -> stringResource(R.string.touch_tile_sos)
     HomeTileKind.APPS -> stringResource(R.string.touch_tile_apps)
-    HomeTileKind.INSTALLED_APP, HomeTileKind.CONTACT -> fallback
+    HomeTileKind.INSTALLED_APP, HomeTileKind.CONTACT, HomeTileKind.WIDGET -> fallback
     HomeTileKind.ALARM -> stringResource(R.string.touch_tile_alarm)
 }

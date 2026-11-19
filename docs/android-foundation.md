@@ -54,6 +54,23 @@ authority is shown as unknown rather than zero. Opening the inbox does not clear
 messages, and the communication repositories clear only the opened conversation
 or call-history record. Active Telecom calls project a return-to-call action.
 
+Repeated navigation to the current screen with identical route arguments is a
+no-op, rather than a single-top replacement that can remount and flicker.
+Menu, Phone, Messages, apps, media and settings share this guard; different route
+arguments still open a separate screen, and contextual Options menus still toggle.
+
+Compact Android widgets are persisted as `WIDGET` Home slots with a host ID and
+provider component, independently of app allowlisting. The protected slot picker
+discovers Home-capable installed providers and disables widgets that cannot fit a
+single tile, respecting each provider's permitted resize axes. `HomeWidgetSetup`
+owns the `AppWidgetHost` lifecycle, Android binding approval, provider configuration,
+pending-state restoration and removal of unused host IDs. A slot is committed only
+after binding/configuration succeeds; cancellation leaves its previous value
+untouched. Both Home styles use native `AppWidgetHostView` content, without an
+outer shortcut click handler. Missing or oversized providers show an explicit
+warning. Widget discovery uses an `APPWIDGET_UPDATE` visibility query, not broad
+package access.
+
 The phone/contacts layer now qualifies and requests the dialer role, handles
 `ACTION_DIAL`, declares the default-phone `InCallService`, and requests phone,
 call-log, contacts, and incoming-call notification permissions in role-first
@@ -119,12 +136,13 @@ charge disclaimer are omitted from message screens.
   read-only contact actions stay disabled and deletion requires confirmation.
   Linked SOS contacts cannot be deleted until replaced. The Classic editor uses
   multi-tap text, numeric phone fields, Back to delete, green Save and red Cancel;
-  long # still opens the software keyboard. Editing preserves additional phone
+  **Open keyboard** shows the software keyboard. Editing preserves additional phone
   numbers and their labels rather than dropping numbers outside the two fields.
-- Classic Home displays saved Hold 1/2 names and routes long presses through
-  the same speed-dial coordinator as Phone. Ordinary taps still enter digits;
-  missing or unresolved assignments show the existing setup/repair guidance,
-  never dial a different contact.
+- Classic Home and both Phone dialers treat 1 and 2 as ordinary keys, without
+  favorite names or direct-call shortcuts.
+- Android Contacts supplies current photos for dialer matches, call history and
+  screens, message threads and recipient headers, and contact tiles in both layouts.
+  Visible avatars refresh when the Contacts provider reports a change.
 - Dialer digits show up to five matching saved contact numbers after a short
   debounce. Existing matches narrow immediately and recent-query previews
   restore immediately on Back; every query is revalidated in the background.
@@ -176,8 +194,9 @@ locked-screen incoming calls, emergency handoff, and OEM dialer-role repair.
 The safety feature routes a configured trusted-contact
 SOS through the shared Telecom call gateway. If the required role or permission
 is absent, the request fails into a repair state instead of simulating success.
-Emergency access is a separate native dialer handoff and is never gated by Claro
-configuration or entitlement.
+The dedicated Emergency services shortcut opens a separate native dialer and
+appears only when opening a configured SOS from its Home tile. Dialing an
+emergency number manually still hands off to the system dialer.
 SOS setup opens a searchable contact/number picker or accepts a specific phone
 number with an optional name. Saving requires a valid non-emergency number and
 recipient agreement; invalid input leaves the existing configuration unchanged.
@@ -258,23 +277,28 @@ only first setup or a style change without a matching entry creates a new Home.
 Android system Home intents also return to Claro Home instead of leaving the
 user on the last dialer/menu screen; incomplete setup remains in onboarding.
 Home status (battery/signal), clock and date are fixed above an independently
-scrolling tile region in both styles. Classic Home and Menu share one root-level
-deck with the number-entry dialer. It stays mounted in the same position while
-only NavHost content changes, including when a digit opens Phone from Home.
-Home passes tile scrolling, digit entry and Hold 1/2 assignments into that deck;
-the screen does not draw a second copy. No lifecycle delay removes/reinserts
-the keypad when opening Menu or starting number entry. Dialer Options, Clear,
-backspace, Call and Hold 1/2 use the same persistent deck with dialer callbacks.
-These native setup decisions supersede the original PRD setup/billing copy;
-the HTML storyboard remains a separate historical design reference.
+scrolling tile region in both styles. Each NavHost destination lays out its
+content and bottom controls together. Classic Home, Menu and Dialer use the
+same deck component, docked below their content. Classic Messages and other
+Phone views render their own controls instead. During Back, an outgoing
+screen never gets the incoming screen's controls.
+Back from Contacts opened in Phone returns to the dialer without clearing
+the number. Contacts opened directly from Menu keeps its normal exit behavior.
+On Classic Home or an empty Classic dialer, hold `*` to start an international
+number with `+`. Tapping `*` or `#` enters that symbol; `#` only changes typing
+mode in a text field.
+These native setup decisions supersede the original PRD setup/billing copy.
+The HTML storyboard follows these flows with in-memory sample data and
+illustrated Android boundaries; it is not a native integration environment.
 
 After Language and display, Choose Home tiles offers Messages, Camera, Gallery
 and Apps switches. Choices use the existing persisted Home slots and affect
 Home only: Menu access, feature behavior, notifications and permission/role
 setup remain unchanged. Existing tile visibility supplies the initial choices,
-so a fresh setup still starts without Messages on Home. Adding a tile to a full
-12-slot Home shows an explicit error and never replaces another tile.
-The same switches are available in Home tiles and speed dial settings.
+so a fresh setup still starts without Messages on Home. Adding an enabled tile
+appends it without replacing an existing tile.
+Home tiles settings lists configured tiles with an Add tile action
+and up/down controls that save the order for both Home styles.
 Installed WhatsApp/WhatsApp Business and Facebook/Facebook Lite also appear
 as optional Home switches with their real app icons. Enabling creates a saved
 Home slot and allows the app; hiding removes only its Home shortcut. App
@@ -290,13 +314,13 @@ them again before persisting or navigating Home. Unavailable roles on devices
 without the relevant support do not block setup.
 
 Classic screens with Claro's keypad do not open the Android keyboard when a
-text field is focused. Long-press # to open it for the focused field; short #
-and Hold 1/2 retain their existing actions. Moving to another field starts with
+text field is focused. Tap **Open keyboard** to open it for the focused field. Moving to another field starts with
 the system keyboard suppressed again. Touch mode and onboarding (which has no
 Classic keypad) keep normal keyboard entry.
 Focused text fields using the global Classic deck (including app search and
 the Home tile picker) use the same multi-tap letters as Contacts and Messages.
-Repeated presses cycle a key's letters; short # switches letters/numbers.
+Repeated presses cycle a key's letters. Hold # to switch between English and Hebrew,
+or tap # to cycle English, Hebrew, and numbers without changing the app language.
 Number and phone fields keep numeric entry. Keypad edits respect the cursor
 and selected text without opening Android's keyboard.
 The global Back key deletes selected text or the preceding Unicode code point
@@ -319,14 +343,14 @@ The Android status bar uses a black background and dark system icons to make it
 less prominent than Claro's own status display. This is visual de-emphasis, not
 kiosk mode: Android still owns the notification shade and swipe gesture.
 
-Home is a configurable 12-slot grid (`HomeSnapshot.homeSlots`, `HOME_SLOT_COUNT`)
+Home is a configurable grid without a fixed tile limit (`HomeSnapshot.homeSlots`)
 persisted by `HomeSlotStore` (`claro_home_slots`; the legacy `claro_favorites`
 list is migrated). Each slot is optional and may hold a contact (direct call),
 an allowed installed app, or a built-in shortcut (Phone, Messages, Camera,
 Gallery, SOS, Apps, Alarm clock via `AlarmClock.ACTION_SHOW_ALARMS`); built-in
 shortcuts are unique, contacts/apps may repeat. Defaults seed Phone, Camera,
 Gallery, SOS and Apps (no Messages). Slots are edited only in the protected
-"Home tiles & speed dial" settings screen. `HomeSnapshot.tiles` is the Classic
+"Home tiles" settings screen. `HomeSnapshot.tiles` is the Classic
 Menu list; the `isOnHome` app flag now means "Show in Menu". The Apps screen
 lists allowed apps only (no search or edit entry); app allow-listing, Menu
 visibility and search live in protected settings. The setup counter
@@ -455,7 +479,7 @@ SDK 37. Dependabot proposes grouped weekly updates, but upgrades must be checked
 against official Android, Kotlin, Firebase, Mixpanel, and RevenueCat release
 notes before merging.
 
-CI runs the wrapper with JDK 17. To refresh dependency checksums after an approved
+Run the Gradle wrapper locally with JDK 17. To refresh dependency checksums after an approved
 upgrade, run:
 
 ```sh
@@ -468,15 +492,54 @@ emulator data, or build directories into repository or session artifact storage.
 
 ## Local verification
 
-Set `ANDROID_HOME` or `ANDROID_SDK_ROOT` to an SDK containing Android 37, then run:
+Tests run only when requested or when preparing a build for Play Internal Testing.
+There is no Android test workflow on GitHub Actions. Set `ANDROID_HOME` (or
+`ANDROID_SDK_ROOT`) to an SDK containing Android 37 and platform-tools. For device
+tests, use `adb devices` to find an already-booted emulator or designated test
+phone and pass its serial with `--device` (or set `ANDROID_SERIAL`). Do not target
+a phone someone relies on for calls or messages.
 
 ```sh
-./gradlew clean :app:assembleDebug test lint
-./gradlew :app:installDebug :app:connectedDebugAndroidTest
+scripts/android-local jvm
+scripts/android-local jvm :app '*IntegrationContractsTest'
+scripts/android-local lint
+scripts/android-local ui --device emulator-5554
+scripts/android-local ui --device emulator-5554 \
+  --class 'com.clarohome.app.StoryboardRegressionTest#touchHomeScrollsTilesWithoutMovingStatusHeader'
+scripts/android-local all --device emulator-5554
 ```
 
-Use an existing emulator/device when UI or platform validation is needed. The
-unit tests require no emulator.
+`jvm` and `lint` need no device. `all` checks the debug build, runs the JVM suites
+and lint across modules, and runs unfiltered connected debug instrumentation on
+the selected device. The runner uses `com.clarohome.launcher.localtest` for
+instrumentation so Gradle does not install over or remove the regular Claro app.
+It does not wipe the device or automatically change Android default apps. The
+reports are under each module's `build/reports/`, including
+`app/build/reports/androidTests/connected/debug/` for the current Android UI suite.
+Some real-activity tests are conditional on role, notification, or initial state;
+review skipped cases and verify those scenarios on a dedicated test device.
+When screenshot comparisons, UI Automator, or performance suites are added,
+expose their local commands here too.
+
+### Play Internal Testing
+
+Update the release `versionCode` in `app/build.gradle.kts` if Play already has
+that version. Use the private Play upload keystore from outside the repository;
+`jarsigner` prompts locally for passwords. Run:
+
+```sh
+export CLARO_UPLOAD_KEYSTORE=/path/to/upload-key.jks
+export CLARO_UPLOAD_KEY_ALIAS=your-upload-alias
+scripts/android-local internal --device emulator-5554
+```
+
+This runs the full local validation before building and signing the release AAB.
+It stops on a failed check or an unavailable test device. Only upload the AAB
+path printed by the successful invocation to **Play Console → Internal testing**;
+do not upload a prior or unsigned Gradle output. The script does not upload or
+publish anything. Do not edit the checkout during preparation; if the candidate
+changes, rerun the gate. The debug device suite is not a substitute for checking
+the signed build and the physical-device scenarios below.
 
 ## Remaining release gates
 

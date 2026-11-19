@@ -140,7 +140,7 @@ data class ClaroPreferences(
     val maximumSpeakerVolume: Boolean = false,
 )
 
-const val HOME_SLOT_COUNT = 12
+const val LEGACY_HOME_SLOT_COUNT = 12
 
 data class HomeTile(
     val id: String,
@@ -152,6 +152,8 @@ data class HomeTile(
     val isCore: Boolean = true,
     val phoneNumber: String? = null,
     val photoUri: String? = null,
+    val appWidgetId: Int? = null,
+    val appWidgetProvider: String? = null,
 )
 
 enum class HomeTileKind {
@@ -164,6 +166,7 @@ enum class HomeTileKind {
     INSTALLED_APP,
     CONTACT,
     ALARM,
+    WIDGET,
 }
 
 val optionalHomeTileKinds = setOf(

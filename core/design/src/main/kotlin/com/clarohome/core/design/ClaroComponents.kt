@@ -354,10 +354,12 @@ fun ClaroRowButton(
     leading: (@Composable () -> Unit)? = null,
     unreadDot: Boolean = false,
     trailing: (@Composable () -> Unit)? = null,
+    enabled: Boolean = true,
 ) {
     val haptics = LocalClaroHaptics.current
     Column(modifier = modifier.fillMaxWidth()) {
         Button(
+            enabled = enabled,
             onClick = {
                 haptics.softkey()
                 onClick()

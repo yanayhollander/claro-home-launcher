@@ -20,13 +20,15 @@ import kotlinx.coroutines.CompletableDeferred
 val LocalClaroOpenKeyboard = staticCompositionLocalOf<(() -> Unit)?> { null }
 val LocalClaroKeypadInput = staticCompositionLocalOf<((Char) -> Unit)?> { null }
 val LocalClaroDeleteText = staticCompositionLocalOf<(() -> Boolean)?> { null }
-val LocalClaroKeypadNumericMode = staticCompositionLocalOf<Boolean?> { null }
+val LocalClaroKeypadMode = staticCompositionLocalOf<ClassicKeypadMode?> { null }
+val LocalClaroSwitchKeypadLanguage = staticCompositionLocalOf<(() -> Unit)?> { null }
 
 private class KeyboardRequest {
     var open by mutableStateOf<(() -> Unit)?>(null)
     var input by mutableStateOf<((Char) -> Unit)?>(null)
     var delete by mutableStateOf<(() -> Boolean)?>(null)
-    var numericMode by mutableStateOf<Boolean?>(null)
+    var mode by mutableStateOf<ClassicKeypadMode?>(null)
+    var switchLanguage by mutableStateOf<(() -> Unit)?>(null)
 }
 
 @Composable
@@ -49,10 +51,11 @@ fun ClaroKeyboardContainer(
                 val connection = request.createInputConnection(editorInfo)
                 keyboard.open = open
                 val keypad = ManualKeypadInput(connection, editorInfo) {
-                    keyboard.numericMode = it
+                    keyboard.mode = it
                 }
                 keyboard.input = keypad::input
                 keyboard.delete = keypad::delete
+                keyboard.switchLanguage = keypad.switchLanguage
                 try {
                     requested.await()
                     nextHandler.startInputMethod(request)
@@ -62,7 +65,8 @@ fun ClaroKeyboardContainer(
                         keyboard.open = null
                         keyboard.input = null
                         keyboard.delete = null
-                        keyboard.numericMode = null
+                        keyboard.mode = null
+                        keyboard.switchLanguage = null
                     }
                 }
             }
@@ -73,7 +77,8 @@ fun ClaroKeyboardContainer(
             LocalClaroOpenKeyboard provides if (manualKeyboard) keyboard.open else null,
             LocalClaroKeypadInput provides if (manualKeyboard) keyboard.input else null,
             LocalClaroDeleteText provides if (manualKeyboard) keyboard.delete else null,
-            LocalClaroKeypadNumericMode provides if (manualKeyboard) keyboard.numericMode else null,
+            LocalClaroKeypadMode provides if (manualKeyboard) keyboard.mode else null,
+            LocalClaroSwitchKeypadLanguage provides if (manualKeyboard) keyboard.switchLanguage else null,
             content = content,
         )
     }
@@ -82,27 +87,35 @@ fun ClaroKeyboardContainer(
 private class ManualKeypadInput(
     private val connection: InputConnection,
     editorInfo: EditorInfo,
-    private val onModeChange: (Boolean) -> Unit,
+    private val onModeChange: (ClassicKeypadMode) -> Unit,
 ) {
     private val inputClass = editorInfo.inputType and InputType.TYPE_MASK_CLASS
     private val phoneNumberField = inputClass == InputType.TYPE_CLASS_PHONE
     private val numericField = phoneNumberField ||
         inputClass == InputType.TYPE_CLASS_NUMBER ||
         inputClass == InputType.TYPE_CLASS_DATETIME
-    private var numericMode = numericField
+    private var mode = if (numericField) ClassicKeypadMode.NUMBERS else ClassicKeypadMode.ENGLISH
     private var previousTap: ClassicMultiTapState? = null
+    val switchLanguage: (() -> Unit)? = if (numericField) null else {
+        { changeMode(mode.switchLanguage()) }
+    }
 
     init {
-        onModeChange(numericMode)
+        onModeChange(mode)
+    }
+
+    private fun changeMode(newMode: ClassicKeypadMode) {
+        mode = newMode
+        previousTap = null
+        onModeChange(mode)
     }
 
     fun input(digit: Char) {
         if (digit == '#' && !numericField) {
-            numericMode = !numericMode
-            previousTap = null
-            onModeChange(numericMode)
+            changeMode(mode.next())
             return
         }
+
         val extracted = connection.getExtractedText(ExtractedTextRequest(), 0)
         val value = extracted?.text?.toString()
         if (
@@ -117,11 +130,12 @@ private class ManualKeypadInput(
             currentValue = value,
             digit = digit,
             fieldKey = "focused-field",
-            numericMode = numericMode,
+            numericMode = mode == ClassicKeypadMode.NUMBERS,
             phoneNumberField = phoneNumberField,
             previousTap = previousTap,
             selectionStart = extracted.selectionStart,
             selectionEnd = extracted.selectionEnd,
+            mode = mode,
         )
         val start = nextTap?.replaceIndex
             ?: minOf(extracted.selectionStart, extracted.selectionEnd)

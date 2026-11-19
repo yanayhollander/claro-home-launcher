@@ -157,7 +157,7 @@ fun MenuOrderScreen(
 }
 
 @Composable
-private fun MoveButton(
+internal fun MoveButton(
     glyph: String,
     description: String,
     enabled: Boolean,

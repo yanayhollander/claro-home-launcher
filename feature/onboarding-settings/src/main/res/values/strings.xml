@@ -42,7 +42,7 @@
     <string name="onb_show_apps_tile">Show Apps on Home</string>
     <string name="onb_show_app_on_home">Show %1$s on Home</string>
     <string name="onb_settings_access">Settings access</string>
-    <string name="onb_step_people_and_speed_dial">Home tiles and speed dial</string>
+    <string name="onb_step_people_and_speed_dial">Home tiles</string>
     <string name="onb_sos_contact_title">SOS contact</string>
     <string name="onb_step_permissions_and_roles">Permissions and roles</string>
     <string name="onb_step_setup_complete">Setup complete</string>
@@ -101,11 +101,11 @@
     <string name="onb_confirm_new_pin_label">Confirm new PIN</string>
     <string name="onb_recover_pin_lost_both_warning">Lost both the PIN and recovery secret? Reset Claro in Android app settings. Local Claro preferences and drafts are cleared; Android contacts, SMS and photos stay.</string>
 
-    <string name="onb_open_contacts_and_speed_dial">Open contacts &amp; speed dial</string>
-    <string name="onb_people_setup_body">Choose what appears on Home — contacts, apps, SOS, alarm clock and more (up to 12 tiles) — and optional Hold 1 / Hold 2 keys. Everything here is optional.</string>
+    <string name="onb_open_contacts_and_speed_dial">Open Home tiles</string>
+    <string name="onb_people_setup_body">Choose what appears on Home — contacts, apps, SOS, alarm clock and more. Everything here is optional.</string>
     <string name="onb_speed_dial_assigned">assigned</string>
     <string name="onb_speed_dial_not_set">not set</string>
-    <string name="onb_people_setup_status_configured" tools:ignore="PluralsCandidate">%1$d of 12 Home tiles configured. Hold 1: %2$s · Hold 2: %3$s.</string>
+    <string name="onb_people_setup_status_configured" tools:ignore="PluralsCandidate">Home tiles configured: %1$d.</string>
     <string name="onb_people_setup_hold_note">Holding 1 or 2 places a call immediately without an extra confirmation screen.</string>
 
     <string name="onb_configure_trusted_person">Configure trusted person</string>
@@ -139,8 +139,8 @@
     <string name="onb_home_and_apps_subtitle">Choose which apps are allowed and shown in the Menu</string>
     <string name="onb_menu_order_title">Menu order</string>
     <string name="onb_menu_order_subtitle">Choose where each item appears in the Menu</string>
-    <string name="onb_people_and_speed_dial_amp_title">Home tiles &amp; speed dial</string>
-    <string name="onb_people_configured_short" tools:ignore="PluralsCandidate">%1$d/12 Home tiles configured</string>
+    <string name="onb_people_and_speed_dial_amp_title">Home tiles</string>
+    <string name="onb_people_configured_short" tools:ignore="PluralsCandidate">Home tiles configured: %1$d</string>
     <string name="onb_language_and_display_amp_title">Language &amp; display</string>
     <string name="onb_sos_subtitle_configured">Trusted person agreed · test separate</string>
     <string name="onb_sos_subtitle_not_configured">Not configured</string>

@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+usage() {
+    cat <<'EOF'
+Usage:
+  scripts/android-local jvm [<:module> <class-or-method-pattern>]
+  scripts/android-local lint
+  scripts/android-local ui [--device <serial>] [--class <class[#method]>]
+  scripts/android-local all [--device <serial>]
+  scripts/android-local internal [--device <serial>]
+
+Device commands require --device or ANDROID_SERIAL for a designated test device.
+internal requires CLARO_UPLOAD_KEYSTORE and CLARO_UPLOAD_KEY_ALIAS. It runs the
+full suite, then builds and signs a release bundle for manual Play Console upload.
+EOF
+}
+
+fail() {
+    printf 'Error: %s\n' "$*" >&2
+    exit 1
+}
+
+mode=${1:-}
+case "$mode" in
+    -h|--help) usage; exit 0 ;;
+    jvm|lint|ui|all|internal) shift ;;
+    *) usage >&2; exit 2 ;;
+esac
+
+device=${ANDROID_SERIAL:-}
+test_class=
+check_device() {
+    [[ -n "$device" && "$device" != *","* && "$device" != *[[:space:]]* ]] ||
+        fail "Select one designated test device with --device or ANDROID_SERIAL."
+    local sdk=${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}
+    local adb=adb
+    if [[ -n "$sdk" && -x "$sdk/platform-tools/adb" ]]; then
+        adb="$sdk/platform-tools/adb"
+    fi
+    command -v "$adb" >/dev/null || fail "Add Android SDK platform-tools to PATH or set ANDROID_HOME."
+    local state boot api
+    state=$("$adb" -s "$device" get-state) && [[ "$state" == device ]] ||
+        fail "Test device '$device' is not online and authorized."
+    boot=$("$adb" -s "$device" shell getprop sys.boot_completed | tr -d '\r') &&
+        [[ "$boot" == 1 ]] || fail "Test device '$device' has not finished booting."
+    api=$("$adb" -s "$device" shell getprop ro.build.version.sdk | tr -d '\r') &&
+        [[ "$api" =~ ^[0-9]+$ && "$api" -ge 29 ]] ||
+        fail "Test device '$device' must run Android 10 (API 29) or newer."
+}
+
+run_ui() {
+    local args=(-Pclaro.localInstrumentation=true connectedDebugAndroidTest)
+    if [[ -n "$test_class" ]]; then
+        args+=("-Pandroid.testInstrumentationRunnerArguments.class=$test_class")
+    fi
+    ANDROID_SERIAL="$device" ./gradlew "${args[@]}"
+}
+
+run_all() {
+    ./gradlew :app:assembleDebug test lint
+    run_ui
+}
+
+prepare_internal() {
+    : "${CLARO_UPLOAD_KEYSTORE:?Set CLARO_UPLOAD_KEYSTORE to the Play upload keystore path.}"
+    : "${CLARO_UPLOAD_KEY_ALIAS:?Set CLARO_UPLOAD_KEY_ALIAS to the Play upload key alias.}"
+    [[ -f "$CLARO_UPLOAD_KEYSTORE" && -r "$CLARO_UPLOAD_KEYSTORE" ]] ||
+        fail "The Play upload keystore is not a readable file."
+    local jarsigner=jarsigner
+    if [[ -n "${JAVA_HOME:-}" ]]; then
+        jarsigner="$JAVA_HOME/bin/jarsigner"
+    fi
+    command -v "$jarsigner" >/dev/null || fail "Use a JDK with jarsigner."
+
+    run_all
+    ./gradlew :app:bundleRelease
+
+    local unsigned=app/build/outputs/bundle/release/app-release.aab
+    [[ -f "$unsigned" ]] || fail "Gradle did not produce the release bundle at $unsigned."
+    local result_root=app/build/outputs/internal-testing
+    mkdir -p "$result_root"
+    local candidate
+    candidate=$(mktemp -d "$result_root/candidate.XXXXXXXX")
+    local bundle="$candidate/claro-internal.aab"
+    if ! "$jarsigner" -keystore "$CLARO_UPLOAD_KEYSTORE" \
+        -signedjar "$bundle" "$unsigned" "$CLARO_UPLOAD_KEY_ALIAS" ||
+        ! "$jarsigner" -verify "$bundle"; then
+        rm -f -- "$bundle"
+        rmdir -- "$candidate"
+        fail "Signing or signature verification failed; do not upload this build."
+    fi
+    printf '\nValidated and signed for manual Play Console Internal Testing upload:\n%s/%s\n' "$PWD" "$bundle"
+}
+
+case "$mode" in
+    jvm)
+        if [[ $# -eq 0 ]]; then
+            exec ./gradlew test
+        fi
+        [[ $# -eq 2 && "$1" =~ ^(:[a-zA-Z0-9_-]+)+$ && -n "$2" ]] ||
+            fail "Use jvm with no arguments, or provide both <:module> and <class-or-method-pattern>."
+        exec ./gradlew "$1:testDebugUnitTest" --tests "$2"
+        ;;
+    lint)
+        [[ $# -eq 0 ]] || fail "lint does not accept additional arguments."
+        exec ./gradlew lint
+        ;;
+    ui|all|internal)
+        while [[ $# -gt 0 ]]; do
+            case "$1" in
+                --device)
+                    [[ $# -ge 2 && -n "$2" && "$2" != --* ]] || fail "Provide a serial after --device."
+                    device=$2
+                    ;;
+                --class)
+                    [[ "$mode" == ui && $# -ge 2 && -n "$2" && "$2" != --* ]] ||
+                        fail "--class requires a class or class#method and is only supported for ui."
+                    test_class=$2
+                    ;;
+                *) fail "Unknown argument: $1" ;;
+            esac
+            shift 2
+        done
+        check_device
+        case "$mode" in
+            ui) run_ui ;;
+            all) run_all ;;
+            internal) prepare_internal ;;
+        esac
+        ;;
+esac

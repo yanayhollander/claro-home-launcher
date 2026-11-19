@@ -155,6 +155,7 @@ data class ContactPage(
 data class ContactMutation(
     val displayName: String,
     val numbers: List<ContactNumber>,
+    // Null leaves an existing photo unchanged.
     val photoUri: String? = null,
 )
 
@@ -300,6 +301,7 @@ data class PhoneSavedState(
     val pendingIdentity: CallerIdentity? = null,
     val contactQuery: String = "",
     val selectedContactLookupKey: String? = null,
+    val contactsOpenedFromDialer: Boolean = false,
 )
 
 data class CommunicationUiState(
@@ -322,6 +324,7 @@ data class CommunicationUiState(
     val dialerMatchesLoading: Boolean = false,
     val dialerSearchGeneration: Long = 0,
     val showMissedCalls: Boolean = false,
+    val contactsOpenedFromDialer: Boolean = false,
 ) {
     val missedIncomingCount: Int?
         get() = if (!qualification.roleHeld || !qualification.callLogPermissionGranted) {
@@ -434,6 +437,7 @@ class PhoneContactsCoordinator(
             pendingIdentity = savedState.pendingIdentity,
             qualification = roleGateway.qualification.value,
             contactQuery = savedState.contactQuery,
+            contactsOpenedFromDialer = savedState.contactsOpenedFromDialer,
         ),
     )
     val state: StateFlow<CommunicationUiState> = mutableState.asStateFlow()
@@ -524,6 +528,7 @@ class PhoneContactsCoordinator(
         pendingIdentity = state.value.pendingIdentity,
         contactQuery = state.value.contactQuery,
         selectedContactLookupKey = state.value.selectedContact?.lookupKey,
+        contactsOpenedFromDialer = state.value.contactsOpenedFromDialer,
     )
 
     suspend fun refreshHistory() = historyStore.refresh()
@@ -554,6 +559,7 @@ class PhoneContactsCoordinator(
                 digits = "",
                 dialerSearchGeneration = dialerSearchGeneration + 1,
                 showMissedCalls = showMissedCalls,
+                contactsOpenedFromDialer = false,
                 pendingIdentity = null,
                 call = null,
                 failure = null,
@@ -564,8 +570,30 @@ class PhoneContactsCoordinator(
         }
     }
 
-    fun openContacts() {
-        update { copy(route = CommunicationRoute.CONTACTS, failure = null, message = null) }
+    fun openContacts(fromDialer: Boolean? = null) = update {
+        copy(
+            route = CommunicationRoute.CONTACTS,
+            contactsOpenedFromDialer = fromDialer ?: when (route) {
+                CommunicationRoute.CONTACTS, CommunicationRoute.CONTACT_DETAIL -> contactsOpenedFromDialer
+                else -> false
+            },
+            failure = null,
+            message = null,
+        )
+    }
+
+    fun returnFromContactsToDialer() = update {
+        if (route == CommunicationRoute.CONTACTS && contactsOpenedFromDialer) {
+            copy(
+                route = CommunicationRoute.DIALER,
+                contactsOpenedFromDialer = false,
+                selectedContact = null,
+                failure = null,
+                message = null,
+            )
+        } else {
+            this
+        }
     }
 
     fun returnToActiveCall() {
@@ -583,9 +611,10 @@ class PhoneContactsCoordinator(
     }
 
     fun inputDigit(digit: Char) {
-        if (digit !in "0123456789*#") return
+        if (digit !in "0123456789*#+") return
         val current = state.value
         if (current.awaitingOutgoingCall) return
+        if (digit == '+' && (current.hasActiveCall || current.digits.isNotEmpty())) return
         val active = current.call
         if (active != null && active.phase in setOf(CallPhase.CONNECTED, CallPhase.ON_HOLD)) {
             if (active.capabilities.canSendDtmf) {

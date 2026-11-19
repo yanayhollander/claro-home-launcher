@@ -20,6 +20,14 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    buildTypes {
+        debug {
+            if (providers.gradleProperty("claro.localInstrumentation").orNull == "true") {
+                applicationIdSuffix = ".localtest"
+            }
+        }
+    }
+
     buildFeatures { compose = true }
     bundle {
         language {

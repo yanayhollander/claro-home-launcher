@@ -1126,8 +1126,6 @@ private fun PeopleSetupStep(
     onBack: () -> Unit,
 ) {
     val assigned = preferences.onboarding.favoriteSlotsAssigned
-    val speedOne = preferences.onboarding.speedDialOneAssigned
-    val speedTwo = preferences.onboarding.speedDialTwoAssigned
 
     OnboardingStepScaffold(
         title = OnboardingStep.PEOPLE_AND_SPEED_DIAL.title(),
@@ -1152,27 +1150,12 @@ private fun PeopleSetupStep(
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.padding(horizontal = 4.dp),
         )
-        val speedOneStatus = stringResource(
-            if (speedOne) R.string.onb_speed_dial_assigned else R.string.onb_speed_dial_not_set,
-        )
-        val speedTwoStatus = stringResource(
-            if (speedTwo) R.string.onb_speed_dial_assigned else R.string.onb_speed_dial_not_set,
-        )
         ClaroInfoCard(
             text = stringResource(
                 R.string.onb_people_setup_status_configured,
                 assigned,
-                speedOneStatus,
-                speedTwoStatus,
             ),
             tone = ClaroBannerTone.INFO,
-        )
-        Text(
-            text = stringResource(R.string.onb_people_setup_hold_note),
-            color = ClaroColors.Muted,
-            fontSize = 18.sp,
-            lineHeight = 23.sp,
-            modifier = Modifier.padding(horizontal = 4.dp),
         )
     }
 }

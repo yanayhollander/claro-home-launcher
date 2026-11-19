@@ -74,6 +74,7 @@
     <string name="touch_number_label_other">Other</string>
     <string name="touch_edit_contact_title">Edit contact</string>
     <string name="touch_add_contact_title">Add contact</string>
+    <string name="touch_delete_contact_title">Delete contact</string>
     <string name="touch_field_name">Name</string>
     <string name="touch_field_mobile_number">Mobile number</string>
     <string name="touch_field_other_number_optional">Other number (optional)</string>

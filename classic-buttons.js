@@ -2,7 +2,7 @@
 (() => {
   "use strict";
   const layouts = [
-    ["classic", "A. Classic", "Compact: softkeys and call keys flank one connected navigation pad."],
+    ["classic", "A. Classic", "Current app: Back/Menu and Call/Home flank Up, wide OK and Down."],
     ["wide", "B. Wide softkeys", "Full-width Back / Confirm row above navigation, with call keys beside the pad."],
     ["lower", "C. Softkeys below", "Back / Confirm nearest the number keys; call keys flank navigation above."],
     ["stacked", "D. Integrated pad", "Wide corner keys with arrows fitted between them, saving a separate navigation row."]

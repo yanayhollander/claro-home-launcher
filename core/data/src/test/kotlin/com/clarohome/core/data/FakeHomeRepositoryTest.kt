@@ -2,7 +2,7 @@ package com.clarohome.core.data
 
 import app.cash.turbine.test
 import com.clarohome.core.model.BadgeValue
-import com.clarohome.core.model.HOME_SLOT_COUNT
+import com.clarohome.core.model.LEGACY_HOME_SLOT_COUNT
 import com.clarohome.core.model.HomeRoleState
 import com.clarohome.core.model.HomeTileKind
 import com.clarohome.core.model.optionalHomeTileKinds
@@ -13,6 +13,56 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
 class LocalHomeRepositoryTest {
+    @Test
+    fun widgetInstancesPersistIndependentlyWithoutAllowlistingTheirApp() = runTest {
+        val store = InMemoryHomeSlotStore()
+        val repository = LocalHomeRepository(store)
+        repository.setInstalledApps(
+            listOf(com.clarohome.core.model.InstalledApp("com.example.gate", "Gate", false)),
+        )
+        for ((slot, id) in listOf(8 to 41, 9 to 42)) {
+            repository.setHomeSlot(
+                slot,
+                homeSlotTile(
+                    slot, HomeTileKind.WIDGET, "Gate widget",
+                    appWidgetId = id,
+                    appWidgetProvider = "com.example.gate/.GateWidget",
+                ),
+            )
+        }
+        val restored = LocalHomeRepository(store)
+        restored.setInstalledApps(
+            listOf(com.clarohome.core.model.InstalledApp("com.example.gate", "Gate", false)),
+        )
+        val home = restored.home.first()
+        assertThat(home.homeSlots[8]?.appWidgetId).isEqualTo(41)
+        assertThat(home.homeSlots[9]?.appWidgetId).isEqualTo(42)
+        assertThat(home.homeSlots[8]?.appWidgetProvider).isEqualTo("com.example.gate/.GateWidget")
+        assertThat(home.installedApps.single().isAllowed).isFalse()
+        assertThat(home.installedApps.single().isOnHome).isFalse()
+        assertThat(home.tiles.any { it.kind == HomeTileKind.WIDGET }).isFalse()
+    }
+
+    @Test
+    fun movingAWidgetDoesNotDuplicateItsHostIdAndReplacingItClearsMetadata() = runTest {
+        val store = InMemoryHomeSlotStore()
+        val repository = LocalHomeRepository(store)
+        val widget = homeSlotTile(
+            8, HomeTileKind.WIDGET, "Gate widget",
+            appWidgetId = 41,
+            appWidgetProvider = "com.example.gate/.GateWidget",
+        )
+        repository.setHomeSlot(8, widget)
+        repository.setHomeSlot(9, widget)
+        assertThat(repository.home.first().homeSlots[8]).isNull()
+        assertThat(repository.home.first().homeSlots[9]?.appWidgetId).isEqualTo(41)
+        repository.setHomeSlot(9, homeSlotTile(9, HomeTileKind.ALARM, "Alarm"))
+        val tile = LocalHomeRepository(store).home.first().homeSlots[9]
+        assertThat(tile?.kind).isEqualTo(HomeTileKind.ALARM)
+        assertThat(tile?.appWidgetId).isNull()
+        assertThat(tile?.appWidgetProvider).isNull()
+    }
+
     @Test
     fun installedSocialHomeTileAndPolicyPersistAndHidingKeepsAppAllowed() = runTest {
         val store = InMemoryHomeSlotStore()
@@ -38,18 +88,20 @@ class LocalHomeRepositoryTest {
     }
 
     @Test
-    fun addingSocialAppToFullHomeDoesNotChangeAllowlistOrReplaceATile() = runTest {
+    fun addingSocialAppAfterLegacySlotsAppendsWithoutReplacingATile() = runTest {
         val repository = LocalHomeRepository(InMemoryHomeSlotStore())
         repository.setInstalledApps(
             listOf(com.clarohome.core.model.InstalledApp("com.facebook.katana", "Facebook", false)),
         )
-        repeat(HOME_SLOT_COUNT) { slot ->
+        repeat(LEGACY_HOME_SLOT_COUNT) { slot ->
             repository.setHomeSlot(slot, homeSlotTile(slot, HomeTileKind.CONTACT, "Person $slot"))
         }
         val original = repository.home.first()
         assertThat(repository.setInstalledAppHomeTile("com.facebook.katana", true))
-            .isEqualTo(HomeTileVisibilityResult.HOME_FULL)
-        assertThat(repository.home.first()).isEqualTo(original)
+            .isEqualTo(HomeTileVisibilityResult.APPLIED)
+        val updated = repository.home.first()
+        assertThat(updated.homeTiles.dropLast(1)).isEqualTo(original.homeTiles)
+        assertThat(updated.homeTiles.last().packageName).isEqualTo("com.facebook.katana")
     }
 
     @Test
@@ -97,9 +149,10 @@ class LocalHomeRepositoryTest {
     }
 
     @Test
-    fun enablingMissingTileOnFullHomeDoesNotReplaceAnExistingTile() = runTest {
-        val repository = LocalHomeRepository(InMemoryHomeSlotStore())
-        repeat(HOME_SLOT_COUNT) { slot ->
+    fun tilesBeyondLegacySlotsSurviveRecreationWithoutReplacingExistingTiles() = runTest {
+        val store = InMemoryHomeSlotStore()
+        val repository = LocalHomeRepository(store)
+        repeat(LEGACY_HOME_SLOT_COUNT + 3) { slot ->
             repository.setHomeSlot(
                 slot,
                 homeSlotTile(slot, HomeTileKind.CONTACT, "Person $slot", phoneNumber = "+1555010$slot"),
@@ -108,8 +161,33 @@ class LocalHomeRepositoryTest {
         val original = repository.home.first()
 
         assertThat(repository.setHomeTileVisibility(HomeTileKind.MESSAGES, true))
-            .isEqualTo(HomeTileVisibilityResult.HOME_FULL)
-        assertThat(repository.home.first()).isEqualTo(original)
+            .isEqualTo(HomeTileVisibilityResult.APPLIED)
+        val restored = LocalHomeRepository(store).home.first()
+        assertThat(restored.homeTiles.dropLast(1)).isEqualTo(original.homeTiles)
+        assertThat(restored.homeTiles.last().kind).isEqualTo(HomeTileKind.MESSAGES)
+    }
+
+    @Test
+    fun movingHomeTilesSkipsEmptySlotsAndPersistsWidgetAndShortcutInOrder() = runTest {
+        val store = InMemoryHomeSlotStore()
+        val repository = LocalHomeRepository(store)
+        val slot = LEGACY_HOME_SLOT_COUNT + 2
+        val widget = homeSlotTile(slot, HomeTileKind.WIDGET, "Clock", appWidgetId = 41)
+        repository.setHomeSlot(slot, widget)
+        val before = repository.home.first()
+
+        repository.moveHomeTile(slot, moveUp = true)
+        val restored = LocalHomeRepository(store).home.first()
+        assertThat(restored.homeTiles.dropLast(2)).isEqualTo(before.homeTiles.dropLast(2))
+        assertThat(restored.homeTiles.takeLast(2).map { it.kind })
+            .containsExactly(HomeTileKind.WIDGET, HomeTileKind.APPS).inOrder()
+        assertThat(restored.homeSlots[4]?.appWidgetId).isEqualTo(41)
+        assertThat(restored.homeSlots[5]).isNull()
+        assertThat(restored.homeSlots[slot]?.id).isEqualTo("slot-$slot")
+        assertThat(restored.menuOrder).isEqualTo(before.menuOrder)
+
+        repository.moveHomeTile(slot, moveUp = false)
+        assertThat(repository.home.first().homeSlots).isEqualTo(restored.homeSlots)
     }
 
     @Test
@@ -127,7 +205,7 @@ class LocalHomeRepositoryTest {
     fun initialHomeHasEssentialsWithoutMessagesAndKeepsSixMenuTiles() = runTest {
         LocalHomeRepository(InMemoryHomeSlotStore()).home.test {
             val home = awaitItem()
-            assertThat(home.homeSlots).hasSize(HOME_SLOT_COUNT)
+            assertThat(home.homeSlots).hasSize(LEGACY_HOME_SLOT_COUNT)
             assertThat(home.homeTiles.map { it.kind }).containsExactly(
                 HomeTileKind.PHONE,
                 HomeTileKind.CAMERA,

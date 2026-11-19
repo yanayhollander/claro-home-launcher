@@ -136,7 +136,7 @@ class FakeContactsGateway(
         val current = values[lookupKey] ?: return ContactWriteResult.Failed("Missing")
         values[lookupKey] = current.copy(
             displayName = mutation.displayName,
-            photoUri = mutation.photoUri,
+            photoUri = mutation.photoUri ?: current.photoUri,
             numbers = mutation.numbers,
         )
         return ContactWriteResult.Saved(lookupKey)

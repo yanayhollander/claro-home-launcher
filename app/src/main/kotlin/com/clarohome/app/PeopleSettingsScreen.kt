@@ -1,19 +1,14 @@
 package com.clarohome.app
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,15 +20,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.clarohome.core.design.ClaroAppIcon
 import com.clarohome.core.design.ClaroAvatar
 import com.clarohome.core.design.ClaroBannerTone
 import com.clarohome.core.design.ClaroColors
-import com.clarohome.core.design.claroFocusRing
 import com.clarohome.core.design.ClaroDimensions
 import com.clarohome.core.design.ClaroIcon
 import com.clarohome.core.design.ClaroIconKind
@@ -44,16 +36,12 @@ import com.clarohome.core.design.ClaroScreenScaffold
 import com.clarohome.core.design.ClaroSecondaryButton
 import com.clarohome.core.design.ClaroSoftkey
 import com.clarohome.core.data.homeSlotTile
-import com.clarohome.core.model.HOME_SLOT_COUNT
 import com.clarohome.core.model.HomeTile
 import com.clarohome.core.model.HomeTileKind
 import com.clarohome.core.model.InstalledApp
 import com.clarohome.feature.communication.ClaroContact
-import com.clarohome.feature.onboarding.settings.HomeTileVisibilityFields
 import com.clarohome.feature.communication.ContactNumber
 import com.clarohome.feature.communication.PhoneAssignment
-
-private const val SLOT_COLUMNS = 3
 
 private val shortcutKinds = listOf(
     HomeTileKind.PHONE,
@@ -74,29 +62,28 @@ fun PeopleSettingsScreen(
     onLoadContacts: () -> Unit,
     onSetSlot: (Int, HomeTile) -> Unit,
     onClearSlot: (Int) -> Unit,
+    onMoveTile: (slot: Int, moveUp: Boolean) -> Unit,
     onSetKey: (String, ClaroContact, ContactNumber) -> Unit,
     onClearKey: (String) -> Unit,
     onBack: () -> Unit,
-    onHomeTileVisibility: (HomeTileKind, Boolean) -> Unit,
-    onInstalledAppVisibility: (String, Boolean) -> Unit,
     message: String? = null,
+    onChooseWidget: ((Int) -> Unit)? = null,
 ) {
     var target by rememberSaveable { mutableStateOf<String?>(null) }
     val picking = target
     if (picking == null) {
-        PeopleGridScreen(
+        HomeTilesEditor(
             homeSlots = homeSlots,
-            assignments = assignments,
             onPick = { target = it },
+            onMoveTile = onMoveTile,
             onBack = onBack,
-            onHomeTileVisibility = onHomeTileVisibility,
             message = message,
-            installedApps = installedApps,
-            onInstalledAppVisibility = onInstalledAppVisibility,
         )
     } else {
         PeoplePickerScreen(
             target = picking,
+            homeSlots = homeSlots,
+            assignments = assignments,
             installedApps = installedApps,
             contacts = contacts,
             onLoadContacts = onLoadContacts,
@@ -117,22 +104,27 @@ fun PeopleSettingsScreen(
                 target = null
             },
             onCancel = { target = null },
+            onChooseWidget = onChooseWidget?.let { choose ->
+                { slot ->
+                    target = null
+                    choose(slot)
+                }
+            },
         )
     }
 }
 
 @Composable
-private fun PeopleGridScreen(
+private fun HomeTilesEditor(
     homeSlots: List<HomeTile?>,
-    assignments: List<PhoneAssignment>,
     onPick: (String) -> Unit,
+    onMoveTile: (slot: Int, moveUp: Boolean) -> Unit,
     onBack: () -> Unit,
-    onHomeTileVisibility: (HomeTileKind, Boolean) -> Unit,
     message: String?,
-    installedApps: List<InstalledApp>,
-    onInstalledAppVisibility: (String, Boolean) -> Unit,
 ) {
     BackHandler(onBack = onBack)
+    val tiles = homeSlots.mapIndexedNotNull { slot, tile -> tile?.let { slot to it } }
+    val nextSlot = (tiles.lastOrNull()?.first ?: -1) + 1
 
     ClaroScreenScaffold(
         title = stringResource(R.string.app_home_tiles_and_speed_dial),
@@ -153,77 +145,49 @@ private fun PeopleGridScreen(
                 .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
         ) {
-            item(key = "home-visibility") {
-                HomeTileVisibilityFields(
-                    homeTileKinds = homeSlots.filterNotNull().map { it.kind }.toSet(),
-                    onVisibilityChange = onHomeTileVisibility,
-                    installedApps = installedApps,
-                    homeAppPackages = homeSlots.mapNotNull { it?.packageName }.toSet(),
-                    onInstalledAppVisibility = onInstalledAppVisibility,
+            item(key = "add-tile") {
+                ClaroRowButton(
+                    title = stringResource(R.string.app_add_home_tile),
+                    subtitle = stringResource(R.string.app_add_home_tile_hint),
+                    leading = { ClaroIcon(ClaroIconKind.APPS, ClaroColors.Blue) },
+                    onClick = { onPick("home:$nextSlot") },
                 )
             }
-            items(HOME_SLOT_COUNT / SLOT_COLUMNS, key = { "slot-row-$it" }) { rowIndex ->
-                Row(horizontalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap)) {
-                    for (column in 0 until SLOT_COLUMNS) {
-                        val index = rowIndex * SLOT_COLUMNS + column
-                        SlotPickerCell(
-                            slot = index,
-                            tile = homeSlots.getOrNull(index),
-                            selected = false,
-                            modifier = Modifier.weight(1f),
-                            onClick = { onPick("home:$index") },
-                        )
-                    }
+            item(key = "home-heading") {
+                SectionTitle(stringResource(R.string.app_tiles_on_home))
+            }
+            if (tiles.isEmpty()) {
+                item(key = "empty-home") {
+                    ClaroInfoCard(stringResource(R.string.app_no_tiles_on_home))
                 }
             }
-            item(key = "keys") {
-                Row(horizontalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap)) {
-                    listOf("1", "2").forEach { slot ->
-                        val assignment = assignments.firstOrNull { it.slot == slot }
-                        val selected = false
-                        val assignedName = assignment?.displayNameSnapshot
-                            ?: stringResource(R.string.app_not_set)
-                        OutlinedButton(
-                            onClick = { onPick("key:$slot") },
-                            modifier = Modifier
-                                .weight(1f)
-                                .heightIn(min = ClaroDimensions.PrimaryTarget)
-                                .claroFocusRing(),
-                            shape = RoundedCornerShape(3.dp),
-                            border = BorderStroke(
-                                width = if (selected) 3.dp else 1.dp,
-                                color = if (selected) ClaroColors.Blue else ClaroColors.Border,
-                            ),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor =
-                                    if (selected) ClaroColors.PaleBlue else ClaroColors.Surface,
-                                contentColor = ClaroColors.Ink,
-                            ),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-                        ) {
-                            Text(
-                                text = stringResource(
-                                    R.string.app_speed_dial_hold_slot,
-                                    slot,
-                                    assignedName,
-                                ),
-                                fontSize = 18.sp,
-                                lineHeight = 22.sp,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
-                                textAlign = TextAlign.Center,
-                            )
-                        }
-                    }
+            itemsIndexed(tiles, key = { _, (slot, _) -> "tile-$slot" }) { index, (slot, tile) ->
+                val label = tile.editorLabel()
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
+                ) {
+                    ClaroRowButton(
+                        title = label,
+                        subtitle = tile.phoneNumber,
+                        leading = { TileEditorIcon(tile) },
+                        trailing = { ClaroIcon(ClaroIconKind.EDIT, ClaroColors.Muted, size = 22.dp) },
+                        onClick = { onPick("home:$slot") },
+                        modifier = Modifier.weight(1f),
+                    )
+                    MoveButton(
+                        glyph = "▲",
+                        description = stringResource(R.string.app_move_up, label),
+                        enabled = index > 0,
+                        onClick = { onMoveTile(slot, true) },
+                    )
+                    MoveButton(
+                        glyph = "▼",
+                        description = stringResource(R.string.app_move_down, label),
+                        enabled = index < tiles.lastIndex,
+                        onClick = { onMoveTile(slot, false) },
+                    )
                 }
-            }
-            item(key = "notice") {
-                Text(
-                    text = stringResource(R.string.app_speed_dial_immediate_notice),
-                    color = ClaroColors.Muted,
-                    fontSize = 16.sp,
-                    lineHeight = 20.sp,
-                    modifier = Modifier.padding(horizontal = 4.dp),
-                )
             }
         }
     }
@@ -232,6 +196,8 @@ private fun PeopleGridScreen(
 @Composable
 private fun PeoplePickerScreen(
     target: String,
+    homeSlots: List<HomeTile?>,
+    assignments: List<PhoneAssignment>,
     installedApps: List<InstalledApp>,
     contacts: List<ClaroContact>,
     onLoadContacts: () -> Unit,
@@ -240,10 +206,13 @@ private fun PeoplePickerScreen(
     onSetKey: (String, ClaroContact, ContactNumber) -> Unit,
     onClearKey: (String) -> Unit,
     onCancel: () -> Unit,
+    onChooseWidget: ((Int) -> Unit)?,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     val (targetKind, targetId) = target.split(':')
     val isHomeTarget = targetKind == "home"
+    val currentTile = if (isHomeTarget) homeSlots.getOrNull(targetId.toInt()) else null
+    val isAssigned = currentTile != null || (!isHomeTarget && assignments.any { it.slot == targetId })
     val trimmed = query.trim()
 
     val choices = contacts.flatMap { contact ->
@@ -257,16 +226,18 @@ private fun PeoplePickerScreen(
     val appChoices = installedApps
         .filter { it.isAvailable && it.label.contains(trimmed, ignoreCase = true) }
         .sortedBy { it.label.lowercase() }
-    val shortcuts = shortcutKinds.map { kind -> kind to stringResource(kind.shortcutLabelRes()) }
+    val shortcuts = shortcutKinds.filter { kind ->
+        homeSlots.none { it?.kind == kind } || currentTile?.kind == kind
+    }.map { kind -> kind to stringResource(kind.shortcutLabelRes()) }
         .filter { (_, label) -> label.contains(trimmed, ignoreCase = true) }
 
     BackHandler(onBack = onCancel)
 
     ClaroScreenScaffold(
-        title = if (isHomeTarget) {
-            stringResource(R.string.app_choose_for_tile, targetId.toInt() + 1)
-        } else {
-            stringResource(R.string.app_choose_for_key, targetId)
+        title = when {
+            currentTile != null -> stringResource(R.string.app_replace_home_tile)
+            isHomeTarget -> stringResource(R.string.app_add_home_tile)
+            else -> stringResource(R.string.app_choose_for_key, targetId)
         },
         scrollable = false,
         dockInSoftkeys = true,
@@ -284,13 +255,17 @@ private fun PeoplePickerScreen(
                 .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
         ) {
-            item(key = "clear") {
-                ClaroSecondaryButton(
-                    label = stringResource(R.string.app_clear_selected_slot),
-                    onClick = {
-                        if (isHomeTarget) onClearSlot(targetId.toInt()) else onClearKey(targetId)
-                    },
-                )
+            if (isAssigned) {
+                item(key = "clear") {
+                    ClaroSecondaryButton(
+                        label = stringResource(
+                            if (isHomeTarget) R.string.app_remove_home_tile else R.string.app_clear_selected_slot,
+                        ),
+                        onClick = {
+                            if (isHomeTarget) onClearSlot(targetId.toInt()) else onClearKey(targetId)
+                        },
+                    )
+                }
             }
             item(key = "search") {
                 OutlinedTextField(
@@ -300,6 +275,16 @@ private fun PeoplePickerScreen(
                     label = { Text(stringResource(R.string.app_search)) },
                     singleLine = true,
                 )
+            }
+            if (isHomeTarget && onChooseWidget != null) {
+                item(key = "widgets") {
+                    ClaroRowButton(
+                        title = stringResource(R.string.app_choose_widget),
+                        subtitle = stringResource(R.string.app_widget_picker_description),
+                        leading = { ClaroIcon(kind = ClaroIconKind.APPS, tint = ClaroColors.Blue, size = 32.dp) },
+                        onClick = { onChooseWidget(targetId.toInt()) },
+                    )
+                }
             }
 
             if (isHomeTarget && shortcuts.isNotEmpty()) {
@@ -374,7 +359,14 @@ private fun PeoplePickerScreen(
                     ClaroRowButton(
                         title = contact.displayName,
                         subtitle = "\u2066${number.label} · ${number.value}\u2069",
-                        leading = { ClaroAvatar(name = contact.displayName, size = 44.dp, photoUri = contact.photoUri) },
+                        leading = {
+                            ClaroAvatar(
+                                name = contact.displayName,
+                                size = 44.dp,
+                                photoUri = contact.photoUri,
+                                contactLookupKey = contact.lookupKey,
+                            )
+                        },
                         onClick = {
                             if (isHomeTarget) {
                                 onSetSlot(
@@ -411,56 +403,20 @@ private fun SectionTitle(text: String) {
 }
 
 @Composable
-private fun SlotPickerCell(
-    slot: Int,
-    tile: HomeTile?,
-    selected: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier = modifier.heightIn(min = 92.dp).claroFocusRing(),
-        shape = RoundedCornerShape(3.dp),
-        border = BorderStroke(
-            width = if (selected) 3.dp else 1.dp,
-            color = if (selected) ClaroColors.Blue else ClaroColors.Border,
-        ),
-        colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = if (selected) ClaroColors.PaleBlue else ClaroColors.Surface,
-            contentColor = ClaroColors.Ink,
-        ),
-        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            when (tile?.kind) {
-                null -> ClaroAvatar(name = null, size = 40.dp, isUnassigned = true)
-                HomeTileKind.INSTALLED_APP -> ClaroAppIcon(packageName = tile.packageName, size = 40.dp)
-                HomeTileKind.CONTACT -> ClaroAvatar(name = tile.label, size = 40.dp, photoUri = tile.photoUri)
-                else -> ClaroIcon(
-                    kind = tile.kind.settingsIconKind(),
-                    tint = ClaroColors.Blue,
-                    size = 36.dp,
-                )
-            }
-            Text(
-                text = when (tile?.kind) {
-                    null -> stringResource(R.string.app_home_slot, slot + 1)
-                    HomeTileKind.CONTACT, HomeTileKind.INSTALLED_APP -> tile.label
-                    else -> stringResource(tile.kind.shortcutLabelRes())
-                },
-                fontSize = 15.sp,
-                lineHeight = 18.sp,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+private fun TileEditorIcon(tile: HomeTile) {
+    when (tile.kind) {
+        HomeTileKind.INSTALLED_APP -> ClaroAppIcon(packageName = tile.packageName, size = 40.dp)
+        HomeTileKind.CONTACT -> ClaroAvatar(
+            name = tile.label, size = 40.dp, photoUri = tile.photoUri, contactNumber = tile.phoneNumber,
+        )
+        else -> ClaroIcon(tile.kind.settingsIconKind(), ClaroColors.Blue, size = 36.dp)
     }
+}
+
+@Composable
+private fun HomeTile.editorLabel(): String = when (kind) {
+    HomeTileKind.CONTACT, HomeTileKind.INSTALLED_APP, HomeTileKind.WIDGET -> label
+    else -> stringResource(kind.shortcutLabelRes())
 }
 
 private fun HomeTileKind.shortcutLabelRes(): Int = when (this) {
@@ -471,7 +427,7 @@ private fun HomeTileKind.shortcutLabelRes(): Int = when (this) {
     HomeTileKind.SOS -> R.string.app_sos
     HomeTileKind.APPS -> R.string.app_apps
     HomeTileKind.ALARM -> R.string.app_alarm_clock
-    HomeTileKind.CONTACT, HomeTileKind.INSTALLED_APP -> error("Not a built-in shortcut: $this")
+    HomeTileKind.CONTACT, HomeTileKind.INSTALLED_APP, HomeTileKind.WIDGET -> error("Not a built-in shortcut: $this")
 }
 
 private fun HomeTileKind.settingsIconKind(): ClaroIconKind = when (this) {
@@ -480,7 +436,7 @@ private fun HomeTileKind.settingsIconKind(): ClaroIconKind = when (this) {
     HomeTileKind.CAMERA -> ClaroIconKind.CAMERA
     HomeTileKind.GALLERY -> ClaroIconKind.GALLERY
     HomeTileKind.SOS -> ClaroIconKind.SOS
-    HomeTileKind.APPS, HomeTileKind.INSTALLED_APP -> ClaroIconKind.APPS
+    HomeTileKind.APPS, HomeTileKind.INSTALLED_APP, HomeTileKind.WIDGET -> ClaroIconKind.APPS
     HomeTileKind.CONTACT -> ClaroIconKind.CONTACT
     HomeTileKind.ALARM -> ClaroIconKind.CLOCK
 }

@@ -70,10 +70,12 @@ class CommunicationViewModel @Inject constructor(
     }
 
     fun openDialer(showMissedCalls: Boolean = false) = coordinator.openDialer(showMissedCalls)
-    fun openContacts() {
-        coordinator.openContacts()
+    fun openContacts(fromDialer: Boolean? = null) {
+        coordinator.openContacts(fromDialer)
         viewModelScope.launch { coordinator.loadContacts() }
     }
+
+    fun returnFromContactsToDialer() = coordinator.returnFromContactsToDialer()
 
     fun returnToActiveCall() = coordinator.returnToActiveCall()
     fun inputDigit(digit: Char) = coordinator.inputDigit(digit)
@@ -140,6 +142,7 @@ class CommunicationViewModel @Inject constructor(
         name: String,
         primaryNumber: String,
         secondaryNumber: String,
+        pickedPhotoUri: String?,
         onResult: (com.clarohome.feature.communication.ContactWriteResult) -> Unit,
     ) {
         viewModelScope.launch {
@@ -156,7 +159,7 @@ class CommunicationViewModel @Inject constructor(
             val mutation = com.clarohome.feature.communication.ContactMutation(
                 displayName = name.trim(),
                 numbers = numbers,
-                photoUri = existing?.photoUri,
+                photoUri = pickedPhotoUri,
             )
             val result = if (existingLookupKey == null) {
                 coordinator.addContact(mutation)
@@ -164,6 +167,11 @@ class CommunicationViewModel @Inject constructor(
                 coordinator.editContact(existingLookupKey, mutation)
             }
             if (result is com.clarohome.feature.communication.ContactWriteResult.Saved) {
+                if (existingLookupKey != null && state.value.selectedContact?.lookupKey == existingLookupKey &&
+                    state.value.route == CommunicationRoute.CONTACT_DETAIL
+                ) {
+                    coordinator.openContact(result.lookupKey)
+                }
                 coordinator.loadContacts(state.value.contactQuery, restart = true)
             }
             onResult(result)
@@ -211,6 +219,7 @@ class CommunicationViewModel @Inject constructor(
         },
         contactQuery = savedStateHandle[KEY_CONTACT_QUERY] ?: "",
         selectedContactLookupKey = savedStateHandle[KEY_SELECTED_CONTACT],
+        contactsOpenedFromDialer = savedStateHandle[KEY_CONTACTS_FROM_DIALER] ?: false,
     )
 
     private fun persist(state: PhoneSavedState) {
@@ -222,6 +231,7 @@ class CommunicationViewModel @Inject constructor(
         savedStateHandle[KEY_PENDING_PHOTO] = state.pendingIdentity?.photoUri
         savedStateHandle[KEY_CONTACT_QUERY] = state.contactQuery
         savedStateHandle[KEY_SELECTED_CONTACT] = state.selectedContactLookupKey
+        savedStateHandle[KEY_CONTACTS_FROM_DIALER] = state.contactsOpenedFromDialer
     }
 
     companion object {
@@ -233,5 +243,6 @@ class CommunicationViewModel @Inject constructor(
         private const val KEY_PENDING_PHOTO = "phone.pending.photo"
         private const val KEY_CONTACT_QUERY = "phone.contacts.query"
         private const val KEY_SELECTED_CONTACT = "phone.contacts.selected"
+        private const val KEY_CONTACTS_FROM_DIALER = "phone.contacts.fromDialer"
     }
 }

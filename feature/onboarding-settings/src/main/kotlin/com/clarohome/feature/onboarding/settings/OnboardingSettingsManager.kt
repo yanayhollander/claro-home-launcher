@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.SystemClock
 import android.provider.Settings
 import com.clarohome.core.domain.ClaroPreferencesRepository
-import com.clarohome.core.model.HOME_SLOT_COUNT
 import com.clarohome.core.model.AccessProtection
 import com.clarohome.core.model.AppLanguage
 import com.clarohome.core.model.CapabilityStatus
@@ -379,7 +378,7 @@ class OnboardingSettingsManager @Inject constructor(
 
     suspend fun updateHomeTileCount(count: Int) = update {
         it.copy(
-            onboarding = it.onboarding.copy(favoriteSlotsAssigned = count.coerceIn(0, HOME_SLOT_COUNT)),
+            onboarding = it.onboarding.copy(favoriteSlotsAssigned = count.coerceAtLeast(0)),
         )
     }
 
@@ -391,7 +390,7 @@ class OnboardingSettingsManager @Inject constructor(
     ) = update {
         it.copy(
             onboarding = it.onboarding.copy(
-                favoriteSlotsAssigned = favoriteSlotsAssigned.coerceIn(0, HOME_SLOT_COUNT),
+                favoriteSlotsAssigned = favoriteSlotsAssigned.coerceAtLeast(0),
                 speedDialOneAssigned = speedDialOneAssigned,
                 speedDialTwoAssigned = speedDialTwoAssigned,
                 sosRecipientAgreed = sosRecipientAgreed,

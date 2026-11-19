@@ -5,7 +5,13 @@
     <string name="app_back">חזרה</string>
     <string name="app_home">בית</string>
     <string name="app_default_apps_required">הגדירו את Claro כברירת המחדל למסך הבית, הטלפון וה-SMS לפני סיום ההגדרה.</string>
-    <string name="app_home_tiles_full">במסך הבית כבר יש 12 אריחים. הסירו אריח לפני הוספת אריח נוסף.</string>
+    <string name="app_add_home_tile">הוספת אריח</string>
+    <string name="app_add_home_tile_hint">בחרו איש קשר, אפליקציה, קיצור דרך או וידג׳ט</string>
+    <string name="app_tiles_on_home">במסך הבית</string>
+    <string name="app_no_tiles_on_home">אין עדיין אריחים במסך הבית. לחצו על הוספת אריח כדי להתחיל.</string>
+    <string name="app_speed_dial_heading">חיוג מהיר</string>
+    <string name="app_replace_home_tile">החלפת אריח</string>
+    <string name="app_remove_home_tile">הסרה ממסך הבית</string>
     <string name="app_menu">תפריט</string>
     <string name="app_call">שיחה</string>
     <string name="app_return_to_call">חזרה לשיחה</string>
@@ -143,7 +149,18 @@
     <string name="app_menu_order_hint">הזיזו פריטים למעלה או למטה. זה הסדר שבו הם מופיעים בתפריט.</string>
     <string name="app_move_up">הזזת %1$s למעלה</string>
     <string name="app_move_down">הזזת %1$s למטה</string>
-    <string name="app_home_tiles_and_speed_dial">אריחי מסך בית וחיוג מהיר</string>
+    <string name="app_home_tiles_and_speed_dial">אריחי מסך הבית</string>
     <string name="app_show_in_menu">הצגה בתפריט</string>
     <string name="app_unavailable_review_in_settings">%1$s חסרה או מושבתת. בקשו ממלווה לבדוק אותה בהגדרות.</string>
+    <string name="app_choose_widget">בחירת וידג׳ט</string>
+    <string name="app_widget_picker_description">הוספת וידג׳ט Android קטן לאריח במסך הבית.</string>
+    <string name="app_widget_compact_notice">וידג׳ט תופס אריח אחד (%1$d על %2$d dp). וידג׳טים גדולים יותר אינם זמינים לבחירה.</string>
+    <string name="app_widgets_none">לא נמצאו וידג׳טים מותקנים שמתאימים לחיפוש. יש להתקין אפליקציה עם וידג׳ט קטן או לשנות את החיפוש.</string>
+    <string name="app_widget_needs_larger_tile">דורש אריח גדול יותר</string>
+    <string name="app_widget_cancelled">הגדרת הווידג׳ט בוטלה. האריח הקודם לא השתנה.</string>
+    <string name="app_widget_setup_unavailable">לא ניתן להוסיף וידג׳ט זה. האריח הקודם לא השתנה.</string>
+    <string name="app_widget_unlock_required">יש לפתוח את ההגדרות לפני הוספת וידג׳ט.</string>
+    <string name="app_widget_setup_pending">יש לסיים או לבטל קודם את הגדרת הווידג׳ט הנוכחי.</string>
+    <string name="app_clock_widget">שעון Claro</string>
+    <string name="app_clock_widget_description">שעון ותאריך חיים בגודל קטן לאריח אחד במסך הבית.</string>
 </resources>

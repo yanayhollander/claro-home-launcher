@@ -29,7 +29,7 @@
     <string name="onb_show_apps_tile">Mostrar Aplicaciones en Inicio</string>
     <string name="onb_show_app_on_home">Mostrar %1$s en Inicio</string>
     <string name="onb_settings_access">Acceso a Configuración</string>
-    <string name="onb_step_people_and_speed_dial">Mosaicos de inicio y marcación rápida</string>
+    <string name="onb_step_people_and_speed_dial">Mosaicos de inicio</string>
     <string name="onb_sos_contact_title">Contacto SOS</string>
     <string name="onb_step_permissions_and_roles">Permisos y funciones</string>
     <string name="onb_step_setup_complete">Configuración completada</string>
@@ -88,11 +88,11 @@
     <string name="onb_confirm_new_pin_label">Confirmar nuevo PIN</string>
     <string name="onb_recover_pin_lost_both_warning">¿Perdiste tanto el PIN como la clave de recuperación? Restablece Claro en los ajustes de aplicaciones de Android. Se borrarán las preferencias locales y los borradores de Claro; tus contactos, SMS y fotos de Android se conservan.</string>
 
-    <string name="onb_open_contacts_and_speed_dial">Abrir contactos y marcación rápida</string>
-    <string name="onb_people_setup_body">Elige qué aparece en Inicio (contactos, aplicaciones, SOS, despertador y más, hasta 12 mosaicos) y, si quieres, las teclas rápidas 1 y 2. Todo es opcional.</string>
+    <string name="onb_open_contacts_and_speed_dial">Abrir mosaicos de inicio</string>
+    <string name="onb_people_setup_body">Elige qué aparece en Inicio (contactos, aplicaciones, SOS, despertador y más). Todo es opcional.</string>
     <string name="onb_speed_dial_assigned">asignado</string>
     <string name="onb_speed_dial_not_set">sin asignar</string>
-    <string name="onb_people_setup_status_configured">%1$d de 12 mosaicos de Inicio configurados. Mantener 1: %2$s · Mantener 2: %3$s.</string>
+    <string name="onb_people_setup_status_configured">Mosaicos de Inicio configurados: %1$d.</string>
     <string name="onb_people_setup_hold_note">Mantener pulsado 1 o 2 inicia la llamada de inmediato, sin pantalla de confirmación adicional.</string>
 
     <string name="onb_configure_trusted_person">Configurar persona de confianza</string>
@@ -126,8 +126,8 @@
     <string name="onb_home_and_apps_subtitle">Elige qué aplicaciones se permiten y se muestran en el Menú</string>
     <string name="onb_menu_order_title">Orden del menú</string>
     <string name="onb_menu_order_subtitle">Elige dónde aparece cada elemento en el menú</string>
-    <string name="onb_people_and_speed_dial_amp_title">Mosaicos de inicio y marcación rápida</string>
-    <string name="onb_people_configured_short">%1$d/12 mosaicos de Inicio configurados</string>
+    <string name="onb_people_and_speed_dial_amp_title">Mosaicos de inicio</string>
+    <string name="onb_people_configured_short">Mosaicos de Inicio configurados: %1$d</string>
     <string name="onb_language_and_display_amp_title">Idioma y pantalla</string>
     <string name="onb_sos_subtitle_configured">Persona de confianza aceptó · prueba aparte</string>
     <string name="onb_sos_subtitle_not_configured">Sin configurar</string>

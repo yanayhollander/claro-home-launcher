@@ -74,6 +74,7 @@
     <string name="touch_number_label_other">Otro</string>
     <string name="touch_edit_contact_title">Editar contacto</string>
     <string name="touch_add_contact_title">Añadir contacto</string>
+    <string name="touch_delete_contact_title">Eliminar contacto</string>
     <string name="touch_field_name">Nombre</string>
     <string name="touch_field_mobile_number">Número móvil</string>
     <string name="touch_field_other_number_optional">Otro número (opcional)</string>

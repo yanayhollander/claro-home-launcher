@@ -372,8 +372,6 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             message.value = when (homeRepository.setHomeTileVisibility(kind, visible)) {
                 HomeTileVisibilityResult.APPLIED -> null
-                HomeTileVisibilityResult.HOME_FULL ->
-                    localizedContext().getString(R.string.app_home_tiles_full)
                 HomeTileVisibilityResult.APP_UNAVAILABLE ->
                     localizedContext().getString(R.string.app_missing_or_disabled_notice)
             }
@@ -383,6 +381,12 @@ class MainViewModel @Inject constructor(
     fun clearHomeSlot(slot: Int) {
         viewModelScope.launch {
             homeRepository.clearHomeSlot(slot)
+        }
+    }
+
+    fun moveHomeTile(slot: Int, moveUp: Boolean) {
+        viewModelScope.launch {
+            homeRepository.moveHomeTile(slot, moveUp)
         }
     }
 
@@ -423,7 +427,6 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             message.value = when (homeRepository.setInstalledAppHomeTile(packageName, onHome)) {
                 HomeTileVisibilityResult.APPLIED -> null
-                HomeTileVisibilityResult.HOME_FULL -> localizedContext().getString(R.string.app_home_tiles_full)
                 HomeTileVisibilityResult.APP_UNAVAILABLE ->
                     localizedContext().getString(R.string.app_missing_or_disabled_notice)
             }

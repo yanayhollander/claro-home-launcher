@@ -33,6 +33,7 @@ interface HomeRepository {
     suspend fun setInstalledApps(apps: List<InstalledApp>)
     suspend fun setHomeSlot(slot: Int, tile: HomeTile)
     suspend fun clearHomeSlot(slot: Int)
+    suspend fun moveHomeTile(slot: Int, moveUp: Boolean)
     suspend fun setHomeTileVisibility(kind: HomeTileKind, visible: Boolean): HomeTileVisibilityResult
     suspend fun setInstalledAppHomeTile(packageName: String, visible: Boolean): HomeTileVisibilityResult
     suspend fun setMenuOrder(order: List<String>)
@@ -50,7 +51,6 @@ interface HomeRepository {
 
 enum class HomeTileVisibilityResult {
     APPLIED,
-    HOME_FULL,
     APP_UNAVAILABLE,
 }
 

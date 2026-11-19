@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="design_add_photo">Add photo</string>
+    <string name="design_change_photo">Change photo</string>
     <string name="design_unassigned_person">Add person</string>
     <string name="design_battery_percent" tools:ignore="PluralsCandidate">Battery %1$d percent</string>
     <string name="design_battery_percent_charging" tools:ignore="PluralsCandidate">Battery %1$d percent, charging</string>
@@ -8,4 +10,6 @@
     <string name="design_signal_no_service">Mobile signal: No signal</string>
     <string name="design_signal_airplane">Mobile signal: Airplane mode</string>
     <string name="design_signal_unknown">Mobile signal: Unknown</string>
+    <string name="claro_widget_unavailable">%1$s is unavailable. Choose another widget in Home settings.</string>
+    <string name="claro_widget_too_large">%1$s needs a larger tile. Choose another widget or phone style.</string>
 </resources>

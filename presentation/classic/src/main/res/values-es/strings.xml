@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="classic_open_keyboard">Abrir teclado</string>
+    <string name="classic_hold_for_language">Mantén: idioma</string>
+    <string name="classic_hold_for_plus">Mantén: +</string>
+    <string name="classic_switch_keyboard_language">Cambiar idioma del teclado</string>
     <string name="classic_hold_for_keyboard">Mantén: teclado</string>
     <string name="classic_ok">OK</string>
     <string name="classic_call">Llamar</string>
@@ -27,7 +30,8 @@
     <string name="classic_badge_new_count">%1$s, %2$d nuevos</string>
     <string name="classic_badge_unknown">%1$s, recuento no disponible, requiere reparación</string>
 
-    <string name="classic_mode_letters">Letras</string>
+    <string name="classic_mode_english">Inglés</string>
+    <string name="classic_mode_hebrew">Hebreo</string>
     <string name="classic_mode_numbers">Números</string>
     <string name="classic_delete_character">Borrar carácter</string>
     <string name="classic_clear_text">Borrar texto</string>

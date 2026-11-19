@@ -111,7 +111,7 @@ fun SafetyMediaAppsScreen(
     onLoadContacts: () -> Unit = {},
     onOpenProtectedSosSettings: () -> Unit = {},
     onRequestMediaAccess: () -> Unit = {},
-    onEmergencyDialer: () -> Unit = {},
+    onEmergencyDialer: (() -> Unit)? = null,
     hasActiveCall: Boolean = false,
     onReturnToCall: () -> Unit = {},
     onSearchContacts: (String) -> Unit = {},
@@ -187,7 +187,7 @@ internal fun SosScreen(
     onCancel: () -> Unit,
     remainingSeconds: (Long) -> Int,
     onOpenProtectedSosSettings: () -> Unit,
-    onEmergencyDialer: () -> Unit,
+    onEmergencyDialer: (() -> Unit)?,
     hasActiveCall: Boolean,
     onReturnToCall: () -> Unit,
 ) {
@@ -259,10 +259,12 @@ internal fun SosScreen(
                         icon = ClaroIconKind.CONTACT,
                     )
                 }
-                ClaroEmergencyButton(
-                    label = stringResource(R.string.app_emergency_call),
-                    onClick = onEmergencyDialer,
-                )
+                if (contact?.recipientConsented == true && onEmergencyDialer != null) {
+                    ClaroEmergencyButton(
+                        label = stringResource(R.string.app_emergency_call),
+                        onClick = onEmergencyDialer,
+                    )
+                }
             }
         },
     ) {
@@ -433,6 +435,7 @@ private fun SosRecipientCard(
         ClaroAvatar(
             name = displayName,
             photoUri = photoUri,
+            contactNumber = destination,
             size = 64.dp,
             modifier = Modifier.padding(10.dp),
         )
@@ -678,7 +681,14 @@ private fun SosContactPicker(
                     ClaroRowButton(
                         title = contact.displayName,
                         subtitle = "\u2066${number.label} · ${number.value}\u2069",
-                        leading = { ClaroAvatar(contact.displayName, photoUri = contact.photoUri, size = 44.dp) },
+                        leading = {
+                            ClaroAvatar(
+                                contact.displayName,
+                                photoUri = contact.photoUri,
+                                size = 44.dp,
+                                contactLookupKey = contact.lookupKey,
+                            )
+                        },
                         onClick = { onChoose(contact, number.value) },
                     )
                 }

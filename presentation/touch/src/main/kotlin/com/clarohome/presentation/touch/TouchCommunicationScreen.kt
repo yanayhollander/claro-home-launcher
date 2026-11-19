@@ -1,12 +1,12 @@
 package com.clarohome.presentation.touch
 
+import androidx.activity.compose.BackHandler
+
 import android.os.SystemClock
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,12 +26,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -66,10 +68,10 @@ import androidx.compose.ui.unit.sp
 import com.clarohome.core.design.claroFocusRing
 import com.clarohome.core.design.ClaroActionDock
 import com.clarohome.core.design.ClaroAvatar
+import com.clarohome.core.design.ClaroContactPhotoPicker
 import com.clarohome.core.design.ClaroBannerTone
 import com.clarohome.core.design.ClaroColors
 import com.clarohome.core.design.ClaroDimensions
-import com.clarohome.core.design.ClaroEmergencyButton
 import com.clarohome.core.design.ClaroHeader
 import com.clarohome.core.design.ClaroIcon
 import com.clarohome.core.design.ClaroIconKind
@@ -78,7 +80,6 @@ import com.clarohome.core.design.ClaroPrimaryButton
 import com.clarohome.core.design.ClaroRowButton
 import com.clarohome.core.design.ClaroSecondaryButton
 import com.clarohome.core.design.LocalClaroHaptics
-import com.clarohome.feature.communication.AssignmentStatus
 import com.clarohome.feature.communication.AudioRoute
 import com.clarohome.feature.communication.CallDirection
 import com.clarohome.feature.communication.CallFailure
@@ -115,7 +116,6 @@ fun TouchCommunicationScreen(
     onDigit: (Char) -> Unit,
     onBackspace: () -> Unit,
     onCallEnteredNumber: () -> Unit,
-    onDirectCall: (String) -> Unit,
     onOpenContacts: () -> Unit,
     onSearchContacts: (String) -> Unit,
     onLoadMoreContacts: () -> Unit,
@@ -134,9 +134,8 @@ fun TouchCommunicationScreen(
     onHome: () -> Unit,
     onOpenHistoryEntry: (String) -> Unit = {},
     onMessageNumber: (String, String?) -> Unit = { _, _ -> },
-    onEmergencyDialer: () -> Unit = {},
     canManageContacts: Boolean = false,
-    onSaveContact: (String?, String, String, String) -> Unit = { _, _, _, _ -> },
+    onSaveContact: (String?, String, String, String, String?) -> Unit = { _, _, _, _, _ -> },
     onDeleteContact: (String) -> Unit = {},
     onRequestUnlockForContacts: () -> Unit = {},
     onSelectDialerContact: (CallerIdentity) -> Unit = {},
@@ -148,6 +147,10 @@ fun TouchCommunicationScreen(
     var draftPrimaryNumber by rememberSaveable { mutableStateOf("") }
     var draftSecondaryNumber by rememberSaveable { mutableStateOf("") }
     var editorError by rememberSaveable { mutableStateOf<ContactEditorError?>(null) }
+    BackHandler(enabled = editorMode != null && canManageContacts) {
+        editorMode = null
+        editorError = null
+    }
 
     Column(
         modifier = Modifier
@@ -163,6 +166,7 @@ fun TouchCommunicationScreen(
                     name = draftName,
                     primaryNumber = draftPrimaryNumber,
                     secondaryNumber = draftSecondaryNumber,
+                    existingPhotoUri = editingContact?.photoUri,
                     errorMessage = editorError?.message(),
                     onNameChange = {
                         draftName = it
@@ -176,7 +180,7 @@ fun TouchCommunicationScreen(
                         draftSecondaryNumber = it
                         editorError = null
                     },
-                    onSave = {
+                    onSave = { photoUri ->
                         val trimmedName = draftName.trim()
                         val normalizedPrimary =
                             PhoneContactsCoordinator.normalizeDialString(draftPrimaryNumber)
@@ -197,6 +201,7 @@ fun TouchCommunicationScreen(
                                     trimmedName,
                                     draftPrimaryNumber.trim(),
                                     draftSecondaryNumber.trim(),
+                                    photoUri,
                                 )
                             }
                         }
@@ -213,10 +218,8 @@ fun TouchCommunicationScreen(
                 onDigit = onDigit,
                 onBackspace = onBackspace,
                 onCallEnteredNumber = onCallEnteredNumber,
-                onDirectCall = onDirectCall,
                 onOpenContacts = onOpenContacts,
                 onOpenHistoryEntry = onOpenHistoryEntry,
-                onEmergencyDialer = onEmergencyDialer,
                 onRepairPhone = onRepairPhone,
                 onSelectDialerContact = onSelectDialerContact,
             )
@@ -313,7 +316,6 @@ fun TouchCommunicationScreen(
                     )
                 },
                 onRepairPhone = onRepairPhone,
-                onEmergencyDialer = onEmergencyDialer,
                 onHome = onHome,
             )
 
@@ -349,10 +351,8 @@ private fun ColumnScope.TouchDialerRoute(
     onDigit: (Char) -> Unit,
     onBackspace: () -> Unit,
     onCallEnteredNumber: () -> Unit,
-    onDirectCall: (String) -> Unit,
     onOpenContacts: () -> Unit,
     onOpenHistoryEntry: (String) -> Unit,
-    onEmergencyDialer: () -> Unit,
     onRepairPhone: () -> Unit,
     onSelectDialerContact: (CallerIdentity) -> Unit,
 ) {
@@ -366,7 +366,13 @@ private fun ColumnScope.TouchDialerRoute(
         )
     }
 
-    ClaroHeader(title = stringResource(R.string.touch_tile_phone))
+    TouchPhoneHeader(title = stringResource(R.string.touch_tile_phone)) {
+        TouchPhoneHeaderAction(
+            label = stringResource(R.string.touch_contacts),
+            icon = ClaroIconKind.CONTACT,
+            onClick = onOpenContacts,
+        )
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -426,72 +432,18 @@ private fun ColumnScope.TouchDialerRoute(
                     )
                 }
             }
-            state.message?.let { message ->
-                ClaroInfoCard(text = localizedPhoneMessage(message, state.failure))
-            }
-            state.pendingIdentity?.let { identity ->
-                Row(
-                    modifier = Modifier.fillMaxWidth().testTag("touch-dialer-selected-contact"),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    ClaroAvatar(name = identity.displayName, photoUri = identity.photoUri, size = 48.dp)
-                    Text(
-                        text = identity.localizedCallerName(),
-                        color = ClaroColors.Ink,
-                        fontSize = 25.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-            }
             DialNumberDisplayRow(
                 digits = state.digits,
                 onBackspace = onBackspace,
             )
-            if (state.digits.isNotEmpty() && state.digits.all(Char::isDigit) && state.pendingIdentity == null) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = stringResource(R.string.touch_matching_contacts),
-                        color = ClaroColors.Ink,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
-                        if (state.dialerMatchesLoading) {
-                            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                        }
-                    }
-                }
-                state.dialerMatches.forEach { identity ->
-                    key(identity) {
-                        ClaroRowButton(
-                            title = identity.localizedCallerName(),
-                            subtitle = identity.number,
-                            leading = {
-                                ClaroAvatar(name = identity.displayName, photoUri = identity.photoUri, size = 44.dp)
-                            },
-                            onClick = { onSelectDialerContact(identity) },
-                        )
-                    }
-                }
+            DialKeypadGrid(onDigit = onDigit)
+            state.message?.let { message ->
+                ClaroInfoCard(text = localizedPhoneMessage(message, state.failure))
             }
-            SpeedDialShortcutBar(
-                state = state,
-                onDigit = onDigit,
-                onDirectCall = onDirectCall,
-            )
-            DialKeypadGrid(
-                state = state,
-                onDigit = onDigit,
-                onDirectCall = onDirectCall,
-            )
-            ClaroEmergencyButton(
-                label = stringResource(R.string.touch_emergency_call),
-                onClick = onEmergencyDialer,
+            DialerContactResults(
+                selectedContact = state.pendingIdentity,
+                matches = state.dialerMatches,
+                onSelectContact = onSelectDialerContact,
             )
         }
         ClaroActionDock {
@@ -500,11 +452,6 @@ private fun ColumnScope.TouchDialerRoute(
                 onClick = onCallEnteredNumber,
                 containerColor = ClaroColors.Green,
                 icon = ClaroIconKind.PHONE,
-            )
-            ClaroSecondaryButton(
-                label = stringResource(R.string.touch_contacts),
-                onClick = onOpenContacts,
-                icon = ClaroIconKind.CONTACT,
             )
         }
     } else {
@@ -564,6 +511,7 @@ private fun ColumnScope.TouchDialerRoute(
                                 isUnassigned = entry.identity.isPrivate ||
                                     entry.identity.displayName.isNullOrBlank(),
                                 photoUri = entry.identity.photoUri,
+                                contactNumber = entry.identity.number.takeUnless { entry.identity.isPrivate },
                             )
                         },
                         trailing = {
@@ -579,19 +527,58 @@ private fun ColumnScope.TouchDialerRoute(
                     )
                 }
             }
-            item(key = "history-emergency") {
-                ClaroEmergencyButton(
-                    label = stringResource(R.string.touch_emergency_call),
-                    onClick = onEmergencyDialer,
+        }
+    }
+}
+
+@Composable
+private fun DialerContactResults(
+    selectedContact: CallerIdentity?,
+    matches: List<CallerIdentity>,
+    onSelectContact: (CallerIdentity) -> Unit,
+) {
+    if (selectedContact != null) {
+        Row(
+            modifier = Modifier.fillMaxWidth().testTag("touch-dialer-selected-contact"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            ClaroAvatar(
+                name = selectedContact.displayName,
+                photoUri = selectedContact.photoUri,
+                contactNumber = selectedContact.number,
+                size = 48.dp,
+            )
+            Text(
+                text = selectedContact.localizedCallerName(),
+                color = ClaroColors.Ink,
+                fontSize = 25.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+    } else if (matches.isNotEmpty()) {
+        Text(
+            text = stringResource(R.string.touch_matching_contacts),
+            color = ClaroColors.Ink,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        matches.forEach { identity ->
+            key(identity) {
+                ClaroRowButton(
+                    title = identity.localizedCallerName(),
+                    subtitle = identity.number,
+                    leading = {
+                        ClaroAvatar(
+                            name = identity.displayName,
+                            photoUri = identity.photoUri,
+                            contactNumber = identity.number,
+                            size = 44.dp,
+                        )
+                    },
+                    onClick = { onSelectContact(identity) },
                 )
             }
-        }
-        ClaroActionDock {
-            ClaroSecondaryButton(
-                label = stringResource(R.string.touch_contacts),
-                onClick = onOpenContacts,
-                icon = ClaroIconKind.CONTACT,
-            )
         }
     }
 }
@@ -633,6 +620,8 @@ private fun DialNumberDisplayRow(
                     lineHeight = 40.sp,
                     fontWeight = FontWeight.Normal,
                     textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             } else {
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
@@ -643,6 +632,8 @@ private fun DialNumberDisplayRow(
                         lineHeight = 40.sp,
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.StartEllipsis,
                     )
                 }
             }
@@ -677,82 +668,9 @@ private fun DialNumberDisplayRow(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun SpeedDialShortcutBar(
-    state: CommunicationUiState,
-    onDigit: (Char) -> Unit,
-    onDirectCall: (String) -> Unit,
-) {
-    val haptics = LocalClaroHaptics.current
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
-    ) {
-        listOf("1", "2").forEach { slot ->
-            val assignment = state.assignments.firstOrNull { it.slot == slot }
-            val nameLabel = assignment?.displayNameSnapshot?.ifBlank { "—" } ?: "—"
-            val statusHint = when {
-                assignment == null -> stringResource(R.string.touch_speed_dial_not_set, slot)
-                assignment.status != AssignmentStatus.RESOLVED ->
-                    stringResource(
-                        R.string.touch_speed_dial_needs_repair,
-                        slot,
-                        assignment.displayNameSnapshot,
-                    )
-                else -> stringResource(
-                    R.string.touch_speed_dial_hold_to_call,
-                    slot,
-                    assignment.displayNameSnapshot,
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = 48.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(ClaroColors.Surface)
-                    .border(1.dp, ClaroColors.Border, RoundedCornerShape(3.dp))
-                    .combinedClickable(
-                        role = Role.Button,
-                        hapticFeedbackEnabled = false,
-                        onClick = {
-                            haptics.keyClick()
-                            onDigit(slot.single())
-                        },
-                        onLongClick = {
-                            haptics.confirmHeavy()
-                            onDirectCall(slot)
-                        },
-                    )
-                    .semantics {
-                        contentDescription = statusHint
-                        role = Role.Button
-                    }
-                    .padding(horizontal = 6.dp, vertical = 6.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = stringResource(R.string.touch_speed_dial_chip, slot, nameLabel),
-                    color = ClaroColors.Ink,
-                    fontSize = 17.sp,
-                    lineHeight = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun DialKeypadGrid(
-    state: CommunicationUiState,
     onDigit: (Char) -> Unit,
-    onDirectCall: (String) -> Unit,
 ) {
     val haptics = LocalClaroHaptics.current
     val rows = listOf(
@@ -775,46 +693,21 @@ private fun DialKeypadGrid(
                     horizontalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
                 ) {
                     row.forEach { digit ->
-                        val speedDialSlot = if (digit == '1' || digit == '2') digit.toString() else null
-                        val assignedName = speedDialSlot?.let { slot ->
-                            state.assignments.firstOrNull { it.slot == slot }?.displayNameSnapshot
-                        }
-                        val keyDescription = when {
-                            !assignedName.isNullOrBlank() ->
-                                stringResource(
-                                    R.string.touch_keypad_digit_hold_call,
-                                    digit.toString(),
-                                    assignedName,
-                                )
-                            speedDialSlot != null ->
-                                stringResource(
-                                    R.string.touch_keypad_digit_hold_speed_dial,
-                                    digit.toString(),
-                                )
-                            else -> digit.toString()
-                        }
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .heightIn(min = 74.dp)
                                 .clip(RoundedCornerShape(1.dp))
                                 .background(ClaroColors.Surface)
-                                .combinedClickable(
+                                .clickable(
                                     role = Role.Button,
-                                    hapticFeedbackEnabled = false,
                                     onClick = {
                                         haptics.keyClick()
                                         onDigit(digit)
                                     },
-                                    onLongClick = speedDialSlot?.let { slot ->
-                                        {
-                                            haptics.confirmHeavy()
-                                            onDirectCall(slot)
-                                        }
-                                    },
                                 )
                                 .semantics {
-                                    contentDescription = keyDescription
+                                    contentDescription = digit.toString()
                                     role = Role.Button
                                 }
                                 .padding(vertical = 4.dp),
@@ -846,6 +739,42 @@ private fun DialKeypadGrid(
 }
 
 @Composable
+private fun TouchPhoneHeader(title: String, actions: @Composable () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().background(ClaroColors.Charcoal),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ClaroHeader(title = title, modifier = Modifier.weight(1f))
+        actions()
+    }
+}
+
+@Composable
+private fun TouchPhoneHeaderAction(
+    label: String,
+    icon: ClaroIconKind,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    val haptics = LocalClaroHaptics.current
+    IconButton(
+        onClick = {
+            haptics.softkey()
+            onClick()
+        },
+        enabled = enabled,
+        modifier = Modifier.size(48.dp),
+    ) {
+        ClaroIcon(
+            kind = icon,
+            tint = Color.White.copy(alpha = if (enabled) 1f else 0.38f),
+            size = 28.dp,
+            contentDescription = label,
+        )
+    }
+}
+
+@Composable
 private fun ColumnScope.ContactListRoute(
     state: CommunicationUiState,
     onSearch: (String) -> Unit,
@@ -854,7 +783,13 @@ private fun ColumnScope.ContactListRoute(
     onRepairPhone: () -> Unit,
     onAddPerson: () -> Unit,
 ) {
-    ClaroHeader(title = stringResource(R.string.touch_contacts))
+    TouchPhoneHeader(title = stringResource(R.string.touch_contacts)) {
+        TouchPhoneHeaderAction(
+            label = stringResource(R.string.touch_add_contact_title),
+            icon = ClaroIconKind.CONTACT_ADD,
+            onClick = onAddPerson,
+        )
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -921,6 +856,7 @@ private fun ColumnScope.ContactListRoute(
                         size = 48.dp,
                         paletteSeed = index,
                         photoUri = contact.photoUri,
+                        contactLookupKey = contact.lookupKey,
                     )
                 },
                 onClick = { onOpenContact(contact.lookupKey) },
@@ -940,13 +876,6 @@ private fun ColumnScope.ContactListRoute(
             }
         }
     }
-    ClaroActionDock {
-        ClaroSecondaryButton(
-            label = stringResource(R.string.touch_add_person),
-            onClick = onAddPerson,
-            icon = ClaroIconKind.CONTACT,
-        )
-    }
 }
 
 @Composable
@@ -961,7 +890,9 @@ private fun ColumnScope.ContactDetailRoute(
     onRequestUnlockForContacts: () -> Unit,
 ) {
     val contact = state.selectedContact
-    var confirmDelete by rememberSaveable(contact?.lookupKey) { mutableStateOf(false) }
+    var confirmDelete by remember(contact?.lookupKey, contact?.canDelete, canManageContacts) {
+        mutableStateOf(false)
+    }
     val contactTitleFallback = stringResource(R.string.touch_contact_title)
 
     if (contact == null) {
@@ -994,7 +925,60 @@ private fun ColumnScope.ContactDetailRoute(
     val isSosLinked = linkedAssignments.any { it.slot.equals("sos", ignoreCase = true) }
     val isSpeedDialLinked = linkedAssignments.any { !it.slot.equals("sos", ignoreCase = true) }
 
-    ClaroHeader(title = contact.displayName.ifBlank { contactTitleFallback })
+    TouchPhoneHeader(title = contact.displayName.ifBlank { contactTitleFallback }) {
+        TouchPhoneHeaderAction(
+            label = stringResource(R.string.touch_action_edit),
+            icon = ClaroIconKind.EDIT,
+            enabled = contact.canEdit,
+            onClick = { onEditContact(contact) },
+        )
+        TouchPhoneHeaderAction(
+            label = stringResource(R.string.touch_action_delete),
+            icon = ClaroIconKind.DELETE,
+            enabled = contact.canDelete,
+            onClick = {
+                if (canManageContacts) confirmDelete = true else onRequestUnlockForContacts()
+            },
+        )
+    }
+
+    if (confirmDelete && canManageContacts && contact.canDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text(stringResource(R.string.touch_delete_contact_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        when {
+                            isSosLinked -> R.string.touch_contact_delete_sos_blocked
+                            isSpeedDialLinked -> R.string.touch_contact_delete_confirm_speed_dial
+                            else -> R.string.touch_contact_delete_confirm_favorites
+                        },
+                        contact.displayName,
+                    ),
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) {
+                    Text(stringResource(R.string.touch_action_cancel))
+                }
+            },
+            confirmButton = {
+                if (!isSosLinked) {
+                    TextButton(
+                        onClick = {
+                            if (confirmDelete) {
+                                confirmDelete = false
+                                onDeleteContact(contact.lookupKey)
+                            }
+                        },
+                    ) {
+                        Text(stringResource(R.string.touch_action_delete), color = ClaroColors.Red)
+                    }
+                }
+            },
+        )
+    }
     Column(
         modifier = Modifier
             .weight(1f)
@@ -1014,6 +998,7 @@ private fun ColumnScope.ContactDetailRoute(
                 name = contact.displayName,
                 size = 104.dp,
                 photoUri = contact.photoUri,
+                contactLookupKey = contact.lookupKey,
             )
             Text(
                 text = contact.displayName,
@@ -1029,116 +1014,56 @@ private fun ColumnScope.ContactDetailRoute(
             ClaroInfoCard(text = localizedPhoneMessage(message, state.failure))
         }
 
-        if (confirmDelete && canManageContacts) {
-            ClaroInfoCard(
-                text = when {
-                    isSosLinked ->
-                        stringResource(R.string.touch_contact_delete_sos_blocked, contact.displayName)
-                    isSpeedDialLinked ->
-                        stringResource(
-                            R.string.touch_contact_delete_confirm_speed_dial,
-                            contact.displayName,
-                        )
-                    else ->
-                        stringResource(
-                            R.string.touch_contact_delete_confirm_favorites,
-                            contact.displayName,
-                        )
-                },
-                tone = if (isSosLinked) ClaroBannerTone.ERROR else ClaroBannerTone.WARNING,
-            )
-        } else {
-            val multipleNumbers = contact.numbers.size > 1
-            contact.numbers.forEach { number ->
-                val numberLabel = number.localizedLabel()
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(ClaroColors.Surface, RoundedCornerShape(3.dp))
-                        .padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
+        val multipleNumbers = contact.numbers.size > 1
+        contact.numbers.forEach { number ->
+            val numberLabel = number.localizedLabel()
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(ClaroColors.Surface, RoundedCornerShape(3.dp))
+                    .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(ClaroDimensions.TileGap),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
+                    Text(
+                        text = numberLabel,
+                        color = ClaroColors.Muted,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                         Text(
-                            text = numberLabel,
-                            color = ClaroColors.Muted,
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.SemiBold,
+                            text = number.value,
+                            color = ClaroColors.Ink,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
                         )
-                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-                            Text(
-                                text = number.value,
-                                color = ClaroColors.Ink,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        }
                     }
-                    ClaroPrimaryButton(
-                        label = if (multipleNumbers) {
-                            stringResource(
-                                R.string.touch_call_labeled_number,
-                                numberLabel,
-                                number.value,
-                            )
-                        } else {
-                            stringResource(R.string.touch_favorite_action_call, contact.displayName)
-                        },
-                        onClick = { onChooseNumber(number) },
-                        containerColor = ClaroColors.Green,
-                        icon = ClaroIconKind.PHONE,
-                    )
-                    ClaroSecondaryButton(
-                        label = if (multipleNumbers) {
-                            stringResource(R.string.touch_write_message_labeled, numberLabel)
-                        } else {
-                            stringResource(R.string.touch_write_message)
-                        },
-                        onClick = { onMessageNumber(number.value, contact.displayName) },
-                        icon = ClaroIconKind.MESSAGES,
-                    )
                 }
-            }
-        }
-    }
-
-    ClaroActionDock {
-        if (confirmDelete && canManageContacts) {
-            ClaroSecondaryButton(
-                label = stringResource(R.string.touch_action_cancel),
-                onClick = { confirmDelete = false },
-            )
-            if (!isSosLinked) {
                 ClaroPrimaryButton(
-                    label = stringResource(R.string.touch_action_delete),
-                    onClick = {
-                        confirmDelete = false
-                        onDeleteContact(contact.lookupKey)
+                    label = if (multipleNumbers) {
+                        stringResource(R.string.touch_call_labeled_number, numberLabel, number.value)
+                    } else {
+                        stringResource(R.string.touch_favorite_action_call, contact.displayName)
                     },
-                    containerColor = ClaroColors.Red,
+                    onClick = { onChooseNumber(number) },
+                    containerColor = ClaroColors.Green,
+                    icon = ClaroIconKind.PHONE,
+                )
+                ClaroSecondaryButton(
+                    label = if (multipleNumbers) {
+                        stringResource(R.string.touch_write_message_labeled, numberLabel)
+                    } else {
+                        stringResource(R.string.touch_write_message)
+                    },
+                    onClick = { onMessageNumber(number.value, contact.displayName) },
+                    icon = ClaroIconKind.MESSAGES,
                 )
             }
-        } else {
-            ClaroSecondaryButton(
-                label = stringResource(R.string.touch_action_edit),
-                enabled = contact.canEdit,
-                onClick = { onEditContact(contact) },
-            )
-            ClaroSecondaryButton(
-                label = stringResource(R.string.touch_action_delete),
-                enabled = contact.canDelete,
-                onClick = {
-                    if (canManageContacts) {
-                        confirmDelete = true
-                    } else {
-                        onRequestUnlockForContacts()
-                    }
-                },
-            )
         }
     }
 }
@@ -1149,13 +1074,15 @@ private fun ColumnScope.ContactEditorView(
     name: String,
     primaryNumber: String,
     secondaryNumber: String,
+    existingPhotoUri: String?,
     errorMessage: String?,
     onNameChange: (String) -> Unit,
     onPrimaryChange: (String) -> Unit,
     onSecondaryChange: (String) -> Unit,
-    onSave: () -> Unit,
+    onSave: (String?) -> Unit,
     onCancel: () -> Unit,
 ) {
+    var pickedPhotoUri by rememberSaveable { mutableStateOf<String?>(null) }
     ClaroHeader(
         title = if (isEdit) {
             stringResource(R.string.touch_edit_contact_title)
@@ -1174,6 +1101,7 @@ private fun ColumnScope.ContactEditorView(
         errorMessage?.let { error ->
             ClaroInfoCard(text = error, tone = ClaroBannerTone.ERROR)
         }
+        ClaroContactPhotoPicker(name, pickedPhotoUri ?: existingPhotoUri) { pickedPhotoUri = it }
         PhoneFieldLabel(stringResource(R.string.touch_field_name))
         OutlinedTextField(
             value = name,
@@ -1220,7 +1148,7 @@ private fun ColumnScope.ContactEditorView(
     ClaroActionDock {
         ClaroPrimaryButton(
             label = stringResource(R.string.touch_action_save),
-            onClick = onSave,
+            onClick = { onSave(pickedPhotoUri) },
             containerColor = ClaroColors.Blue,
         )
         ClaroSecondaryButton(
@@ -1316,6 +1244,7 @@ private fun ColumnScope.IncomingCallRoute(
             size = 112.dp,
             photoUri = identity?.photoUri,
             isUnassigned = isPrivate || identity?.displayName.isNullOrBlank(),
+            contactNumber = identity?.number.takeUnless { isPrivate },
         )
         Text(
             text = callerName,
@@ -1393,6 +1322,7 @@ private fun ColumnScope.ActiveCallRoute(
             size = 64.dp,
             modifier = Modifier.testTag("touch-active-avatar"),
             isUnassigned = identity?.isPrivate == true,
+            contactNumber = identity?.number.takeUnless { identity?.isPrivate == true },
         )
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -1752,6 +1682,7 @@ private fun ColumnScope.CallOutcomeRoute(
             size = 112.dp,
             photoUri = identity?.photoUri,
             isUnassigned = identity?.isPrivate == true || identity?.displayName.isNullOrBlank(),
+            contactNumber = identity?.number.takeUnless { identity?.isPrivate == true },
         )
         if (displayName == null && rawNumber != null && callerName == rawNumber) {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
@@ -1895,7 +1826,6 @@ private fun ColumnScope.CallFailedRoute(
     state: CommunicationUiState,
     onRetryCall: () -> Unit,
     onRepairPhone: () -> Unit,
-    onEmergencyDialer: () -> Unit,
     onHome: () -> Unit,
 ) {
     val identity = state.pendingIdentity ?: state.call?.identity
@@ -1928,6 +1858,7 @@ private fun ColumnScope.CallFailedRoute(
                     size = 48.dp,
                     photoUri = target.photoUri,
                     isUnassigned = target.isPrivate || target.displayName.isNullOrBlank(),
+                    contactNumber = target.number.takeUnless { target.isPrivate },
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     val targetNumber = target.number?.takeIf { it.isNotBlank() }
@@ -1960,10 +1891,6 @@ private fun ColumnScope.CallFailedRoute(
                 }
             }
         }
-        ClaroEmergencyButton(
-            label = stringResource(R.string.touch_emergency_call),
-            onClick = onEmergencyDialer,
-        )
     }
     ClaroActionDock {
         if (state.qualification.needsRepair && state.qualification.telephonySupported) {
@@ -2008,6 +1935,7 @@ private fun CenteredCallerBlock(
             size = avatarSizeDp.dp,
             photoUri = identity?.photoUri,
             isUnassigned = identity?.isPrivate == true || displayName == null,
+            contactNumber = identity?.number.takeUnless { identity?.isPrivate == true },
         )
         if (identity?.isPrivate != true && displayName == null && number != null) {
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {

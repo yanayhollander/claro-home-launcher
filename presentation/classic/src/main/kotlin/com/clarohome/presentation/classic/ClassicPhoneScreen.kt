@@ -71,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import com.clarohome.core.design.ClaroAppIcon
+import com.clarohome.core.design.ClaroAppWidget
 import com.clarohome.core.design.ClaroFocusVisibility
 import com.clarohome.core.design.ClaroAvatar
 import com.clarohome.core.design.ClaroBatteryMeter
@@ -80,6 +81,9 @@ import com.clarohome.core.design.ClaroIcon
 import com.clarohome.core.design.ClaroIconKind
 import com.clarohome.core.design.LocalClaroHaptics
 import com.clarohome.core.design.LocalClaroOpenKeyboard
+import com.clarohome.core.design.ClassicKeypadMode
+import com.clarohome.core.design.LocalClaroKeypadMode
+import com.clarohome.core.design.LocalClaroSwitchKeypadLanguage
 import com.clarohome.core.model.BadgeValue
 import com.clarohome.core.model.BatteryStatus
 import com.clarohome.core.model.CellularStatus
@@ -134,8 +138,6 @@ fun ClassicPhoneScreen(
     onDigitSelected: (Char) -> Unit = {},
     onBack: () -> Unit = {},
     onHome: () -> Unit = {},
-    assignments: Map<Char, String> = emptyMap(),
-    onLongDigitSelected: ((Char) -> Unit)? = null,
     showControls: Boolean = true,
     tileScrollState: ScrollState = rememberScrollState(),
 ) {
@@ -241,8 +243,9 @@ fun ClassicPhoneScreen(
             )
             ClassicNumericKeypad(
                 onDigitSelected = onDigitSelected,
-                assignments = assignments,
-                onLongDigitSelected = onLongDigitSelected,
+                mode = null,
+                onSwitchLanguage = null,
+                allowInternationalPrefix = home.activeCall == null,
             )
         }
     }
@@ -365,6 +368,15 @@ private fun ClassicHomeTile(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
+    if (tile.kind == HomeTileKind.WIDGET) {
+        ClaroAppWidget(
+            appWidgetId = tile.appWidgetId,
+            provider = tile.appWidgetProvider,
+            label = tile.label,
+            modifier = modifier.height(86.dp).clip(RoundedCornerShape(3.dp)),
+        )
+        return
+    }
     var isFocused by remember { mutableStateOf(false) }
     val showFocus = isFocused && ClaroFocusVisibility.visible
     val haptics = LocalClaroHaptics.current
@@ -376,7 +388,7 @@ private fun ClassicHomeTile(
         HomeTileKind.GALLERY -> stringResource(R.string.classic_tile_gallery)
         HomeTileKind.APPS -> stringResource(R.string.classic_tile_apps)
         HomeTileKind.ALARM -> stringResource(R.string.classic_tile_alarm)
-        HomeTileKind.CONTACT, HomeTileKind.INSTALLED_APP -> tile.label
+        HomeTileKind.CONTACT, HomeTileKind.INSTALLED_APP, HomeTileKind.WIDGET -> tile.label
     }
     val badgeDescription = when (val badge = tile.badge) {
         is BadgeValue.Known -> if (badge.count == 0) {
@@ -419,7 +431,9 @@ private fun ClassicHomeTile(
         ) {
             when (tile.kind) {
                 HomeTileKind.INSTALLED_APP -> ClaroAppIcon(packageName = tile.packageName, size = 38.dp)
-                HomeTileKind.CONTACT -> ClaroAvatar(name = tile.label, size = 38.dp, photoUri = tile.photoUri)
+                HomeTileKind.CONTACT -> ClaroAvatar(
+                    name = tile.label, size = 38.dp, photoUri = tile.photoUri, contactNumber = tile.phoneNumber,
+                )
                 else -> ClaroIcon(
                     kind = tile.kind.classicIconKind(),
                     tint = if (isSos) Color.White else tile.kind.classicIconTint(),
@@ -449,7 +463,7 @@ private fun HomeTileKind.classicIconKind(): ClaroIconKind = when (this) {
     HomeTileKind.CAMERA -> ClaroIconKind.CAMERA
     HomeTileKind.GALLERY -> ClaroIconKind.GALLERY
     HomeTileKind.SOS -> ClaroIconKind.SOS
-    HomeTileKind.APPS, HomeTileKind.INSTALLED_APP -> ClaroIconKind.APPS
+    HomeTileKind.APPS, HomeTileKind.INSTALLED_APP, HomeTileKind.WIDGET -> ClaroIconKind.APPS
     HomeTileKind.CONTACT -> ClaroIconKind.CONTACT
     HomeTileKind.ALARM -> ClaroIconKind.CLOCK
 }
@@ -775,20 +789,27 @@ internal fun ClassicOptionsOverlay(
 }
 
 @Composable
-fun ClassicKeypadModeStatus(numericMode: Boolean?) {
+fun ClassicKeypadModeStatus(mode: ClassicKeypadMode?) {
     ClassicModeStatusStrip(
-        modeLabel = numericMode?.let {
-            stringResource(
-                if (it) R.string.classic_mode_numbers else R.string.classic_mode_letters,
-            )
-        },
+        modeLabel = mode?.displayLabel(),
+        onOpenKeyboard = LocalClaroOpenKeyboard.current.takeIf { mode != null },
     )
 }
+
+@Composable
+internal fun ClassicKeypadMode.displayLabel(): String = stringResource(
+    when (this) {
+        ClassicKeypadMode.ENGLISH -> R.string.classic_mode_english
+        ClassicKeypadMode.HEBREW -> R.string.classic_mode_hebrew
+        ClassicKeypadMode.NUMBERS -> R.string.classic_mode_numbers
+    },
+)
 
 @Composable
 internal fun ClassicModeStatusStrip(
     modeLabel: String? = null,
     feedback: String? = null,
+    onOpenKeyboard: (() -> Unit)? = null,
 ) {
     if (modeLabel == null && feedback.isNullOrBlank()) return
     Row(
@@ -825,6 +846,15 @@ internal fun ClassicModeStatusStrip(
                     lineHeight = 15.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
+                )
+            }
+            if (onOpenKeyboard != null) {
+                Text(
+                    text = stringResource(R.string.classic_open_keyboard),
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    modifier = Modifier.clickable(role = Role.Button, onClick = onOpenKeyboard)
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
                 )
             }
         }
@@ -1149,9 +1179,10 @@ private fun ClassicDirectionButton(
 @OptIn(ExperimentalFoundationApi::class)
 fun ClassicNumericKeypad(
     onDigitSelected: ((Char) -> Unit)?,
-    assignments: Map<Char, String> = emptyMap(),
-    onLongDigitSelected: ((Char) -> Unit)? = null,
     keyHeight: Dp = 64.dp,
+    mode: ClassicKeypadMode? = LocalClaroKeypadMode.current,
+    onSwitchLanguage: (() -> Unit)? = LocalClaroSwitchKeypadLanguage.current,
+    allowInternationalPrefix: Boolean = false,
 ) {
     val haptics = LocalClaroHaptics.current
     val openKeyboard = LocalClaroOpenKeyboard.current
@@ -1165,9 +1196,6 @@ fun ClassicNumericKeypad(
         '7' to stringResource(R.string.classic_keypad_legend_7),
         '8' to stringResource(R.string.classic_keypad_legend_8),
         '9' to stringResource(R.string.classic_keypad_legend_9),
-        '*' to stringResource(R.string.classic_keypad_legend_star),
-        '0' to stringResource(R.string.classic_keypad_space),
-        '#' to stringResource(R.string.classic_keypad_legend_pound),
     )
     val keys = listOf(
         listOf('1', '2', '3'),
@@ -1186,29 +1214,30 @@ fun ClassicNumericKeypad(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     row.forEach { key ->
-                        val assignedName = assignments[key]?.takeIf { it.isNotBlank() }?.take(10)
                         val digitAction = onDigitSelected
-                        val keyboardAction = openKeyboard.takeIf { key == '#' }
-                        val legend = if (keyboardAction != null) {
-                            stringResource(R.string.classic_hold_for_keyboard)
-                        } else {
-                            assignedName ?: legends.getValue(key)
+                        val languageAction = onSwitchLanguage.takeIf { key == '#' && digitAction != null }
+                        val keyboardAction = openKeyboard.takeIf { key == '#' && mode != null && languageAction == null }
+                        val entersPlus = key == '*' && allowInternationalPrefix && digitAction != null
+                        val plusLabel = if (entersPlus) stringResource(R.string.classic_hold_for_plus) else null
+                        val legend = when {
+                            languageAction != null -> stringResource(R.string.classic_hold_for_language)
+                            keyboardAction != null -> stringResource(R.string.classic_hold_for_keyboard)
+                            plusLabel != null -> plusLabel
+                            mode == ClassicKeypadMode.NUMBERS -> ""
+                            key == '0' && mode != null -> stringResource(R.string.classic_keypad_space)
+                            key == '*' && mode != null -> legends.getValue('1')
+                            key == '1' && mode == null -> ""
+                            else -> mode?.hebrewLetters(key) ?: legends[key].orEmpty()
                         }
                         val enabled = digitAction != null || keyboardAction != null
-                        val keyDescription = if (
-                            (key == '1' || key == '2') && onLongDigitSelected != null
-                        ) {
-                            stringResource(
-                                R.string.classic_keypad_key_speed_dial,
-                                key.toString(),
-                                legend,
-                            )
-                        } else {
+                        val keyDescription = if (legend.isNotEmpty()) {
                             stringResource(
                                 R.string.classic_keypad_key_description,
                                 key.toString(),
                                 legend,
                             )
+                        } else {
+                            key.toString()
                         }
                         Box(
                             modifier = Modifier
@@ -1230,22 +1259,25 @@ fun ClassicNumericKeypad(
                                         Modifier.combinedClickable(
                                             role = Role.Button,
                                             hapticFeedbackEnabled = false,
-                                            onLongClickLabel = if (keyboardAction != null) {
-                                                stringResource(R.string.classic_open_keyboard)
-                                            } else {
-                                                null
+                                            onLongClickLabel = when {
+                                                languageAction != null -> stringResource(R.string.classic_switch_keyboard_language)
+                                                keyboardAction != null -> stringResource(R.string.classic_open_keyboard)
+                                                else -> plusLabel
                                             },
                                             onClick = {
                                                 haptics.keyClick()
                                                 digitAction?.invoke(key)
                                             },
                                             onLongClick = {
-                                                if (keyboardAction != null) {
+                                                if (languageAction != null) {
+                                                    haptics.confirmHeavy()
+                                                    languageAction()
+                                                } else if (keyboardAction != null) {
                                                     haptics.confirmHeavy()
                                                     keyboardAction()
-                                                } else if ((key == '1' || key == '2') && onLongDigitSelected != null) {
+                                                } else if (entersPlus) {
                                                     haptics.confirmHeavy()
-                                                    onLongDigitSelected(key)
+                                                    digitAction?.invoke('+')
                                                 } else {
                                                     haptics.keyClick()
                                                     digitAction?.invoke(key)

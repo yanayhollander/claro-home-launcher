@@ -16,15 +16,15 @@
       <span>claro<span class="brand-sub">HOME LAUNCHER</span></span>
     </a>
     <div class="version-switcher" role="group" aria-label="Storyboard versions">
-      <a href="index.html#home" id="touch-version">Original</a>
-      <a href="index.html?version=classic#home" id="classic-version">2G phone</a>
+      <a href="index.html#home" id="touch-version">Touch Home</a>
+      <a href="index.html?version=classic#home" id="classic-version">Classic Phone</a>
     </div>
     <div id="classic-layout-controls" class="classic-layout-controls" hidden>
       <label for="classic-layout">Button arrangement</label>
       <select id="classic-layout"></select>
       <a href="classic-buttons.html">Compare all four side by side ↗</a>
     </div>
-    <div class="edition">PRODUCT STORYBOARD <span>02</span></div>
+    <div class="edition">APP STORYBOARD <span>03</span></div>
     <p class="sidebar-intro">A familiar phone.<br>A little more independence.</p>
     <nav id="screen-nav" aria-label="Storyboard screens"></nav>
     <div class="sidebar-bottom">
@@ -51,6 +51,8 @@
           <div class="phone-hardware" aria-hidden="true"><span></span></div>
           <div class="device-status"><span>9:41</span><span class="device-status-right" aria-label="Demo signal full, battery 82 percent">▂▄▆█ &nbsp; 82% ▰</span></div>
           <div id="phone-content" class="phone-content" tabindex="-1"></div>
+          <button id="return-to-call" class="primary return-to-call" data-action="return-to-call" hidden>Return to call</button>
+          <div id="call-controls-dock" class="call-controls-dock" hidden></div>
           <div id="phone-actions" class="phone-action-dock" role="group" aria-label="Screen actions" hidden></div>
           <div id="classic-deck" class="classic-deck" hidden></div>
           <nav class="phone-system-nav" aria-label="Phone navigation">
@@ -72,7 +74,7 @@
     </div>
     <footer class="workspace-footer"><span>CLARO HOME <span class="footer-divider">/</span> Independence, thoughtfully designed.</span><span>Prototype only. Not an emergency service.</span></footer>
   </main>
-  <label class="capture-toggle"><input type="checkbox" id="clean-preview">Phone only</label>
+  <label class="capture-toggle"><input type="checkbox" id="clean-preview">Phone only · Escape restores review</label>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <script>
     document.addEventListener("keydown", event => {

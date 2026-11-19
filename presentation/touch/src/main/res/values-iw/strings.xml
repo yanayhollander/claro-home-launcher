@@ -26,7 +26,7 @@
     <string name="touch_tile_badge_count">%1$s, %2$d חדשים</string>
     <string name="touch_tile_badge_unknown">%1$s, המספר אינו זמין, נדרש תיקון</string>
 
-    <string name="touch_tab_keypad">מקשים</string>
+    <string name="touch_tab_keypad">חייגן</string>
     <string name="touch_tab_recent">אחרונות</string>
     <string name="touch_tab_missed">שלא נענו</string>
     <string name="touch_action_home">בית</string>
@@ -74,6 +74,7 @@
     <string name="touch_number_label_other">אחר</string>
     <string name="touch_edit_contact_title">עריכת איש קשר</string>
     <string name="touch_add_contact_title">הוספת איש קשר</string>
+    <string name="touch_delete_contact_title">מחיקת איש קשר</string>
     <string name="touch_field_name">שם</string>
     <string name="touch_field_mobile_number">מספר נייד</string>
     <string name="touch_field_other_number_optional">מספר נוסף (לא חובה)</string>

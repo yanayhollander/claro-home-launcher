@@ -50,6 +50,7 @@ import com.clarohome.core.design.ClaroAvatar
 import com.clarohome.core.design.ClaroBannerTone
 import com.clarohome.core.design.ClaroColors
 import com.clarohome.core.design.ClassicMultiTapState
+import com.clarohome.core.design.ClassicKeypadMode
 import com.clarohome.core.design.applyClassicKeypadInput
 import com.clarohome.core.design.ClaroIconKind
 import com.clarohome.core.design.ClaroIcon
@@ -135,7 +136,7 @@ fun ClassicMessagingScreen(
         displayScrollState.scrollTo(0)
         if (state.route == MessagingRoute.INBOX && state.searchQuery.isNotEmpty()) onSearchInbox("")
     }
-    var numericMode by rememberSaveable(state.route) { mutableStateOf(false) }
+    var keypadMode by rememberSaveable(state.route) { mutableStateOf(ClassicKeypadMode.ENGLISH) }
     var multiTapState by remember(state.route) { mutableStateOf<ClassicMultiTapState?>(null) }
     var composeTarget by rememberSaveable(state.route, state.draft.id) {
         mutableStateOf(ClassicComposeTarget.BODY)
@@ -150,14 +151,14 @@ fun ClassicMessagingScreen(
         MessagingRoute.COMPOSE,
     ) || state.route == MessagingRoute.CONVERSATION && replying)
 
-    val activeModeLabel: String? = when {
+    val activeMode = when {
         !isEditingRoute -> null
         state.route == MessagingRoute.COMPOSE &&
             composeTarget == ClassicComposeTarget.RECIPIENT ->
-            stringResource(R.string.classic_mode_numbers)
-        numericMode -> stringResource(R.string.classic_mode_numbers)
-        else -> stringResource(R.string.classic_mode_letters)
+            ClassicKeypadMode.NUMBERS
+        else -> keypadMode
     }
+    val activeModeLabel = activeMode?.displayLabel()
 
     val options = buildClassicMessagingOptions(
         state = state,
@@ -259,7 +260,7 @@ fun ClassicMessagingScreen(
             val editingRecipientPhone = state.route == MessagingRoute.COMPOSE &&
                 composeTarget == ClassicComposeTarget.RECIPIENT
             if (digit == '#' && !editingRecipientPhone) {
-                numericMode = !numericMode
+                keypadMode = keypadMode.next()
                 multiTapState = null
             } else {
                 when (state.route) {
@@ -268,8 +269,9 @@ fun ClassicMessagingScreen(
                             currentValue = state.recipientQuery,
                             digit = digit,
                             fieldKey = "recipient-search",
-                            numericMode = numericMode,
+                            numericMode = keypadMode == ClassicKeypadMode.NUMBERS,
                             previousTap = multiTapState,
+                            mode = keypadMode,
                         )
                         multiTapState = nextTap
                         onSearchRecipients(updated)
@@ -292,8 +294,9 @@ fun ClassicMessagingScreen(
                                 currentValue = state.draft.body,
                                 digit = digit,
                                 fieldKey = "compose-body",
-                                numericMode = numericMode,
+                                numericMode = keypadMode == ClassicKeypadMode.NUMBERS,
                                 previousTap = multiTapState,
+                                mode = keypadMode,
                             )
                             multiTapState = nextTap
                             onBodyChange(updated)
@@ -305,8 +308,9 @@ fun ClassicMessagingScreen(
                             currentValue = state.draft.body,
                             digit = digit,
                             fieldKey = "conversation-reply",
-                            numericMode = numericMode,
+                            numericMode = keypadMode == ClassicKeypadMode.NUMBERS,
                             previousTap = multiTapState,
+                            mode = keypadMode,
                         )
                         multiTapState = nextTap
                         onBodyChange(updated)
@@ -441,7 +445,20 @@ fun ClassicMessagingScreen(
         )
         if (isEditingRoute) {
             ClassicModeStatusStrip(modeLabel = activeModeLabel)
-            ClassicNumericKeypad(onDigitSelected = keypadAction)
+            ClassicNumericKeypad(
+                onDigitSelected = keypadAction,
+                mode = activeMode,
+                onSwitchLanguage = if (isEditingRoute &&
+                    !(state.route == MessagingRoute.COMPOSE && composeTarget == ClassicComposeTarget.RECIPIENT)
+                ) {
+                    {
+                        keypadMode = keypadMode.switchLanguage()
+                        multiTapState = null
+                    }
+                } else {
+                    null
+                },
+            )
         }
     }
 }
@@ -633,6 +650,7 @@ private fun ClassicMessageDisplay(
                                 size = 44.dp,
                                 paletteSeed = index,
                                 isUnassigned = conversation.recipient.displayName.isNullOrBlank(),
+                                contactNumber = conversation.recipient.number,
                             )
                         },
                     )
@@ -847,6 +865,7 @@ private fun ClassicMessageDisplay(
                                     size = 44.dp,
                                     paletteSeed = index,
                                     photoUri = contact.photoUri,
+                                    contactLookupKey = contact.lookupKey,
                                 )
                             },
                         )
@@ -1074,6 +1093,7 @@ private fun MessageRecipientHeader(recipient: MessageRecipient?) {
             name = recipient?.displayName,
             size = 48.dp,
             isUnassigned = recipient?.displayName.isNullOrBlank(),
+            contactNumber = recipient?.number,
         )
         Column(modifier = Modifier.weight(1f)) {
             if (nameIsRawNumber) {

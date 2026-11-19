@@ -3,9 +3,11 @@
 Product planning and an interactive HTML storyboard for an Android launcher built
 around confidence, familiarity and large, recognizable icons and photo controls.
 
-**This is a design prototype, not an Android application.** Calls, SMS, emergency
-actions, permissions, subscriptions and device readings use fictional demo data.
-It never contacts anybody, requests Android permissions or processes a payment.
+The repository contains both a native Android app and a dependency-free browser
+storyboard. **The storyboard uses fictional data and simulated outcomes.** It
+never contacts anybody, requests Android permissions or processes a payment.
+Its screens now follow the current native app flows, rather than the original
+historical PRD alone.
 
 ## Explore
 
@@ -26,12 +28,84 @@ Use the screen navigator to review individual screens or follow the buttons on t
 phone for connected journeys. The side panel explains the intent behind each
 screen. Review controls expose alternate and failure states.
 
-Under **02 Dialer**, three indented options preview **Contacts first**,
+Under **02 Dialer**, three indented historical alternatives preview **Contacts first**,
 **Keypad first** (with a prominent Contacts button), and **Two big choices**.
 These are interactive alternatives, not an approved replacement: the original
-Dialer and the Home Phone tile remain unchanged. Single-number contacts in these
-options open call confirmation directly; multiple-number contacts still require
-an explicit number choice. Keypad long-press shortcuts remain available.
+Dialer. Call actions now start the simulated call directly, without confirmation;
+multiple-number contacts still require an explicit number choice. Long-press
+shortcuts remain available. Historical `#call-confirm` and `#message-confirm`
+links resolve to the dialer and message editor, not obsolete confirmation screens.
+
+### Current app flows
+
+- **Home:** Add as many tiles as you need for contacts, installed apps or built-in
+  shortcuts, including Alarm clock. Defaults contain Phone, Camera, Gallery,
+  SOS and Apps, without Messages. Built-ins are unique; contacts/apps may repeat.
+  Clock/status stay fixed while tiles scroll. Both styles group signal and
+  battery percentage at the top right. Home tiles offers
+  an Add tile action, an editable list with up/down controls to reorder tiles,
+  and searchable pickers.
+- **Setup:** one welcome action, then Phone style (Classic preselected),
+  Language and display, Choose Home tiles, Settings access, Home tiles,
+  SOS contact, and Permissions and roles. Back revisits steps.
+  Finish requires all supported Home/Phone/SMS roles; the sequential Android
+  prompts are illustrated, and declining one stops the sequence.
+  No plans, trial or handover checklist is included in setup.
+- **Calls:** direct dialing, number-to-contact matches and history rows with
+  direction indicators. Touch shows only configured speed-dial shortcuts, with
+  Contacts in the app bar. Neither dialer has an emergency button; the dedicated
+  shortcut is available from the Home SOS tile when SOS is configured. Contact matches
+  appear below the keypad so they don't move the number buttons while typing.
+  Touch Contacts uses app-bar icons for Add, Edit, and Delete. Deleting a
+  contact requires a separate confirmation in a dialog.
+  In the Android app, both Touch and Classic can add or replace a photo when
+  creating or editing a contact. The photo is written to Android Contacts on Save.
+  Non-missed history fills the dialer instead of showing
+  Ended. New calls start at Dialing; external review controls simulate connection
+  and outcomes. A fixed Return to call action remains available across screens.
+  Speaker/Mute/Hold controls are docked; Classic hides the number pad until Keypad.
+- **Messages:** direct Send without review, date/time labels, retained new-message
+  and per-recipient reply drafts, and explicit duplicate-risk confirmation for
+  uncertain retries. Classic inbox/conversations have no number pad or inbox
+  search; Reply opens a separate writing view. Back from Reply retains the draft.
+  Options contains confirmed conversation deletion.
+- **Settings:** session-long unlock, explicit Lock settings, Apps & Menu
+  allowlisting/search, separate Menu order, Home slots, phone-style switching
+  without losing in-memory data, and automatic call-audio settings with a
+  maximum-volume warning. Language/text-size rows open full-screen pickers;
+  Standard/Large/Huge and vibration replace the old contrast toggle.
+- **Media:** Camera opens its external illustration immediately and returns to
+  the preceding screen. Gallery represents newest device photos without an
+  import step. Classic Up/Down browses pictures, and Options opens confirmed
+  device deletion. The browser never opens a real camera or deletes real files.
+- **Membership:** default screens show unavailable/unconfigured store products.
+  Historical purchase scenarios remain explicit external review states only;
+  they do not represent verified plans, purchases or entitlements.
+
+App discovery, contact photos, launcher icons, native notifications, sensor/audio
+switching, haptics, store verification and Android permissions cannot run in this
+static page. Original sample artwork stands in for device photos/icons. Core
+navigation has English, Spanish and Hebrew/RTL previews; secondary copy and
+multi-tap remain English, unlike the localized Android app. All configuration
+and drafts reset when the page reloads. Changing style **inside Settings** keeps
+this in-memory state; the external version/comparison links reload the preview.
+
+### Native Home widgets (Android only)
+
+Unlock Settings, open **Home tiles**, choose a slot, then tap
+**Choose widget**. Pick a compact widget from an installed app and complete
+Android's approval and any setup supplied by that app. The existing tile stays
+unchanged if setup is cancelled or fails.
+
+Widgets occupy one tile in either phone style; widgets whose minimum size does
+not fit are disabled in the picker. **Claro clock** is included as a compact live
+time/date example with no account, permission or network requirement beyond
+Android's widget-host approval. Changing phone style can make a widget too
+large, in which case Home shows a warning instead of clipping its controls.
+Widget buttons belong to their provider and can perform real actions, including
+opening a gate. PalGate is available only if installed and exposing a compatible
+Android widget. Removing or replacing a widget releases its Android widget ID.
+The browser storyboard does not host Android widgets.
 
 ### Missed and unanswered calls
 
@@ -46,9 +120,8 @@ known, unknown or private), or the active-call screen's **no answer** control.
 Both screens are also available directly in the sidebar and comparison selector.
 These are simulated outcomes, not an actual ring timeout or carrier callback.
 
-Home shows persistent missed-call and unread-message counts: large tappable
-notification shortcuts beside the clock in 2G mode, and Phone/Messages tile badges
-in touch mode. They open the relevant call or inbox; opening the inbox alone
+Home and Menu share missed-call and unread-message badges. Opening Phone does
+not mark a missed call reviewed; it prioritizes missed entries. Opening the inbox alone
 does not mark messages read. Reading a missed call clears only that call's count,
 and opening another person's conversation does not clear Mira's unread message.
 Permission denial shows `?` instead of a guessed count. An unanswered outgoing
@@ -56,25 +129,25 @@ call does not increase the incoming missed-call count. Simulating a missed
 incoming call returns Home with a new indication and retains earlier call records.
 Home preview controls can show missed calls, unread messages or cleared alerts.
 
-### Separate 2G phone version
+### Classic Phone controls
 
-The **Original / 2G phone** switch above the storyboard navigation keeps both
-designs available. Open <http://127.0.0.1:4173/?version=classic#home> for the
-classic concept; the original URL and its dialer alternatives are unchanged.
-Switching versions reloads the in-memory prototype rather than sharing drafts.
+The **Touch Home / Classic Phone** switch above the storyboard navigation keeps
+both presentations available. Open
+<http://127.0.0.1:4173/?version=classic#home> for Classic.
 
-The 2G concept keeps a 12-key number pad, four large outer keys, and one connected
-four-way pad with center OK. Back always stays on the left and the primary
-Confirm/Unlock/Save/Send softkey on the right. Green Call/Answer stays left and red
-Home/End/Decline stays right. Their positions do not move between screens within
-an arrangement. There are no separate permanent Delete or Options keys.
+Classic keeps a 12-key number pad, four large outer keys, and a connected
+**Up / wide OK / Down** pad, with no left/right arrows. The current arrangement
+has Back/Menu above Call/Home. Primary Unlock/Save/Done/Send actions use the
+green-key position; Unlock, display Save and Apps Done use blue. Destructive
+confirmations use the red key. Reading messages and collapsed calls hide the
+number pad.
 
-The right softkey opens Menu/Options when there is no primary action, and selects
-an option while that list is open. When a screen has both a primary action and
-secondary choices, an Options navigation row in the display opens the latter.
-Text deletion and clearing are included in Options alongside secondary actions
-such as Edit, Delete contact, Cancel and navigation shortcuts. Text deletion never
-deletes a contact/photo; destructive choices still require separate confirmation.
+The right softkey opens Menu/Options and selects an option while that list is
+open. Back deletes selected/preceding text before navigating, except Reply Back
+retains the draft and returns to reading. Reply also has a backspace control.
+Dialer Options has no Delete character or Clear text command; use Back to delete digits.
+Contact Edit/Delete and photo/conversation Delete live in Options; destructive
+actions require confirmation.
 
 Open <http://127.0.0.1:4173/classic-buttons.html> to compare the base arrangement
 and three alternatives side by side:
@@ -94,32 +167,23 @@ Individual layouts use `?version=classic&layout=classic`, `layout=wide`,
 `layout=lower`, or `layout=stacked`, followed by the desired screen hash.
 The existing `layout=stacked` URL now opens replacement D, the integrated pad.
 
-The classic active-call screen shows status and duration near the top without
-requiring an initial scroll, followed by a centered caller photo, name and number.
-Longer caller details scroll above the fixed phone controls.
-The storyboard uses a fixed sample duration, not a live call timer.
+Active calls show the caller photo, name and number with secondary status and
+duration. Controls stay fixed below the scrollable details. The storyboard uses
+a fixed connected sample duration, not a live timer.
 
-The four arrows highlight contacts, menu items and fields; OK opens/selects the
-highlighted item. Left/right move the text cursor or change a selected dropdown;
-up/down move between fields. Photo-view left/right show the previous/next photo.
-When no selectable item remains above/below, up/down scroll the display with
-overlap. The selected item scrolls into view. Lists, photos, selection controls
-and input fields also remain tappable, and swiping still scrolls the display.
-Home prioritizes the clock, four people, Messages and SOS. Menu contains Phone,
-Contacts, Messages, Camera, Gallery, SOS, Apps and protected Settings instead of
-repeating the original six-tile home. The same contact assignments and access
-rules are used within each preview session.
+Up/Down visits every selectable item in reading order, including across grid
+columns, and scrolls it into view. The amber focus ring appears only after the
+first arrow press on each screen. In photo detail, Up/Down browses pictures,
+except during deletion confirmation. Lists and fields remain tappable.
+Menu retains all built-in features independently of Home visibility.
 
-Typing from Home starts number entry, not a call. Green opens call confirmation,
-then confirms it. Confirmation has no duplicate Call or Cancel buttons in the
-display: use the green Call softkey to proceed, or Back/Home to leave.
-Long-pressing 1/2 for 0.8 seconds calls the assigned person
-directly only from idle Home/Phone. Text/date/PIN entry cannot trigger speed dial.
-Focused fields use the fixed keys: English ABC multi-tap for text, # to switch
-ABC/123, 0 for space, and number entry for phone/PIN/date fields. The mode indicator
-appears only for text entry, labeled Letters or Numbers, never as an idle "123".
-Date separators are inserted automatically. This is a basic English text-entry preview, not T9
-prediction or a completed Spanish/Hebrew keyboard.
+Typing from Home starts fresh number entry, not a call. Green calls directly.
+In both dialers, 1 and 2 are ordinary digits and cannot start a call.
+Focused text fields use multi-tap: hold # to switch between English and Hebrew,
+or tap # to cycle English, Hebrew, and numbers.
+0 inserts a space in either text language, and phone/PIN/date fields stay numeric.
+Date separators are inserted automatically. In the Android app, **Open keyboard**
+shows the system keyboard for the focused field; another field suppresses it again.
 
 Green answers incoming calls; red declines/ends a call or returns Home while
 retaining SMS drafts. On the active-call screen the numbers simulate tones;
@@ -134,11 +198,12 @@ date question: enter today's local date as **dd/MM/YYYY**. It has no PIN or
 recovery phrase to forget and is only an accidental-change barrier, not a security
 lock or an assessment of someone's abilities.
 
-For PIN mode, create a 4–6 digit PIN and a separate recovery phrase in Setup.
+For PIN mode, create a 6-digit PIN and a separate 12+ character recovery secret.
 There are no preassigned demo credentials. The date question cannot recover or
 bypass a caregiver PIN. After setup, changing access methods requires the current
-unlock method. Returning Home locks settings; three incorrect attempts pause
-entry for 30 seconds. All choices remain in memory and reset on page reload.
+unlock method. Done and Home leave settings unlocked; **Lock settings** or a
+page reload locks them. Three incorrect attempts pause entry for 30 seconds.
+All choices remain in memory and reset on page reload.
 
 ## Visual review contract
 
@@ -152,10 +217,9 @@ trial/renewal/price disclosures remain visible.
 - Use original artwork, large recognizable icons and portraits, white/charcoal
   neutral surfaces and saturated green/blue/orange/violet/red accents, not muted
   beige/sage cards or copied competitor artwork.
-- At the 360×800dp reference view, fit six big rectangular light tiles in a tight
-  2×3 grid with dark separators, 2–4dp gutters and minimal padding, plus four visible
-  photo contacts with short names. Use handset/envelope/camera/photo/SOS/apps
-  symbols and short recognition labels; no demo-initials notes.
+- Home uses a configurable three-column grid with dark separators, 2–4dp gutters
+  and minimal padding. Home tiles scroll below fixed status/clock.
+  Use recognizable symbols, contact portraits and short labels.
 - Keep day/date/time, a horizontal battery bar and stepped signal bars compact
   and neutral. Every control has an accessible name; visible labels and non-color
   cues remain where needed. Preserve ≥64dp primary targets, AA contrast and
@@ -166,8 +230,8 @@ trial/renewal/price disclosures remain visible.
   add an exit hint or prototype banner inside the phone capture.
 
 These are presentation requirements, not claims of native functionality.
-English, Spanish and Hebrew with RTL remain planned; native scope and commercial
-decisions are unchanged.
+Native English, Spanish and Hebrew/RTL are implemented. The browser's limited
+localization and device-only boundaries are described above.
 
 ## Product documents
 
@@ -184,17 +248,17 @@ SMS and emergency behavior require real-device validation before release.
 
 ## Native Android foundation
 
-The repository also contains a modular Kotlin and Jetpack Compose application
-scaffold. It preserves the static storyboard and establishes replaceable
-data/platform/vendor boundaries, persisted Touch/Classic visual mode, typed
-navigation, startup recovery, deterministic fake data, and accessible placeholder
-homes. The caregiver membership surface now includes fake plans by default and
-configuration-gated RevenueCat, Mixpanel, Firebase Analytics, and Crashlytics
-adapters with explicit default-off diagnostics consent. Production phone and SMS
-flows remain unimplemented.
+The modular Kotlin/Jetpack Compose app implements persisted Touch/Classic
+presentation, onboarding, protected settings, Home customization, Telecom calls,
+contacts, SMS/MMS, gallery, allowed apps and SOS integration. Native production
+debug builds do not seed storyboard people or invented entitlements.
+RevenueCat, Mixpanel, Firebase Analytics and Crashlytics adapters are
+configuration-gated, with separate default-off diagnostics consent. Unconfigured
+billing is explicitly unavailable rather than supplying fake plans.
 
 See [Android foundation](docs/android-foundation.md) for the module graph,
-dependency policy, and local build commands.
+dependency policy, and [local test and Internal Testing commands](docs/android-foundation.md#local-verification).
+Android checks run locally on request, not on commits, pushes, or pull requests.
 
 ## Scope boundary
 

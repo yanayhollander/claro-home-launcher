@@ -50,17 +50,18 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.clarohome.core.design.ClaroAvatar
+import com.clarohome.core.design.ClaroContactPhotoPicker
 import com.clarohome.core.design.ClaroBannerTone
 import com.clarohome.core.design.ClaroColors
 import com.clarohome.core.design.ClassicMultiTapState
+import com.clarohome.core.design.ClassicKeypadMode
 import com.clarohome.core.design.applyClassicKeypadInput
-import com.clarohome.core.design.ClaroEmergencyButton
 import com.clarohome.core.design.ClaroIcon
 import com.clarohome.core.design.ClaroIconKind
 import com.clarohome.core.design.ClaroInfoCard
 import com.clarohome.core.design.LocalClaroDeleteText
 import com.clarohome.core.design.LocalClaroKeypadInput
-import com.clarohome.core.design.LocalClaroKeypadNumericMode
+import com.clarohome.core.design.LocalClaroKeypadMode
 import com.clarohome.core.model.BatteryStatus
 import com.clarohome.core.model.CellularStatus
 import com.clarohome.feature.communication.AudioRoute
@@ -91,7 +92,6 @@ fun ClassicCommunicationScreen(
     onDigit: (Char) -> Unit,
     onBackspace: () -> Unit,
     onCallEnteredNumber: () -> Unit,
-    onDirectCall: (String) -> Unit,
     onOpenContacts: () -> Unit,
     onSearchContacts: (String) -> Unit,
     onLoadMoreContacts: () -> Unit,
@@ -111,10 +111,9 @@ fun ClassicCommunicationScreen(
     onHome: () -> Unit,
     battery: BatteryStatus? = null,
     cellular: CellularStatus? = null,
-    onEmergencyDialer: () -> Unit = {},
     onCallIdentity: ((CallerIdentity) -> Unit)? = null,
     canManageContacts: Boolean = false,
-    onSaveContact: (String?, String, String, String) -> Unit = { _, _, _, _ -> },
+    onSaveContact: (String?, String, String, String, String?) -> Unit = { _, _, _, _, _ -> },
     onDeleteContact: (String) -> Unit = {},
     onRequestUnlockForContacts: () -> Unit = {},
     onSelectDialerContact: (CallerIdentity) -> Unit = {},
@@ -122,6 +121,7 @@ fun ClassicCommunicationScreen(
     dialerOptionsOpen: Boolean = false,
     onDialerOptionsChange: ((Boolean) -> Unit)? = null,
     dialerScrollState: ScrollState? = null,
+    onContactsBack: (() -> Unit)? = null,
 ) {
     val detailKey = state.selectedContact?.lookupKey.takeIf { state.route == CommunicationRoute.CONTACT_DETAIL }
     var localOptionsOpen by rememberSaveable(state.route, detailKey) { mutableStateOf(false) }
@@ -130,12 +130,12 @@ fun ClassicCommunicationScreen(
     val setOptionsOpen: (Boolean) -> Unit = {
         if (sharedDialer && onDialerOptionsChange != null) onDialerOptionsChange(it) else localOptionsOpen = it
     }
-    BackHandler(enabled = sharedDialer && optionsOpen) { setOptionsOpen(false) }
+    BackHandler(enabled = optionsOpen && (sharedDialer || onContactsBack != null)) { setOptionsOpen(false) }
     val localScrollState = key(state.route, detailKey, optionsOpen) { rememberScrollState() }
     val displayScrollState = if (sharedDialer) dialerScrollState ?: localScrollState else localScrollState
     var dtmfFeedback by rememberSaveable(state.call?.id, state.route) { mutableStateOf("") }
     var showCallKeypad by rememberSaveable(state.call?.id, state.route) { mutableStateOf(false) }
-    var contactsNumericMode by rememberSaveable(state.route) { mutableStateOf(false) }
+    var contactsMode by rememberSaveable(state.route) { mutableStateOf(ClassicKeypadMode.ENGLISH) }
     var contactsMultiTap by remember(state.route) { mutableStateOf<ClassicMultiTapState?>(null) }
     var editorMode by rememberSaveable(state.route, state.selectedContact?.lookupKey) {
         mutableStateOf<String?>(null)
@@ -173,9 +173,9 @@ fun ClassicCommunicationScreen(
             contact = contact.takeIf { editorMode == "edit" },
             battery = battery,
             cellular = cellular,
-            onSave = { name, primary, secondary ->
+            onSave = { name, primary, secondary, photoUri ->
                 if (canManageContacts && (editorMode == "add" || contact?.canEdit == true)) {
-                    onSaveContact(contact?.lookupKey.takeIf { editorMode == "edit" }, name, primary, secondary)
+                    onSaveContact(contact?.lookupKey.takeIf { editorMode == "edit" }, name, primary, secondary, photoUri)
                     editorMode = null
                 }
             },
@@ -221,14 +221,12 @@ fun ClassicCommunicationScreen(
     val options = buildClassicCommunicationOptions(
         state = state,
         callbackAction = callbackAction,
-        onBackspace = onBackspace,
         onOpenContacts = onOpenContacts,
         onToggleMute = onToggleMute,
         onAudioRoute = onAudioRoute,
         onToggleHold = onToggleHold,
         onSwap = onSwap,
         onRepairPhone = onRepairPhone,
-        onEmergencyDialer = onEmergencyDialer,
     ) + when (state.route) {
         CommunicationRoute.CONTACTS -> listOf(
             ClassicOptionAction(label = stringResource(R.string.classic_add_contact), onSelect = addContact),
@@ -261,6 +259,7 @@ fun ClassicCommunicationScreen(
                 onSearchContacts(state.contactQuery.dropLast(1))
             }
         }
+        state.route == CommunicationRoute.CONTACTS && onContactsBack != null -> onContactsBack
         state.route == CommunicationRoute.CALL_CONFIRMATION -> onCancelCall
         state.route == CommunicationRoute.CONTACT_DETAIL -> onOpenContacts
         else -> onHome
@@ -316,15 +315,16 @@ fun ClassicCommunicationScreen(
         }
         state.route == CommunicationRoute.CONTACTS -> { digit ->
             if (digit == '#') {
-                contactsNumericMode = !contactsNumericMode
+                contactsMode = contactsMode.next()
                 contactsMultiTap = null
             } else {
                 val (updated, nextTap) = applyClassicKeypadInput(
                     currentValue = state.contactQuery,
                     digit = digit,
                     fieldKey = "contact-search",
-                    numericMode = contactsNumericMode,
+                    numericMode = contactsMode == ClassicKeypadMode.NUMBERS,
                     previousTap = contactsMultiTap,
+                    mode = contactsMode,
                 )
                 contactsMultiTap = nextTap
                 onSearchContacts(updated)
@@ -333,13 +333,6 @@ fun ClassicCommunicationScreen(
         else -> null
     }
 
-    val speedDialAssignments = if (state.route == CommunicationRoute.DIALER && !optionsOpen) {
-        state.assignments
-            .filter { it.slot == "1" || it.slot == "2" }
-            .associate { it.slot.first() to it.displayNameSnapshot }
-    } else {
-        emptyMap()
-    }
 
     Column(
         modifier = Modifier
@@ -449,7 +442,6 @@ fun ClassicCommunicationScreen(
                         onOpenHistoryEntry = onOpenHistoryEntry,
                         onChooseNumber = onChooseNumber,
                         onRepairPhone = onRepairPhone,
-                        onEmergencyDialer = onEmergencyDialer,
                         onSelectDialerContact = onSelectDialerContact,
                     )
                 }
@@ -493,35 +485,27 @@ fun ClassicCommunicationScreen(
             scrollState = displayScrollState,
         )
         if (state.route != CommunicationRoute.ACTIVE_CALL || showCallKeypad) {
+        val keypadMode = contactsMode.takeIf { state.route == CommunicationRoute.CONTACTS && !optionsOpen }
         ClassicModeStatusStrip(
-            modeLabel = if (state.route == CommunicationRoute.CONTACTS && !optionsOpen) {
-                if (contactsNumericMode) {
-                    stringResource(R.string.classic_mode_numbers)
-                } else {
-                    stringResource(R.string.classic_mode_letters)
-                }
-            } else {
-                null
-            },
+            modeLabel = keypadMode?.displayLabel(),
             feedback = dtmfFeedback.takeIf {
                 state.route == CommunicationRoute.ACTIVE_CALL && it.isNotEmpty()
             },
         )
         ClassicNumericKeypad(
             onDigitSelected = keypadAction,
-            assignments = speedDialAssignments,
-            onLongDigitSelected = if (state.route == CommunicationRoute.DIALER && !optionsOpen) {
-                { digit ->
-                    if (digit == '1' || digit == '2') {
-                        onDirectCall(digit.toString())
-                    } else {
-                        onDigit(digit)
-                    }
+            mode = keypadMode,
+            onSwitchLanguage = if (keypadMode != null) {
+                {
+                    contactsMode = contactsMode.switchLanguage()
+                    contactsMultiTap = null
                 }
             } else {
                 null
             },
             keyHeight = if (state.route == CommunicationRoute.ACTIVE_CALL) 48.dp else 64.dp,
+            allowInternationalPrefix = state.route == CommunicationRoute.DIALER &&
+                state.digits.isEmpty() && !state.hasActiveCall && !state.awaitingOutgoingCall,
         )
         }
         }
@@ -533,7 +517,7 @@ private fun ClassicContactEditor(
     contact: ClaroContact?,
     battery: BatteryStatus?,
     cellular: CellularStatus?,
-    onSave: (String, String, String) -> Unit,
+    onSave: (String, String, String, String?) -> Unit,
     onCancel: () -> Unit,
 ) {
     var name by rememberSaveable(contact?.lookupKey) { mutableStateOf(contact?.displayName.orEmpty()) }
@@ -544,11 +528,12 @@ private fun ClassicContactEditor(
         mutableStateOf(contact?.numbers?.getOrNull(1)?.value.orEmpty())
     }
     var showError by rememberSaveable { mutableStateOf(false) }
+    var pickedPhotoUri by rememberSaveable(contact?.lookupKey) { mutableStateOf<String?>(null) }
     val focusRequester = remember { FocusRequester() }
     val scroll = rememberScrollState()
     val input = LocalClaroKeypadInput.current
     val deleteText = LocalClaroDeleteText.current
-    val numericMode = LocalClaroKeypadNumericMode.current
+    val keypadMode = LocalClaroKeypadMode.current
     val save: () -> Unit = {
         val primaryValid = PhoneContactsCoordinator.normalizeDialString(primary).length >= 3
         val secondaryValid = secondary.isBlank() ||
@@ -556,7 +541,7 @@ private fun ClassicContactEditor(
         if (name.isBlank() || !primaryValid || !secondaryValid) {
             showError = true
         } else {
-            onSave(name.trim(), primary.trim(), secondary.trim())
+            onSave(name.trim(), primary.trim(), secondary.trim(), pickedPhotoUri)
         }
     }
     BackHandler(onBack = onCancel)
@@ -606,6 +591,7 @@ private fun ClassicContactEditor(
                     phone = true,
                     modifier = Modifier.testTag("classic-contact-secondary"),
                 )
+                ClaroContactPhotoPicker(name, pickedPhotoUri ?: contact?.photoUri) { pickedPhotoUri = it }
             }
         }
         ClassicIntegratedPad(
@@ -617,7 +603,7 @@ private fun ClassicContactEditor(
             onRed = onCancel,
             scrollState = scroll,
         )
-        ClassicKeypadModeStatus(numericMode = numericMode)
+        ClassicKeypadModeStatus(mode = keypadMode)
         ClassicNumericKeypad(onDigitSelected = input)
     }
 }
@@ -652,20 +638,15 @@ private fun ClassicContactField(
 private fun buildClassicCommunicationOptions(
     state: CommunicationUiState,
     callbackAction: (() -> Unit)?,
-    onBackspace: () -> Unit,
     onOpenContacts: () -> Unit,
     onToggleMute: () -> Unit,
     onAudioRoute: (AudioRoute) -> Unit,
     onToggleHold: () -> Unit,
     onSwap: () -> Unit,
     onRepairPhone: () -> Unit,
-    onEmergencyDialer: () -> Unit,
 ): List<ClassicOptionAction> {
-    val deleteCharacterLabel = stringResource(R.string.classic_delete_character)
-    val clearTextLabel = stringResource(R.string.classic_clear_text)
     val contactsLabel = stringResource(R.string.classic_contacts)
     val repairPhoneLabel = stringResource(R.string.classic_repair_phone_access)
-    val emergencyCallLabel = stringResource(R.string.classic_emergency_call)
     val earpieceLabel = stringResource(R.string.classic_earpiece)
     val speakerLabel = stringResource(R.string.classic_speaker)
     val unmuteLabel = stringResource(R.string.classic_unmute)
@@ -678,25 +659,10 @@ private fun buildClassicCommunicationOptions(
     return buildList {
         when (state.route) {
             CommunicationRoute.DIALER -> {
-                add(
-                    ClassicOptionAction(
-                        label = deleteCharacterLabel,
-                        enabled = state.digits.isNotEmpty(),
-                        onSelect = onBackspace,
-                    ),
-                )
-                add(
-                    ClassicOptionAction(
-                        label = clearTextLabel,
-                        enabled = state.digits.isNotEmpty(),
-                        onSelect = { repeat(state.digits.length) { onBackspace() } },
-                    ),
-                )
                 add(ClassicOptionAction(label = contactsLabel, onSelect = onOpenContacts))
                 if (state.qualification.needsRepair && state.qualification.telephonySupported) {
                     add(ClassicOptionAction(label = repairPhoneLabel, onSelect = onRepairPhone))
                 }
-                add(ClassicOptionAction(label = emergencyCallLabel, onSelect = onEmergencyDialer))
             }
 
             CommunicationRoute.CONTACTS -> {
@@ -758,12 +724,10 @@ private fun buildClassicCommunicationOptions(
                 if (state.qualification.needsRepair && state.qualification.telephonySupported) {
                     add(ClassicOptionAction(label = repairPhoneLabel, onSelect = onRepairPhone))
                 }
-                add(ClassicOptionAction(label = emergencyCallLabel, onSelect = onEmergencyDialer))
             }
 
             CommunicationRoute.CALL_CONFIRMATION -> {
                 add(ClassicOptionAction(label = contactsLabel, onSelect = onOpenContacts))
-                add(ClassicOptionAction(label = emergencyCallLabel, onSelect = onEmergencyDialer))
             }
 
             CommunicationRoute.INCOMING_CALL,
@@ -784,7 +748,6 @@ private fun ClassicCommunicationDisplay(
     onOpenHistoryEntry: (String) -> Unit,
     onChooseNumber: (ContactNumber) -> Unit,
     onRepairPhone: () -> Unit,
-    onEmergencyDialer: () -> Unit,
     onSelectDialerContact: (CallerIdentity) -> Unit,
 ) {
     when (state.route) {
@@ -820,6 +783,7 @@ private fun ClassicCommunicationDisplay(
                             photoUri = identity.photoUri,
                             size = 48.dp,
                             isUnassigned = identity.isPrivate,
+                            contactNumber = identity.number.takeUnless { identity.isPrivate },
                         )
                         Text(
                             text = identity.classicAccessibleName(),
@@ -870,7 +834,12 @@ private fun ClassicCommunicationDisplay(
                                 subtitle = identity.number,
                                 onClick = { onSelectDialerContact(identity) },
                                 leading = {
-                                    ClaroAvatar(name = identity.displayName, photoUri = identity.photoUri, size = 44.dp)
+                                    ClaroAvatar(
+                                        name = identity.displayName,
+                                        photoUri = identity.photoUri,
+                                        contactNumber = identity.number,
+                                        size = 44.dp,
+                                    )
                                 },
                             )
                         }
@@ -911,6 +880,7 @@ private fun ClassicCommunicationDisplay(
                                 isUnassigned = entry.identity.isPrivate ||
                                     entry.identity.displayName.isNullOrBlank(),
                                 photoUri = entry.identity.photoUri,
+                                contactNumber = entry.identity.number.takeUnless { entry.identity.isPrivate },
                             )
                         },
                         trailing = {
@@ -940,10 +910,6 @@ private fun ClassicCommunicationDisplay(
                         },
                     )
                 }
-                ClaroEmergencyButton(
-                    label = stringResource(R.string.classic_emergency_call),
-                    onClick = onEmergencyDialer,
-                )
                 state.message?.takeIf { it.isNotBlank() }?.let { msg ->
                     ClaroInfoCard(
                         text = localizeCommunicationMessage(msg, state.failure),
@@ -1013,6 +979,7 @@ private fun ClassicCommunicationDisplay(
                                 size = 44.dp,
                                 paletteSeed = index,
                                 photoUri = contact.photoUri,
+                                contactLookupKey = contact.lookupKey,
                             )
                         },
                     )
@@ -1050,6 +1017,7 @@ private fun ClassicCommunicationDisplay(
                         name = contact.displayName,
                         size = 72.dp,
                         photoUri = contact.photoUri,
+                        contactLookupKey = contact.lookupKey,
                         modifier = Modifier.testTag("classic-contact-avatar"),
                     )
                     DisplayName(contact.displayName)
@@ -1084,6 +1052,7 @@ private fun ClassicCommunicationDisplay(
                     name = identity?.displayName?.takeIf { !identity.isPrivate },
                     size = 72.dp,
                     photoUri = identity?.photoUri,
+                    contactNumber = identity?.number.takeUnless { identity?.isPrivate == true },
                     isUnassigned = identity == null ||
                         identity.isPrivate ||
                         identity.displayName.isNullOrBlank(),
@@ -1107,6 +1076,7 @@ private fun ClassicCommunicationDisplay(
                     name = identity?.displayName?.takeIf { !identity.isPrivate },
                     size = 72.dp,
                     photoUri = identity?.photoUri,
+                    contactNumber = identity?.number.takeUnless { identity?.isPrivate == true },
                     isUnassigned = identity == null ||
                         identity.isPrivate ||
                         identity.displayName.isNullOrBlank(),
@@ -1136,6 +1106,7 @@ private fun ClassicCommunicationDisplay(
                     name = resolvedIdentity?.displayName?.takeIf { !resolvedIdentity.isPrivate },
                     size = 72.dp,
                     photoUri = resolvedIdentity?.photoUri,
+                    contactNumber = resolvedIdentity?.number.takeUnless { resolvedIdentity?.isPrivate == true },
                     isUnassigned = resolvedIdentity == null ||
                         resolvedIdentity.isPrivate ||
                         resolvedIdentity.displayName.isNullOrBlank(),
@@ -1213,10 +1184,6 @@ private fun ClassicCommunicationDisplay(
                         borderColor = ClaroColors.Blue,
                     )
                 }
-                ClaroEmergencyButton(
-                    label = stringResource(R.string.classic_emergency_call),
-                    onClick = onEmergencyDialer,
-                )
             }
         }
 
@@ -1391,6 +1358,7 @@ private fun ClassicActiveCallIdentity(state: CommunicationUiState) {
                 size = 48.dp,
                 modifier = Modifier.testTag("classic-active-avatar"),
                 isUnassigned = identity?.isPrivate == true,
+                contactNumber = identity?.number.takeUnless { identity?.isPrivate == true },
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(

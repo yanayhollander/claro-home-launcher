@@ -9,6 +9,23 @@ data class ClassicMultiTapState(
     val replaceIndex: Int,
     val committedValue: String,
     val timestampElapsedMillis: Long,
+    val mode: ClassicKeypadMode = ClassicKeypadMode.ENGLISH,
+)
+
+enum class ClassicKeypadMode {
+    ENGLISH, HEBREW, NUMBERS;
+
+    fun next(): ClassicKeypadMode = entries[(ordinal + 1) % entries.size]
+
+    fun switchLanguage(): ClassicKeypadMode = if (this == HEBREW) ENGLISH else HEBREW
+
+    fun hebrewLetters(digit: Char): String? =
+        if (this == HEBREW) hebrewKeypadLetters[digit] else null
+}
+
+private val hebrewKeypadLetters = mapOf(
+    '2' to "אבג", '3' to "דהו", '4' to "זחט", '5' to "יכךל",
+    '6' to "מםנן", '7' to "סעפף", '8' to "צץקר", '9' to "שת",
 )
 
 private val classicMultiTapAlphabets = mapOf(
@@ -34,6 +51,7 @@ fun applyClassicKeypadInput(
     previousTap: ClassicMultiTapState?,
     selectionStart: Int = currentValue.length,
     selectionEnd: Int = selectionStart,
+    mode: ClassicKeypadMode = ClassicKeypadMode.ENGLISH,
 ): Pair<String, ClassicMultiTapState?> {
     require(selectionStart in 0..currentValue.length && selectionEnd in 0..currentValue.length)
     val start = minOf(selectionStart, selectionEnd)
@@ -50,11 +68,13 @@ fun applyClassicKeypadInput(
     }
     if (numericMode) return (prefix + digit + suffix) to null
 
-    val alphabet = classicMultiTapAlphabets[digit] ?: return currentValue to null
+    val alphabet = mode.hebrewLetters(digit)?.let { it + digit }
+        ?: classicMultiTapAlphabets[digit] ?: return currentValue to null
     val now = SystemClock.elapsedRealtime()
     val continuing = previousTap != null &&
         previousTap.fieldKey == fieldKey &&
         previousTap.digit == digit &&
+        previousTap.mode == mode &&
         (now - previousTap.timestampElapsedMillis) < 1_000L &&
         previousTap.committedValue == currentValue &&
         previousTap.replaceIndex in currentValue.indices &&
@@ -80,5 +100,6 @@ fun applyClassicKeypadInput(
         replaceIndex = replaceIndex,
         committedValue = updatedValue,
         timestampElapsedMillis = now,
+        mode = mode,
     )
 }

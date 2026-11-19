@@ -13,6 +13,7 @@
     <string name="comm_caller_unknown">Número desconocido</string>
     <string name="comm_contact_name_and_number_required">El nombre y el número son obligatorios</string>
     <string name="comm_contact_not_saved">No se guardó el contacto</string>
+    <string name="comm_contact_photo_unreadable">No se pudo leer la foto seleccionada. No se guardó el contacto.</string>
     <string name="comm_contact_saved_not_opened">El contacto se guardó pero no se pudo abrir</string>
     <string name="comm_contact_not_found">No se encontró el contacto</string>
     <string name="comm_contact_change_failed">No se pudo actualizar el contacto</string>

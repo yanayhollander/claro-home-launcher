@@ -155,6 +155,30 @@ class PhoneContactsCoordinatorTest {
     }
 
     @Test
+    fun backFromDialerContactsRestoresTheEnteredNumberButDirectContactsDoesNotReturnToDialer() = runTest {
+        val fixture = fixture()
+        val coordinator = fixture.coordinator
+        coordinator.openDialer()
+        "202".forEach(coordinator::inputDigit)
+        coordinator.openContacts(fromDialer = true)
+        coordinator.returnFromContactsToDialer()
+        assertThat(coordinator.state.value.route).isEqualTo(CommunicationRoute.DIALER)
+        assertThat(coordinator.state.value.digits).isEqualTo("202")
+
+        coordinator.openContacts(fromDialer = true)
+        coordinator.openContacts(fromDialer = false)
+        coordinator.returnFromContactsToDialer()
+        assertThat(coordinator.state.value.route).isEqualTo(CommunicationRoute.CONTACTS)
+    }
+
+    @Test
+    fun internationalPrefixIsKeptOnlyAtTheStartOfADialedNumber() = runTest {
+        val coordinator = fixture().coordinator
+        "+972+".forEach(coordinator::inputDigit)
+        assertThat(coordinator.state.value.digits).isEqualTo("+972")
+    }
+
+    @Test
     fun inCallDigitsSendTonesWithoutSearchingContacts() = runTest {
         val fixture = fixture()
         fixture.telecom.mutableEvents.value = dialingCall().copy(
@@ -163,6 +187,7 @@ class PhoneContactsCoordinatorTest {
         )
         runCurrent()
         fixture.coordinator.inputDigit('2')
+        fixture.coordinator.inputDigit('+')
         advanceTimeBy(200)
         runCurrent()
         assertThat(fixture.contacts.matchingQueries).isEmpty()

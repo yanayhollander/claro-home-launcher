@@ -1,10 +1,16 @@
 package com.clarohome.app
 
 import android.graphics.Bitmap
+import android.appwidget.AppWidgetProviderInfo
+import android.content.Context
+import android.content.ContextWrapper
 import android.net.Uri
 import android.os.Environment
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
@@ -15,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
@@ -45,6 +52,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -62,6 +71,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import com.clarohome.core.design.ClaroColors
 import com.clarohome.core.design.ClaroAvatar
 import com.clarohome.core.design.ClaroSoftkeyHost
@@ -70,6 +80,10 @@ import com.clarohome.core.design.ClaroTheme
 import com.clarohome.core.design.ClaroLocaleContainer
 import com.clarohome.core.design.ClaroKeyboardContainer
 import com.clarohome.core.design.LocalClaroKeypadInput
+import com.clarohome.core.design.LocalClaroKeypadMode
+import com.clarohome.core.design.fitsCompactHomeTile
+import com.clarohome.core.data.SharedPreferencesHomeSlotStore
+import com.clarohome.core.data.homeSlotTile
 import com.clarohome.core.design.applyClassicKeypadInput
 import com.clarohome.core.design.HapticCue
 import com.clarohome.core.design.RecordingClaroHaptics
@@ -138,16 +152,69 @@ import java.io.FileOutputStream
 import java.time.Instant
 import java.util.Locale
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.serialization.Serializable
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+@Serializable
+private data class RepeatNavigationRoute(val item: Int)
+
 @RunWith(AndroidJUnit4::class)
 class StoryboardRegressionTest {
     @get:Rule
     val compose = createComposeRule()
+
+    @Test
+    fun compactWidgetsRespectMinimumSizeAndOnlyUsePermittedResizeAxes() {
+        val provider = AppWidgetProviderInfo().apply {
+            minWidth = 300
+            minHeight = 200
+            minResizeWidth = 90
+            minResizeHeight = 80
+            resizeMode = AppWidgetProviderInfo.RESIZE_NONE
+        }
+        assertTrue(!provider.fitsCompactHomeTile(100, 100))
+        provider.resizeMode = AppWidgetProviderInfo.RESIZE_HORIZONTAL
+        assertTrue(!provider.fitsCompactHomeTile(100, 100))
+        provider.resizeMode = AppWidgetProviderInfo.RESIZE_BOTH
+        assertTrue(provider.fitsCompactHomeTile(100, 100))
+        assertTrue(!provider.fitsCompactHomeTile(89, 100))
+        assertTrue(!provider.fitsCompactHomeTile(100, 79))
+        provider.minResizeWidth = 0
+        assertTrue(!provider.fitsCompactHomeTile(100, 100))
+    }
+
+    @Test
+    fun widgetPreferencesPersistTheBindingAndDiscardItWhenTheSlotIsCleared() {
+        val target = InstrumentationRegistry.getInstrumentation().targetContext
+        val context = object : ContextWrapper(target) {
+            override fun getSharedPreferences(name: String, mode: Int) =
+                super.getSharedPreferences("widget-regression-$name", mode)
+        }
+        val preferences = context.getSharedPreferences("claro_home_slots", Context.MODE_PRIVATE)
+        preferences.edit().clear().commit()
+        try {
+            val slots = MutableList<HomeTile?>(12) { null }
+            slots[7] = homeSlotTile(
+                7, HomeTileKind.WIDGET, "Example widget",
+                appWidgetId = 42,
+                appWidgetProvider = "com.example/.ExampleWidget",
+            )
+            SharedPreferencesHomeSlotStore(context).save(slots)
+            assertEquals(slots, SharedPreferencesHomeSlotStore(context).load())
+            slots[7] = null
+            SharedPreferencesHomeSlotStore(context).save(slots)
+            assertEquals(null, SharedPreferencesHomeSlotStore(context).load()[7])
+            assertTrue(!preferences.contains("7.widget_id"))
+            assertTrue(!preferences.contains("7.widget_provider"))
+        } finally {
+            preferences.edit().clear().commit()
+        }
+    }
 
     @Test
     fun classicHomeScrollsOnlyTilesNotStatusClockOrDate() {
@@ -236,10 +303,10 @@ class StoryboardRegressionTest {
         }
         compose.onNodeWithText("Call in 5 seconds").assertDoesNotExist()
         compose.onNode(hasText("Set up SOS") and hasClickAction()).performClick()
-        compose.onNodeWithText("Emergency services").performClick()
+        compose.onNodeWithText("Emergency services").assertDoesNotExist()
         compose.runOnIdle {
             assertEquals(1, setupRequests)
-            assertEquals(1, emergencyRequests)
+            assertEquals(0, emergencyRequests)
             assertEquals(0, callRequests)
         }
     }
@@ -433,12 +500,15 @@ class StoryboardRegressionTest {
                 digits = "2",
                 selectedContact = null,
                 dialerMatches = listOf(CallerIdentity("Alex", "2335550199"), mira),
+                assignments = listOf(PhoneAssignment("2", "favorite", "2025550198", "Favorite contact")),
             ),
         )
         compose.setContent {
             ClaroTheme { ClassicContactFixture(state = state, unlocked = false) }
         }
         val rowId = compose.onNodeWithText("Mira").fetchSemanticsNode().id
+        compose.onNodeWithText("Favorite contact").assertDoesNotExist()
+        compose.onNodeWithContentDescription("2, ABC").assertIsDisplayed()
         val keypadTop = compose.onNodeWithContentDescription("3, DEF").fetchSemanticsNode().boundsInRoot.top
         compose.runOnIdle {
             state = state.copy(digits = "21", dialerMatches = listOf(mira), dialerMatchesLoading = true)
@@ -447,6 +517,111 @@ class StoryboardRegressionTest {
         compose.onNodeWithText("Loading contacts…").assertDoesNotExist()
         assertEquals(rowId, compose.onNodeWithText("Mira").fetchSemanticsNode().id)
         assertEquals(keypadTop, compose.onNodeWithContentDescription("3, DEF").fetchSemanticsNode().boundsInRoot.top)
+    }
+
+    @Test
+    fun touchDialerKeysStayInPlaceWhileTypingAndContactMatchesChange() {
+        val mira = CallerIdentity("Mira", "3335550101")
+        var state by mutableStateOf(
+            CommunicationUiState(
+                route = CommunicationRoute.DIALER,
+                qualification = DialerQualification(true, true, true, true, true, true, true),
+                assignments = listOf(PhoneAssignment("1", "favorite", "2025550198", "Favorite contact")),
+            ),
+        )
+        compose.setContent {
+            ClaroTheme {
+                TouchCommunicationScreen(
+                    state = state,
+                    onDigit = { state = state.copy(digits = state.digits + it, dialerMatchesLoading = true) },
+                    onBackspace = {},
+                    onCallEnteredNumber = {},
+                    onOpenContacts = {},
+                    onSearchContacts = {},
+                    onLoadMoreContacts = {},
+                    onOpenContact = {},
+                    onChooseNumber = {},
+                    onConfirmCall = {},
+                    onCancelCall = {},
+                    onAnswer = {},
+                    onDecline = {},
+                    onEnd = {},
+                    onToggleMute = {},
+                    onAudioRoute = {},
+                    onToggleHold = {},
+                    onSwap = {},
+                    onRepairPhone = {},
+                    onHome = {},
+                )
+            }
+        }
+        compose.onNodeWithText("1 · Favorite contact").assertDoesNotExist()
+        compose.onNodeWithContentDescription("1").assertIsDisplayed()
+        val key = compose.onNodeWithContentDescription("3")
+        val initialBounds = key.assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        key.performClick()
+        compose.onNodeWithText("Matching contacts").assertDoesNotExist()
+        assertEquals(initialBounds, key.fetchSemanticsNode().boundsInRoot)
+
+        compose.runOnIdle {
+            state = state.copy(dialerMatches = listOf(mira), dialerMatchesLoading = false)
+        }
+        compose.onNodeWithText("Mira").assertExists()
+        assertEquals(initialBounds, key.fetchSemanticsNode().boundsInRoot)
+        key.performClick()
+        compose.runOnIdle {
+            assertEquals("33", state.digits)
+            state = state.copy(digits = "3".repeat(64), dialerMatches = emptyList(), dialerMatchesLoading = false)
+        }
+        compose.onNodeWithText("Matching contacts").assertDoesNotExist()
+        assertEquals(initialBounds, key.fetchSemanticsNode().boundsInRoot)
+    }
+
+    @Test
+    fun touchContactDeleteRequiresSeparateConfirmation() {
+        val state = classicContactState()
+        val deleted = mutableListOf<String>()
+        compose.setContent {
+            ClaroTheme {
+                TouchCommunicationScreen(
+                    state = state,
+                    onDigit = {},
+                    onBackspace = {},
+                    onCallEnteredNumber = {},
+                    onOpenContacts = {},
+                    onSearchContacts = {},
+                    onLoadMoreContacts = {},
+                    onOpenContact = {},
+                    onChooseNumber = {},
+                    onConfirmCall = {},
+                    onCancelCall = {},
+                    onAnswer = {},
+                    onDecline = {},
+                    onEnd = {},
+                    onToggleMute = {},
+                    onAudioRoute = {},
+                    onToggleHold = {},
+                    onSwap = {},
+                    onRepairPhone = {},
+                    onHome = {},
+                    canManageContacts = true,
+                    onDeleteContact = { deleted.add(it) },
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("Edit").assertIsDisplayed()
+        val deleteIcon = compose.onNodeWithContentDescription("Delete")
+        deleteIcon.assertIsDisplayed().performClick()
+        compose.onNodeWithText("Delete contact").assertIsDisplayed()
+        compose.runOnIdle { assertTrue(deleted.isEmpty()) }
+
+        compose.onNodeWithText("Cancel").performClick()
+        compose.onNodeWithText("Delete contact").assertDoesNotExist()
+        compose.runOnIdle { assertTrue(deleted.isEmpty()) }
+
+        deleteIcon.performClick()
+        compose.onNodeWithText("Delete").performClick()
+        compose.runOnIdle { assertEquals(listOf("mira"), deleted) }
     }
 
     @Test
@@ -473,6 +648,29 @@ class StoryboardRegressionTest {
             assertTrue(!preferences.easyCallAudio)
             assertTrue(!preferences.maximumSpeakerVolume)
         }
+    }
+
+    @Test
+    fun classicDialerOptionsExcludeTextEditingActions() {
+        compose.setContent {
+            ClaroTheme {
+                ClassicContactFixture(
+                    state = classicContactState().copy(
+                        route = CommunicationRoute.DIALER,
+                        digits = "1234",
+                        selectedContact = null,
+                    ),
+                    unlocked = false,
+                )
+            }
+        }
+        compose.onNodeWithText("Options").performClick()
+        compose.onNodeWithText("Contacts").assertIsDisplayed()
+        compose.onNodeWithText("Emergency services").assertDoesNotExist()
+        compose.onNodeWithText("Delete character").assertDoesNotExist()
+        compose.onNodeWithText("Clear text").assertDoesNotExist()
+        compose.onNodeWithText("Back").performClick()
+        compose.onNodeWithText("1234").assertIsDisplayed()
     }
 
     @Test
@@ -672,9 +870,8 @@ class StoryboardRegressionTest {
     }
 
     @Test
-    fun classicHomeHoldKeysCallAssignmentsWithoutEnteringDigits() {
+    fun classicHomeHoldKeysEnterDigitsWithoutAdvertisingSpeedDial() {
         val digits = mutableListOf<Char>()
-        val held = mutableListOf<Char>()
         compose.setContent {
             ClaroTheme {
                 ClassicPhoneScreen(
@@ -683,25 +880,17 @@ class StoryboardRegressionTest {
                     onTileSelected = {},
                     onRepairHomeRole = {},
                     onReturnToCall = {},
-                    assignments = mapOf('1' to "Mira", '2' to "Daniel"),
                     onDigitSelected = { digits += it },
-                    onLongDigitSelected = { held += it },
                 )
             }
         }
-        compose.onNodeWithContentDescription("1, Mira. Hold for speed dial")
-            .performTouchInput { longClick() }
-        compose.onNodeWithContentDescription("2, Daniel. Hold for speed dial")
-            .performTouchInput { longClick() }
+        compose.onNodeWithText("1").performTouchInput { longClick() }
+        compose.onNodeWithText("2").performTouchInput { longClick() }
+        compose.onNodeWithContentDescription("#").performClick()
+        compose.onNodeWithText("*").performClick()
+        compose.onNodeWithText("*").performTouchInput { longClick() }
         compose.runOnIdle {
-            assertEquals(listOf('1', '2'), held)
-            assertTrue(digits.isEmpty())
-        }
-        compose.onNodeWithContentDescription("1, Mira. Hold for speed dial").performClick()
-        compose.onNodeWithText("3").performTouchInput { longClick() }
-        compose.runOnIdle {
-            assertEquals(listOf('1', '2'), held)
-            assertEquals(listOf('1', '3'), digits)
+            assertEquals(listOf('1', '2', '#', '*', '+'), digits)
         }
     }
 
@@ -731,7 +920,6 @@ class StoryboardRegressionTest {
             onDigit = {},
             onBackspace = {},
             onCallEnteredNumber = {},
-            onDirectCall = {},
             onOpenContacts = onOpenContacts,
             onSearchContacts = {},
             onLoadMoreContacts = {},
@@ -749,7 +937,7 @@ class StoryboardRegressionTest {
             onRepairPhone = {},
             onHome = {},
             canManageContacts = unlocked,
-            onSaveContact = onSave,
+            onSaveContact = { key, name, primary, secondary, _ -> onSave(key, name, primary, secondary) },
             onDeleteContact = onDelete,
             onRequestUnlockForContacts = onUnlock,
             onSelectDialerContact = onSelectDialerContact,
@@ -816,8 +1004,135 @@ class StoryboardRegressionTest {
     }
 
     @Test
+    fun repeatedMenuNavigationKeepsTheEntryAndScreenMounted() {
+        lateinit var navigation: NavHostController
+        var mounted = 0
+        var disposed = 0
+        compose.setContent {
+            navigation = rememberNavController()
+            NavHost(navController = navigation, startDestination = ClassicHomeRoute) {
+                composable<ClassicHomeRoute> { Text("Home screen") }
+                composable<LauncherMenuRoute> {
+                    DisposableEffect(Unit) {
+                        mounted++
+                        onDispose { disposed++ }
+                    }
+                    Text("Menu screen")
+                }
+            }
+        }
+        compose.runOnIdle { navigation.navigateIfNotCurrent(LauncherMenuRoute) }
+        compose.onNodeWithText("Menu screen").assertIsDisplayed()
+        val original = compose.runOnIdle { navigation.currentBackStackEntry!! }
+        val originalNode = compose.onNodeWithText("Menu screen").fetchSemanticsNode().id
+        repeat(3) {
+            compose.runOnIdle {
+                navigation.navigateIfNotCurrent(LauncherMenuRoute)
+                assertSame(original, navigation.currentBackStackEntry)
+            }
+            assertEquals(originalNode, compose.onNodeWithText("Menu screen").fetchSemanticsNode().id)
+        }
+        compose.runOnIdle {
+            assertEquals(1, mounted)
+            assertEquals(0, disposed)
+        }
+    }
+
+    @Test
+    fun repeatedScreenNavigationPreservesStateButDifferentArgumentsStillNavigateBack() {
+        lateinit var navigation: NavHostController
+        compose.setContent {
+            navigation = rememberNavController()
+            NavHost(navController = navigation, startDestination = RepeatNavigationRoute(1)) {
+                composable<RepeatNavigationRoute> { entry ->
+                    Text("Item ${entry.toRoute<RepeatNavigationRoute>().item}")
+                }
+            }
+        }
+        compose.onNodeWithText("Item 1").assertIsDisplayed()
+        val original = compose.runOnIdle { navigation.currentBackStackEntry!! }
+        compose.runOnIdle {
+            original.savedStateHandle["draft"] = "preserved"
+            navigation.navigateIfNotCurrent(RepeatNavigationRoute(1))
+            assertSame(original, navigation.currentBackStackEntry)
+            assertEquals("preserved", navigation.currentBackStackEntry?.savedStateHandle?.get<String>("draft"))
+            navigation.navigateIfNotCurrent(RepeatNavigationRoute(2))
+        }
+        compose.onNodeWithText("Item 2").assertIsDisplayed()
+        compose.runOnIdle {
+            assertEquals(original.id, navigation.previousBackStackEntry?.id)
+            navigation.popBackStack()
+        }
+        compose.onNodeWithText("Item 1").assertIsDisplayed()
+        compose.runOnIdle {
+            assertSame(original, navigation.currentBackStackEntry)
+            assertEquals("preserved", navigation.currentBackStackEntry?.savedStateHandle?.get<String>("draft"))
+        }
+    }
+
+    @Test
     fun classicMenuHomeReusesExistingHomeEntry() {
         assertMenuHomeReusesEntry(VisualMode.CLASSIC)
+    }
+
+    @Test
+    fun backKeepsEachClassicDeckWithItsOwnScreen() {
+        lateinit var navigation: NavHostController
+        var phoneRoute by mutableStateOf(CommunicationRoute.DIALER)
+        compose.setContent {
+            navigation = rememberNavController()
+            val frame: DestinationFrame = { entry, content ->
+                Box(Modifier.testTag(entry.destination.route.orEmpty())) {
+                    ClaroDestinationLayout(
+                        useGlobalDeck = usesClassicDestinationDeck(entry, VisualMode.CLASSIC, phoneRoute),
+                        content = content,
+                        controls = { host ->
+                            if (host != null) Text("Shared deck", Modifier.testTag("destination-deck"))
+                        },
+                    )
+                }
+            }
+            NavHost(
+                navController = navigation,
+                startDestination = ClassicHomeRoute,
+                popEnterTransition = { fadeIn(tween(500)) },
+                popExitTransition = { fadeOut(tween(500)) },
+            ) {
+                framedComposable<ClassicHomeRoute>(frame) { Text("Home content") }
+                framedComposable<LauncherMenuRoute>(frame) { Text("Menu content") }
+                framedComposable<PhoneRoute>(frame) { Text("Phone content") }
+                framedComposable<MessagesRoute>(frame) { Text("Messages content") }
+            }
+        }
+
+        fun assertDeck(routeTag: String, expected: Boolean) {
+            val node = compose.onNode(hasTestTag("destination-deck") and hasAnyAncestor(hasTestTag(routeTag)))
+            if (expected) node.assertExists() else node.assertDoesNotExist()
+        }
+
+        compose.waitForIdle()
+        val homeTag = compose.runOnIdle { checkNotNull(navigation.currentDestination?.route) }
+        for (destination in listOf(LauncherMenuRoute, PhoneRoute, MessagesRoute)) {
+            compose.runOnIdle {
+                phoneRoute = CommunicationRoute.CONTACTS
+                navigation.navigate(destination)
+            }
+            val outgoingTag = compose.runOnIdle { checkNotNull(navigation.currentDestination?.route) }
+            val hasOutgoingDeck = destination == LauncherMenuRoute
+            assertDeck(outgoingTag, hasOutgoingDeck)
+            compose.mainClock.autoAdvance = false
+            try {
+                compose.runOnIdle { assertTrue(navigation.popBackStack()) }
+                compose.mainClock.advanceTimeBy(100)
+                compose.onNodeWithTag(outgoingTag).assertExists()
+                assertDeck(outgoingTag, hasOutgoingDeck)
+                assertDeck(homeTag, true)
+            } finally {
+                compose.mainClock.autoAdvance = true
+            }
+            compose.onNodeWithTag(outgoingTag).assertDoesNotExist()
+            assertDeck(homeTag, true)
+        }
     }
 
     @Test
@@ -991,9 +1306,21 @@ class StoryboardRegressionTest {
         compose.runOnIdle { assertEquals("B", search) }
         compose.onNodeWithText("3").performClick()
         compose.runOnIdle { assertEquals("Bd", search) }
+        compose.onNodeWithText("#").performTouchInput { longClick() }
+        compose.onNodeWithText("אבג").assertIsDisplayed()
+        compose.onNodeWithText("3").performClick()
+        compose.runOnIdle { assertEquals("Bdד", search) }
+        compose.onNodeWithText("3").performClick()
+        compose.runOnIdle { assertEquals("Bdה", search) }
+        compose.onNodeWithText("#").performTouchInput { longClick() }
+        compose.onNodeWithText("ABC").assertIsDisplayed()
+        compose.onNodeWithText("#").performClick()
         compose.onNodeWithText("#").performClick()
         compose.onNodeWithText("2").performClick()
-        compose.runOnIdle { assertEquals("Bd2", search) }
+        compose.runOnIdle { assertEquals("Bdה2", search) }
+        compose.onNodeWithText("#").performClick()
+        compose.onNodeWithText("2").performClick()
+        compose.runOnIdle { assertEquals("Bdה2a", search) }
 
         compose.onNodeWithTag("number-field").performClick()
         compose.onNodeWithText("2").performClick()
@@ -1027,7 +1354,7 @@ class StoryboardRegressionTest {
     }
 
     @Test
-    fun classicKeyboardRequiresLongPoundForEachFocusedField() {
+    fun classicSystemKeyboardRequiresExplicitOpenForEachFocusedField() {
         var first by mutableStateOf("")
         var second by mutableStateOf("")
         var inputSessions = 0
@@ -1048,6 +1375,7 @@ class StoryboardRegressionTest {
                             onValueChange = { second = it },
                             modifier = Modifier.testTag("second-field"),
                         )
+                        com.clarohome.presentation.classic.ClassicKeypadModeStatus(LocalClaroKeypadMode.current)
                         ClassicNumericKeypad(onDigitSelected = {})
                     }
                 }
@@ -1061,13 +1389,15 @@ class StoryboardRegressionTest {
             assertEquals(0, inputSessions)
         }
         compose.onNodeWithText("#").performTouchInput { longClick() }
+        compose.runOnIdle { assertEquals(0, inputSessions) }
+        compose.onNodeWithText("Open keyboard").performClick()
         compose.runOnIdle { assertEquals(1, inputSessions) }
 
         compose.onNodeWithTag("second-field").performClick()
         compose.runOnIdle { assertEquals(1, inputSessions) }
         compose.onNodeWithText("#").performClick()
         compose.runOnIdle { assertEquals(1, inputSessions) }
-        compose.onNodeWithText("#").performTouchInput { longClick() }
+        compose.onNodeWithText("Open keyboard").performClick()
         compose.runOnIdle { assertEquals(2, inputSessions) }
     }
 
@@ -1526,7 +1856,6 @@ class StoryboardRegressionTest {
                             onDigit = {},
                             onBackspace = {},
                             onCallEnteredNumber = {},
-                            onDirectCall = {},
                             onOpenContacts = {},
                             onSearchContacts = {},
                             onLoadMoreContacts = {},
@@ -1550,7 +1879,6 @@ class StoryboardRegressionTest {
                             onDigit = {},
                             onBackspace = {},
                             onCallEnteredNumber = {},
-                            onDirectCall = {},
                             onOpenContacts = {},
                             onSearchContacts = {},
                             onLoadMoreContacts = {},

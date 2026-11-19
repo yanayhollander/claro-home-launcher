@@ -29,6 +29,9 @@
 
     <queries>
         <intent>
+            <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+        </intent>
+        <intent>
             <action android:name="com.android.phone.EmergencyDialer.DIAL" />
         </intent>
         <intent>
@@ -72,6 +75,17 @@
         <meta-data
             android:name="firebase_crashlytics_collection_enabled"
             android:value="false" />
+        <receiver
+            android:name=".ClaroClockWidgetProvider"
+            android:exported="false"
+            android:label="@string/app_clock_widget">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_clock_info" />
+        </receiver>
         <activity
             android:name=".MainActivity"
             android:exported="true"

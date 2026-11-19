@@ -2,6 +2,7 @@ package com.clarohome.core.design
 
 import android.graphics.ImageDecoder
 import android.net.Uri
+import android.provider.ContactsContract
 import android.util.Log
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -183,6 +184,14 @@ enum class ClaroIconKind(
         "M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM2 21v-3a7 7 0 0 1 14 0v3M20 5v8m-4-4h8",
         filled = false,
     ),
+    EDIT(
+        "M4 20l1-5L17 3l4 4L9 19l-5 1ZM14 6l4 4",
+        filled = false,
+    ),
+    DELETE(
+        "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7",
+        filled = false,
+    ),
 }
 
 fun ClaroIconKind.imageVector(): ImageVector {
@@ -243,16 +252,29 @@ fun ClaroAvatar(
     paletteSeed: Int? = null,
     isUnassigned: Boolean = false,
     photoUri: String? = null,
+    contactNumber: String? = null,
+    contactLookupKey: String? = null,
 ) {
     val context = LocalContext.current
     val pixels = with(LocalDensity.current) { size.roundToPx().coerceIn(1, 512) }
-    val photo by produceState<ImageBitmap?>(null, photoUri, pixels, context, isUnassigned) {
+    val number = contactNumber?.takeIf(String::isNotBlank)
+    val lookupKey = contactLookupKey?.takeIf(String::isNotBlank)
+    val hasContact = number != null || lookupKey != null
+    val revision = if (hasContact || photoUri?.let { Uri.parse(it).authority } == ContactsContract.AUTHORITY) {
+        LocalClaroContactPhotoRevision.current
+    } else {
+        0L
+    }
+    val photo by produceState<ImageBitmap?>(null, photoUri, number, lookupKey, pixels, context, isUnassigned, revision) {
         value = null
-        if (photoUri.isNullOrBlank() || isUnassigned) return@produceState
+        if (!hasContact && (photoUri.isNullOrBlank() || isUnassigned)) return@produceState
         value = withContext(Dispatchers.IO) {
+            val resolver = context.contentResolver
+            val currentUri = resolver.currentContactPhoto(number, lookupKey, photoUri)
+            if (currentUri.isNullOrBlank()) return@withContext null
             try {
                 ImageDecoder.decodeBitmap(
-                    ImageDecoder.createSource(context.contentResolver, Uri.parse(photoUri)),
+                    ImageDecoder.createSource(resolver, Uri.parse(currentUri)),
                 ) { decoder, info, _ ->
                     decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
                     val scale = minOf(
@@ -379,29 +401,32 @@ fun ClaroBatteryMeter(
     modifier: Modifier = Modifier,
     borderColor: Color = Color.White,
     backgroundColor: Color = ClaroColors.Charcoal,
+    compact: Boolean = false,
 ) {
     val label = if (battery.isCharging) {
         stringResource(R.string.design_battery_percent_charging, battery.percentage)
     } else {
         stringResource(R.string.design_battery_percent, battery.percentage)
     }
+    val width = if (compact) 24.dp else 96.dp
+    val inset = if (compact) 2.dp else 3.dp
     Row(
         modifier = modifier.semantics { contentDescription = label },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
-                .width(96.dp)
-                .height(16.dp)
+                .width(width)
+                .height(if (compact) 12.dp else 16.dp)
                 .background(borderColor)
-                .padding(2.dp)
+                .padding(if (compact) 1.dp else 2.dp)
                 .background(backgroundColor)
                 .padding(1.dp),
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .width((90.dp * (battery.percentage.coerceIn(0, 100) / 100f)))
+                    .width((width - inset * 2) * (battery.percentage.coerceIn(0, 100) / 100f))
                     .background(Color(0xFF3BE564)),
             )
         }

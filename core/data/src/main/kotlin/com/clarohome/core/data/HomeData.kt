@@ -5,7 +5,7 @@ import com.clarohome.core.model.BadgeValue
 import com.clarohome.core.model.BatteryStatus
 import com.clarohome.core.model.CellularAvailability
 import com.clarohome.core.model.CellularStatus
-import com.clarohome.core.model.HOME_SLOT_COUNT
+import com.clarohome.core.model.LEGACY_HOME_SLOT_COUNT
 import com.clarohome.core.model.optionalHomeTileKinds
 import com.clarohome.core.domain.HomeTileVisibilityResult
 import com.clarohome.core.model.HomeRoleState
@@ -61,13 +61,15 @@ fun homeSlotTile(
     packageName: String? = null,
     phoneNumber: String? = null,
     photoUri: String? = null,
+    appWidgetId: Int? = null,
+    appWidgetProvider: String? = null,
 ): HomeTile = HomeTile(
     id = "slot-$slot",
     label = label,
     accent = when (kind) {
         HomeTileKind.PHONE -> TileAccent.GREEN
         HomeTileKind.CAMERA, HomeTileKind.ALARM -> TileAccent.ORANGE
-        HomeTileKind.GALLERY, HomeTileKind.INSTALLED_APP -> TileAccent.VIOLET
+        HomeTileKind.GALLERY, HomeTileKind.INSTALLED_APP, HomeTileKind.WIDGET -> TileAccent.VIOLET
         HomeTileKind.SOS -> TileAccent.RED
         HomeTileKind.MESSAGES, HomeTileKind.APPS, HomeTileKind.CONTACT -> TileAccent.BLUE
     },
@@ -81,6 +83,8 @@ fun homeSlotTile(
     isCore = false,
     phoneNumber = phoneNumber,
     photoUri = photoUri,
+    appWidgetId = appWidgetId,
+    appWidgetProvider = appWidgetProvider,
 )
 
 /** Fresh installs start with the essentials; everything else is optional. */
@@ -92,8 +96,8 @@ fun defaultHomeSlots(extra: List<HomeTile> = emptyList()): List<HomeTile?> {
         HomeTileKind.SOS to "SOS",
         HomeTileKind.APPS to "Apps",
     ).map { (kind, label) -> homeSlotTile(0, kind, label) }
-    val seeded = (essentials + extra).take(HOME_SLOT_COUNT)
-    return List(HOME_SLOT_COUNT) { index ->
+    val seeded = essentials + extra
+    return List(maxOf(LEGACY_HOME_SLOT_COUNT, seeded.size)) { index ->
         seeded.getOrNull(index)?.let { it.copy(id = "slot-$index") }
     }
 }
@@ -138,7 +142,11 @@ class SharedPreferencesHomeSlotStore @Inject constructor(
             save(migrated)
             return migrated
         }
-        return List(HOME_SLOT_COUNT) { slot ->
+        val lastSlot = prefs.all.keys.asSequence()
+            .filter { it.endsWith(".kind") }
+            .mapNotNull { it.removeSuffix(".kind").toIntOrNull() }
+            .maxOrNull() ?: -1
+        return List(maxOf(LEGACY_HOME_SLOT_COUNT, lastSlot + 1)) { slot ->
             val kind = runCatching {
                 HomeTileKind.valueOf(prefs.getString("$slot.kind", null).orEmpty())
             }.getOrNull() ?: return@List null
@@ -149,6 +157,8 @@ class SharedPreferencesHomeSlotStore @Inject constructor(
                 packageName = prefs.getString("$slot.package", null),
                 phoneNumber = prefs.getString("$slot.number", null),
                 photoUri = prefs.getString("$slot.photo", null),
+                appWidgetId = prefs.getInt("$slot.widget_id", -1).takeIf { it >= 0 },
+                appWidgetProvider = prefs.getString("$slot.widget_provider", null),
             )
         }
     }
@@ -157,13 +167,15 @@ class SharedPreferencesHomeSlotStore @Inject constructor(
         prefs.edit {
             clear()
             putBoolean(INITIALIZED, true)
-            slots.take(HOME_SLOT_COUNT).forEachIndexed { slot, tile ->
+            slots.forEachIndexed { slot, tile ->
                 if (tile == null) return@forEachIndexed
                 putString("$slot.kind", tile.kind.name)
                 putString("$slot.label", tile.label)
                 putString("$slot.package", tile.packageName)
                 putString("$slot.number", tile.phoneNumber)
                 putString("$slot.photo", tile.photoUri)
+                tile.appWidgetId?.let { putInt("$slot.widget_id", it) }
+                putString("$slot.widget_provider", tile.appWidgetProvider)
             }
         }
     }
@@ -239,8 +251,7 @@ class LocalHomeRepository @Inject constructor(
             ?: return HomeTileVisibilityResult.APP_UNAVAILABLE
         val existing = home.homeSlots.indexOfFirst { it?.packageName == packageName }
         if (visible) {
-            val slot = if (existing >= 0) existing else home.homeSlots.indexOfFirst { it == null }
-            if (slot < 0) return HomeTileVisibilityResult.HOME_FULL
+            val slot = if (existing >= 0) existing else home.homeSlots.indexOfLast { it != null } + 1
             setAppAllowed(packageName, true)
             setAppOnHome(packageName, true)
             setHomeSlot(slot, homeSlotTile(slot, HomeTileKind.INSTALLED_APP, app.label, packageName))
@@ -261,8 +272,7 @@ class LocalHomeRepository @Inject constructor(
         val home = state.value
         if (visible) {
             if (home.homeTiles.none { it.kind == kind }) {
-                val slot = home.homeSlots.indexOfFirst { it == null }
-                if (slot < 0) return HomeTileVisibilityResult.HOME_FULL
+                val slot = home.homeSlots.indexOfLast { it != null } + 1
                 setHomeSlot(slot, home.tiles.first { it.kind == kind })
             }
         } else {
@@ -274,8 +284,10 @@ class LocalHomeRepository @Inject constructor(
     }
 
     override suspend fun setHomeSlot(slot: Int, tile: HomeTile) {
-        if (slot !in 0 until HOME_SLOT_COUNT) return
-        val updated = state.value.homeSlots.mapIndexed { index, current ->
+        require(slot >= 0)
+        val home = state.value
+        val updated = List(maxOf(home.homeSlots.size, slot + 1)) { index ->
+            val current = home.homeSlots.getOrNull(index)
             when {
                 index == slot -> homeSlotTile(
                     slot = slot,
@@ -284,9 +296,13 @@ class LocalHomeRepository @Inject constructor(
                     packageName = tile.packageName,
                     phoneNumber = tile.phoneNumber,
                     photoUri = tile.photoUri,
-                ).copy(badge = state.value.badgeFor(tile.kind))
+                    appWidgetId = tile.appWidgetId,
+                    appWidgetProvider = tile.appWidgetProvider,
+                ).copy(badge = home.badgeFor(tile.kind))
                 // Built-in shortcuts exist once; placing one elsewhere moves it.
                 tile.kind.isUniqueShortcut && current?.kind == tile.kind -> null
+                tile.kind == HomeTileKind.WIDGET && current?.kind == HomeTileKind.WIDGET &&
+                    current.appWidgetId == tile.appWidgetId -> null
                 else -> current
             }
         }
@@ -296,13 +312,29 @@ class LocalHomeRepository @Inject constructor(
     }
 
     override suspend fun clearHomeSlot(slot: Int) {
-        if (slot !in 0 until HOME_SLOT_COUNT) return
+        if (slot !in state.value.homeSlots.indices) return
         val updated = state.value.homeSlots.mapIndexed { index, current ->
             if (index == slot) null else current
         }
         state.value = state.value.copy(homeSlots = updated)
         slotStore.save(updated)
         syncAppHomeFlags()
+    }
+
+    override suspend fun moveHomeTile(slot: Int, moveUp: Boolean) {
+        val home = state.value
+        val tile = home.homeSlots.getOrNull(slot) ?: return
+        val neighbor = if (moveUp) {
+            (slot - 1 downTo 0).firstOrNull { home.homeSlots[it] != null }
+        } else {
+            (slot + 1 until home.homeSlots.size).firstOrNull { home.homeSlots[it] != null }
+        } ?: return
+        val updated = home.homeSlots.toMutableList().apply {
+            this[slot] = this[neighbor]?.copy(id = "slot-$slot")
+            this[neighbor] = tile.copy(id = "slot-$neighbor")
+        }
+        slotStore.save(updated)
+        state.value = home.copy(homeSlots = updated)
     }
 
     override suspend fun reset() {
@@ -419,7 +451,7 @@ class LocalHomeRepository @Inject constructor(
         tiles.firstOrNull { it.kind == kind }?.badge
 
     private val HomeTileKind.isUniqueShortcut: Boolean
-        get() = this != HomeTileKind.CONTACT && this != HomeTileKind.INSTALLED_APP
+        get() = this !in setOf(HomeTileKind.CONTACT, HomeTileKind.INSTALLED_APP, HomeTileKind.WIDGET)
 
     private fun HomeSnapshot.withApps(apps: List<InstalledApp>): HomeSnapshot {
         val coreTiles = tiles.filter { it.isCore }

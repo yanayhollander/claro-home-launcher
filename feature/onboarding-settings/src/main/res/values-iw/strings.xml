@@ -29,7 +29,7 @@
     <string name="onb_show_apps_tile">הצגת יישומים במסך הבית</string>
     <string name="onb_show_app_on_home">הצגת %1$s במסך הבית</string>
     <string name="onb_settings_access">גישה להגדרות</string>
-    <string name="onb_step_people_and_speed_dial">אריחי מסך בית וחיוג מהיר</string>
+    <string name="onb_step_people_and_speed_dial">אריחי מסך הבית</string>
     <string name="onb_sos_contact_title">איש קשר לחירום (SOS)</string>
     <string name="onb_step_permissions_and_roles">הרשאות וברירות מחדל</string>
     <string name="onb_step_setup_complete">ההגדרה הושלמה</string>
@@ -88,11 +88,11 @@
     <string name="onb_confirm_new_pin_label">אימות קוד PIN חדש</string>
     <string name="onb_recover_pin_lost_both_warning">איבדתם גם את קוד ה-PIN וגם את צופן השחזור? אפסו את Claro בהגדרות היישומים של Android. ההעדפות המקומיות והטיוטות של Claro יימחקו; אנשי הקשר, הודעות ה-SMS והתמונות בטלפון יישמרו.</string>
 
-    <string name="onb_open_contacts_and_speed_dial">פתיחת אנשי קשר וחיוג מהיר</string>
-    <string name="onb_people_setup_body">בחרו מה יופיע במסך הבית — אנשי קשר, אפליקציות, SOS, שעון מעורר ועוד (עד 12 אריחים) — ולפי הצורך גם מקשים 1 ו-2 ללחיצה ארוכה. הכול כאן אופציונלי.</string>
+    <string name="onb_open_contacts_and_speed_dial">פתיחת אריחי מסך הבית</string>
+    <string name="onb_people_setup_body">בחרו מה יופיע במסך הבית — אנשי קשר, אפליקציות, SOS, שעון מעורר ועוד. הכול כאן אופציונלי.</string>
     <string name="onb_speed_dial_assigned">משויך</string>
     <string name="onb_speed_dial_not_set">לא הוגדר</string>
-    <string name="onb_people_setup_status_configured">%1$d מתוך 12 אריחים במסך הבית הוגדרו. לחיצה ארוכה על 1: %2$s · לחיצה ארוכה על 2: %3$s.</string>
+    <string name="onb_people_setup_status_configured">אריחים שהוגדרו במסך הבית: %1$d.</string>
     <string name="onb_people_setup_hold_note">לחיצה ארוכה על 1 או 2 מוציאה שיחה מיד, ללא מסך אישור נוסף.</string>
 
     <string name="onb_configure_trusted_person">הגדרת איש קשר מהימן</string>
@@ -126,8 +126,8 @@
     <string name="onb_home_and_apps_subtitle">בחרו אילו יישומים מורשים ויוצגו בתפריט</string>
     <string name="onb_menu_order_title">סדר התפריט</string>
     <string name="onb_menu_order_subtitle">בחירת המיקום של כל פריט בתפריט</string>
-    <string name="onb_people_and_speed_dial_amp_title">אריחי מסך בית וחיוג מהיר</string>
-    <string name="onb_people_configured_short">%1$d/12 אריחים הוגדרו במסך הבית</string>
+    <string name="onb_people_and_speed_dial_amp_title">אריחי מסך הבית</string>
+    <string name="onb_people_configured_short">אריחים שהוגדרו במסך הבית: %1$d</string>
     <string name="onb_language_and_display_amp_title">שפה ותצוגה</string>
     <string name="onb_sos_subtitle_configured">איש קשר מהימן אושר · בדיקה בנפרד</string>
     <string name="onb_sos_subtitle_not_configured">לא הוגדר</string>
