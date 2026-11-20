@@ -44,6 +44,7 @@ import com.clarohome.core.domain.TelemetryScreen
 import com.clarohome.feature.billing.observability.ConsentAwareObservability
 import com.clarohome.feature.billing.observability.ConsentController
 import com.clarohome.feature.billing.observability.DiagnosticsConsent
+import com.clarohome.feature.billing.observability.TelemetryIdentityStore
 import com.clarohome.feature.launcher.home.HomeRoleController
 import com.clarohome.feature.launcher.home.InstalledAppCatalog
 import com.clarohome.feature.launcher.home.LauncherStatusReader
@@ -79,6 +80,7 @@ data class MainUiState(
     val activeActivities: Set<CriticalActivity> = emptySet(),
     val message: String? = null,
     val billingObservability: BillingObservabilityUiState = BillingObservabilityUiState(),
+    val telemetryUserId: String? = null,
 )
 
 @HiltViewModel
@@ -101,7 +103,11 @@ class MainViewModel @Inject constructor(
     private val billingRepository: BillingRepository,
     private val consentController: ConsentController,
     private val observability: ConsentAwareObservability,
+    private val telemetryIdentityStore: TelemetryIdentityStore,
 ) : ViewModel() {
+    val appVersion: String = checkNotNull(
+        appContext.packageManager.getPackageInfo(appContext.packageName, 0).versionName,
+    )
     private val startup = MutableStateFlow<StartupRecoveryState>(StartupRecoveryState.Recovering)
     private val message = MutableStateFlow<String?>(null)
     private val sosCoordinator = SosCoordinator(phoneCallGateway, emergencyNumberDetector)
@@ -136,6 +142,11 @@ class MainViewModel @Inject constructor(
             activeActivities = activeActivities,
             message = status.first,
             billingObservability = status.second,
+            telemetryUserId = if (status.second.consent.analytics || status.second.consent.crashReports) {
+                telemetryIdentityStore.getExisting()
+            } else {
+                null
+            },
         )
     }.stateIn(
         scope = viewModelScope,

@@ -1,6 +1,9 @@
 package com.clarohome.feature.onboarding.settings
 
+import android.content.ClipData
 import android.content.res.Configuration
+import android.os.SystemClock
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -42,7 +45,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,6 +56,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -68,6 +75,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -100,6 +108,7 @@ import com.clarohome.core.model.flowIndex
 import com.clarohome.core.model.onboardingStepOrder
 import com.clarohome.core.model.optionalHomeTileKinds
 import com.clarohome.core.model.defaultAppsConfigured
+import kotlinx.coroutines.launch
 
 data class OnboardingCallbacks(
     val onContinue: (OnboardingStep) -> Unit,
@@ -445,6 +454,8 @@ fun PinRecoveryScreen(
 @Composable
 fun SettingsHubScreen(
     preferences: ClaroPreferences,
+    appVersion: String,
+    telemetryUserId: String?,
     onPhoneStyle: () -> Unit,
     onDisplayLanguage: () -> Unit,
     onAccessMethod: () -> Unit,
@@ -625,7 +636,70 @@ fun SettingsHubScreen(
                 },
                 onClick = onResetClaro,
             )
+            SettingsAppInfo(appVersion = appVersion, telemetryUserId = telemetryUserId)
         }
+    }
+}
+
+@Composable
+private fun SettingsAppInfo(appVersion: String, telemetryUserId: String?) {
+    val context = LocalContext.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    val userIdLabel = stringResource(R.string.onb_user_id)
+    val copyHint = stringResource(R.string.onb_user_id_copy_hint)
+    val copiedMessage = stringResource(R.string.onb_user_id_copied)
+    var tapCount by remember(telemetryUserId) { mutableIntStateOf(0) }
+    var lastTapAt by remember(telemetryUserId) { mutableStateOf<Long?>(null) }
+
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("settings-user-id")
+                .clickable(
+                    enabled = telemetryUserId != null,
+                    onClickLabel = copyHint,
+                ) {
+                    val now = SystemClock.uptimeMillis()
+                    tapCount = if (lastTapAt?.let { now - it <= 600L } == true) tapCount + 1 else 1
+                    lastTapAt = now
+                    if (tapCount == 3) {
+                        tapCount = 0
+                        scope.launch {
+                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(userIdLabel, telemetryUserId)))
+                            Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+                .padding(vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = userIdLabel,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = telemetryUserId ?: stringResource(R.string.onb_user_id_unavailable),
+                style = MaterialTheme.typography.bodySmall.copy(
+                    textDirection = if (telemetryUserId != null) TextDirection.Ltr else TextDirection.Content,
+                ),
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            text = stringResource(R.string.onb_app_version, appVersion),
+            style = MaterialTheme.typography.bodySmall,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.testTag("settings-app-version"),
+        )
     }
 }
 

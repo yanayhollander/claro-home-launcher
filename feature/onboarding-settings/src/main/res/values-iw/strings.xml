@@ -4,6 +4,11 @@
     <string name="touch_home">מסך בית במגע</string>
     <string name="classic_phone">טלפון קלאסי</string>
     <string name="settings">הגדרות</string>
+    <string name="onb_user_id">מזהה משתמש</string>
+    <string name="onb_user_id_copy_hint">הקישו שלוש פעמים להעתקת מזהה המשתמש</string>
+    <string name="onb_user_id_copied">מזהה המשתמש הועתק</string>
+    <string name="onb_user_id_unavailable">לא זמין — ייתכן שניתוח השימוש ודיווח הקריסות כבויים</string>
+    <string name="onb_app_version">גרסה %1$s</string>
     <string name="phone_style">סגנון הטלפון</string>
     <string name="unlock">פתיחה</string>
 

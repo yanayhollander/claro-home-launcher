@@ -1398,6 +1398,8 @@ private fun ClaroApp(
                         ProtectedSessionMonitor(viewModel, navController)
                         SettingsHubScreen(
                             preferences = state.preferences,
+                            appVersion = viewModel.appVersion,
+                            telemetryUserId = state.telemetryUserId,
                             onCallAudio = { navController.navigateIfNotCurrent(CallAudioRoute) },
                             onPhoneStyle = {
                                 navController.navigateIfNotCurrent(PhoneStyleRoute)

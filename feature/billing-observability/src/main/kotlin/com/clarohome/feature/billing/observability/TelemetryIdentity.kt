@@ -9,6 +9,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 interface TelemetryIdentityStore {
+    fun getExisting(): String?
     fun getOrCreate(): String?
     fun clear()
 }
@@ -22,6 +23,12 @@ class SharedPreferencesTelemetryIdentityStore @Inject constructor(
 ) : TelemetryIdentityStore {
     private val preferences = context.getSharedPreferences(OBSERVABILITY_PREFERENCES, Context.MODE_PRIVATE)
     private var unpersistedId: String? = null
+
+    @Synchronized
+    override fun getExisting(): String? =
+        preferences.getString(TELEMETRY_IDENTITY_KEY, null)?.takeIf {
+            it.matches(INSTALLATION_ID) && it != unpersistedId
+        }
 
     @Synchronized
     @SuppressLint("UseKtx") // An ID must be persisted before it is sent to any destination.

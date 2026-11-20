@@ -74,6 +74,11 @@ links resolve to the dialer and message editor, not obsolete confirmation screen
   without losing in-memory data, and automatic call-audio settings with a
   maximum-volume warning. Language/text-size rows open full-screen pickers;
   Standard/Large/Huge and vibration replace the old contrast toggle.
+  In the native app, the bottom of Settings shows the shared Firebase,
+  Crashlytics and Mixpanel user ID above the installed app version. Tap the ID
+  three times quickly to copy it. Viewing Settings never creates an ID or
+  enables telemetry; the ID is unavailable when analytics and crash reporting
+  are both off.
 - **Media:** Camera opens its external illustration immediately and returns to
   the preceding screen. Gallery represents newest device photos without an
   import step. Classic Up/Down browses pictures, and Options opens confirmed

@@ -4,6 +4,11 @@
     <string name="touch_home">Inicio táctil</string>
     <string name="classic_phone">Teléfono clásico</string>
     <string name="settings">Configuración</string>
+    <string name="onb_user_id">ID de usuario</string>
+    <string name="onb_user_id_copy_hint">Toca tres veces para copiar el ID de usuario</string>
+    <string name="onb_user_id_copied">ID de usuario copiado</string>
+    <string name="onb_user_id_unavailable">No disponible — los análisis y los informes de fallos pueden estar desactivados</string>
+    <string name="onb_app_version">Versión %1$s</string>
     <string name="phone_style">Estilo del teléfono</string>
     <string name="unlock">Desbloquear</string>
 

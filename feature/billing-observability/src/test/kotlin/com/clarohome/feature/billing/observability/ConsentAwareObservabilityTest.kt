@@ -333,6 +333,8 @@ private class MemoryIdentityStore : TelemetryIdentityStore {
     var failPersistence = false
     private var id: String? = null
 
+    override fun getExisting(): String? = id
+
     override fun getOrCreate(): String? {
         if (failPersistence) return null
         return id ?: "installation-${++creationCount}".also { id = it }
