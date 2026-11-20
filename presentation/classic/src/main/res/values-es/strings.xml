@@ -15,7 +15,6 @@
     <string name="classic_navigate_down">Navegar abajo</string>
     <string name="classic_keypad_space">espacio</string>
     <string name="classic_keypad_key_description">%1$s, %2$s</string>
-    <string name="classic_keypad_key_speed_dial">%1$s, %2$s. Mantén pulsado para marcación rápida</string>
 
     <string name="classic_messages">Mensajes</string>
     <string name="classic_sos">SOS</string>
@@ -74,7 +73,6 @@
     <string name="classic_decline">Rechazar</string>
     <string name="classic_end">Finalizar</string>
     <string name="classic_repair_phone_access">Reparar acceso al teléfono</string>
-    <string name="classic_emergency_call">Servicios de emergencia</string>
     <string name="classic_earpiece">Auricular</string>
     <string name="classic_speaker">Altavoz</string>
     <string name="classic_mute">Silenciar</string>

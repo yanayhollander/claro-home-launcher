@@ -15,7 +15,6 @@
     <string name="classic_navigate_down">ניווט למטה</string>
     <string name="classic_keypad_space">רווח</string>
     <string name="classic_keypad_key_description">%1$s, %2$s</string>
-    <string name="classic_keypad_key_speed_dial">%1$s, %2$s. לחיצה ארוכה לחיוג מהיר</string>
 
     <string name="classic_messages">הודעות</string>
     <string name="classic_sos">SOS</string>
@@ -74,7 +73,6 @@
     <string name="classic_decline">דחה</string>
     <string name="classic_end">סיים</string>
     <string name="classic_repair_phone_access">תיקון גישה לטלפון</string>
-    <string name="classic_emergency_call">שירותי חירום</string>
     <string name="classic_earpiece">אפרכסת</string>
     <string name="classic_speaker">רמקול</string>
     <string name="classic_mute">השתק</string>

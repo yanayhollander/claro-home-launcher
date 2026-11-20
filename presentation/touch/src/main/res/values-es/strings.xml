@@ -9,7 +9,6 @@
     <string name="touch_home_role_unknown">El estado de la aplicación de inicio no está disponible.</string>
     <string name="touch_home_role_choose">Elegir Claro como inicio</string>
     <string name="touch_home_role_open_settings">Abrir configuración de inicio</string>
-    <string name="touch_add_person">Añadir persona</string>
     <string name="touch_favorite_action_call">Llamar a %1$s</string>
     <string name="touch_signal_no_sim">Sin SIM</string>
     <string name="touch_signal_no_signal">Sin señal</string>
@@ -37,7 +36,6 @@
     <string name="touch_action_delete">Eliminar</string>
     <string name="touch_action_try_again">Intentar de nuevo</string>
     <string name="touch_contacts">Contactos</string>
-    <string name="touch_emergency_call">Servicios de emergencia</string>
     <string name="touch_emergency_dialer_title">Marcador de emergencia</string>
     <string name="touch_emergency_handoff_message">Continúa en el marcador de emergencia del sistema.</string>
     <string name="touch_calling_unavailable_device">Las llamadas no están disponibles en este dispositivo.</string>
@@ -49,12 +47,6 @@
     <string name="touch_dial_number_empty_a11y">Número de teléfono vacío</string>
     <string name="touch_dial_number_value_a11y">Número de teléfono %1$s</string>
     <string name="touch_backspace">Borrar</string>
-    <string name="touch_speed_dial_chip">%1$s · %2$s</string>
-    <string name="touch_speed_dial_not_set">Marcación rápida %1$s sin configurar</string>
-    <string name="touch_speed_dial_needs_repair">Marcación rápida %1$s, %2$s, requiere reparación</string>
-    <string name="touch_speed_dial_hold_to_call">Mantén pulsado %1$s para llamar a %2$s</string>
-    <string name="touch_keypad_digit_hold_call">%1$s. Mantén pulsado para llamar a %2$s</string>
-    <string name="touch_keypad_digit_hold_speed_dial">%1$s. Mantén pulsado para marcación rápida</string>
     <string name="touch_search_name_or_number">Buscar nombre o número</string>
     <string name="touch_contacts_phone_needs_repair">Los contactos están disponibles, pero el acceso al teléfono requiere reparación.</string>
     <string name="touch_no_contacts_yet">Aún no hay contactos.</string>

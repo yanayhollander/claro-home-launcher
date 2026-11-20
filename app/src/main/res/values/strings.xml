@@ -9,7 +9,6 @@
     <string name="app_add_home_tile_hint">Choose a contact, app, shortcut, or widget</string>
     <string name="app_tiles_on_home">On your Home screen</string>
     <string name="app_no_tiles_on_home">No Home tiles yet. Tap Add tile to get started.</string>
-    <string name="app_speed_dial_heading">Speed dial</string>
     <string name="app_replace_home_tile">Replace tile</string>
     <string name="app_remove_home_tile">Remove from Home</string>
     <string name="app_menu">Menu</string>
@@ -72,9 +71,6 @@
     <string name="app_apps_empty_body">Apps that a caregiver chooses to allow will appear here. To add some, open Settings \u2192 Apps &amp; Menu and turn on the apps you want.</string>
     <string name="app_is_missing_or_disabled">App is missing or disabled</string>
 
-    <string name="app_not_set">Not set</string>
-    <string name="app_speed_dial_hold_slot">Hold %1$s · %2$s</string>
-    <string name="app_speed_dial_immediate_notice">Holding 1 or 2 calls immediately, without confirmation.</string>
     <string name="app_clear_selected_slot">Clear selected slot</string>
     <string name="app_no_contacts_available">No contacts are available. Allow Contacts access or add a contact in Android.</string>
     <string name="app_load_contacts">Load contacts</string>
@@ -138,12 +134,10 @@
     <string name="app_gallery_partial_access">Android is sharing only some pictures. Allow all pictures to see them all.</string>
     <string name="app_picture_position">Picture %1$d of %2$d</string>
     <string name="app_apps_and_menu">Apps &amp; menu</string>
-    <string name="app_home_slot">Tile %1$d</string>
     <string name="app_alarm_clock">Alarm clock</string>
     <string name="app_section_shortcuts">Shortcuts</string>
     <string name="app_section_apps">Apps</string>
     <string name="app_section_contacts">Contacts</string>
-    <string name="app_choose_for_tile">Choose for tile %1$d</string>
     <string name="app_choose_for_key">Choose for speed dial %1$s</string>
     <string name="app_menu_order_title">Menu order</string>
     <string name="app_menu_order_hint">Move items up or down. This is the order they appear in the Menu.</string>

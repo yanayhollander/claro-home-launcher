@@ -35,6 +35,7 @@ import androidx.core.content.ContextCompat
 import androidx.annotation.VisibleForTesting
 import androidx.core.content.edit
 import androidx.core.app.NotificationCompat
+import androidx.core.net.toUri
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -861,7 +862,7 @@ class AndroidContactsGateway @Inject constructor(
 
     private suspend fun readContactPhoto(photoUri: String): ByteArray? = withContext(Dispatchers.IO) {
         try {
-            val bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(resolver, Uri.parse(photoUri))) {
+            val bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(resolver, photoUri.toUri())) {
                     decoder, info, _ ->
                 decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
                 val width = info.size.width

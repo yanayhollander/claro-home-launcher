@@ -12,10 +12,6 @@
     <string name="onb_language_hebrew" translatable="false">עברית</string>
     <string name="onb_date_format_pattern" translatable="false">dd/MM/YYYY</string>
     <string name="onb_preview_sample_phone_time" translatable="false">202-555-0101 · 9:41</string>
-    <string name="onb_preview_sample_time" translatable="false">9:41</string>
-    <string name="onb_classic_preview_sms" translatable="false">SMS</string>
-    <string name="onb_classic_preview_sos" translatable="false">SOS</string>
-    <string name="onb_classic_preview_ok" translatable="false">OK</string>
     <string name="onb_text_size_sample" translatable="false">Aa</string>
     <string name="onb_language_display_summary" translatable="false">%1$s · %2$s</string>
     <string name="onb_bullet_item" translatable="false">• %1$s</string>
@@ -64,7 +60,6 @@
     <string name="onb_classic_mode_card_summary">Number keys and familiar phone controls</string>
     <string name="onb_mode_selected">✓ Selected</string>
     <string name="onb_tap_to_choose">Tap to choose</string>
-    <string name="onb_classic_preview_date">Wed 11</string>
 
     <string name="onb_section_language">Language</string>
     <string name="onb_section_text_size">Text size</string>
@@ -103,10 +98,7 @@
 
     <string name="onb_open_contacts_and_speed_dial">Open Home tiles</string>
     <string name="onb_people_setup_body">Choose what appears on Home — contacts, apps, SOS, alarm clock and more. Everything here is optional.</string>
-    <string name="onb_speed_dial_assigned">assigned</string>
-    <string name="onb_speed_dial_not_set">not set</string>
     <string name="onb_people_setup_status_configured" tools:ignore="PluralsCandidate">Home tiles configured: %1$d.</string>
-    <string name="onb_people_setup_hold_note">Holding 1 or 2 places a call immediately without an extra confirmation screen.</string>
 
     <string name="onb_configure_trusted_person">Configure trusted person</string>
     <string name="onb_continue_sos_incomplete">Skip SOS for now</string>

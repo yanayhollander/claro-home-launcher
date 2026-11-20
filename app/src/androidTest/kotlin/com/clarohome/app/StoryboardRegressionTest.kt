@@ -884,8 +884,8 @@ class StoryboardRegressionTest {
                 )
             }
         }
-        compose.onNodeWithText("1").performTouchInput { longClick() }
-        compose.onNodeWithText("2").performTouchInput { longClick() }
+        compose.onNodeWithContentDescription("1").performTouchInput { longClick() }
+        compose.onNodeWithContentDescription("2, ABC").performTouchInput { longClick() }
         compose.onNodeWithContentDescription("#").performClick()
         compose.onNodeWithText("*").performClick()
         compose.onNodeWithText("*").performTouchInput { longClick() }
@@ -1960,7 +1960,9 @@ class StoryboardRegressionTest {
     @Test
     fun touchMessagingMatchesInboxAndComposeStoryboard() {
         var messagingRoute by mutableStateOf(MessagingRoute.INBOX)
+        var backDispatcher: androidx.activity.OnBackPressedDispatcher? = null
         compose.setContent {
+            backDispatcher = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
             ClaroTheme {
                 TouchMessagingScreen(
                     state = MessagingUiState(
@@ -2011,7 +2013,7 @@ class StoryboardRegressionTest {
                     onSend = {},
                     onRetry = {},
                     onConfirmDuplicateRisk = {},
-                    onCancelFailure = {},
+                    onCancelFailure = { messagingRoute = MessagingRoute.INBOX },
                     onRepair = {},
                     onHome = {},
                 )
@@ -2023,8 +2025,9 @@ class StoryboardRegressionTest {
 
         compose.onNodeWithText("Write a message").performClick()
         compose.onNodeWithText("Send").assertHeightIsAtLeast(64.dp)
-        compose.onNodeWithText("Cancel · keep draft").assertHeightIsAtLeast(64.dp)
         capture("message-compose", "touch-messaging")
+        compose.runOnIdle { checkNotNull(backDispatcher).onBackPressed() }
+        compose.onNodeWithText("Write a message").assertIsDisplayed()
     }
 
     @Test

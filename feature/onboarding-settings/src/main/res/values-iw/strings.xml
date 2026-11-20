@@ -51,7 +51,6 @@
     <string name="onb_classic_mode_card_summary">מקשי מספרים וכפתורי טלפון מוכרים</string>
     <string name="onb_mode_selected">✓ נבחר</string>
     <string name="onb_tap_to_choose">הקישו לבחירה</string>
-    <string name="onb_classic_preview_date">ד׳ 11</string>
 
     <string name="onb_section_language">שפה</string>
     <string name="onb_section_text_size">גודל טקסט</string>
@@ -90,10 +89,7 @@
 
     <string name="onb_open_contacts_and_speed_dial">פתיחת אריחי מסך הבית</string>
     <string name="onb_people_setup_body">בחרו מה יופיע במסך הבית — אנשי קשר, אפליקציות, SOS, שעון מעורר ועוד. הכול כאן אופציונלי.</string>
-    <string name="onb_speed_dial_assigned">משויך</string>
-    <string name="onb_speed_dial_not_set">לא הוגדר</string>
     <string name="onb_people_setup_status_configured">אריחים שהוגדרו במסך הבית: %1$d.</string>
-    <string name="onb_people_setup_hold_note">לחיצה ארוכה על 1 או 2 מוציאה שיחה מיד, ללא מסך אישור נוסף.</string>
 
     <string name="onb_configure_trusted_person">הגדרת איש קשר מהימן</string>
     <string name="onb_continue_sos_incomplete">דילוג על SOS כרגע</string>

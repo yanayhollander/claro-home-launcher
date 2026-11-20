@@ -28,7 +28,6 @@
     <string name="classic_navigate_down">Navigate down</string>
     <string name="classic_keypad_space">space</string>
     <string name="classic_keypad_key_description">%1$s, %2$s</string>
-    <string name="classic_keypad_key_speed_dial">%1$s, %2$s. Hold for speed dial</string>
 
     <string name="classic_messages">Messages</string>
     <string name="classic_sos">SOS</string>
@@ -87,7 +86,6 @@
     <string name="classic_decline">Decline</string>
     <string name="classic_end">End</string>
     <string name="classic_repair_phone_access">Repair phone access</string>
-    <string name="classic_emergency_call">Emergency services</string>
     <string name="classic_earpiece">Earpiece</string>
     <string name="classic_speaker">Speaker</string>
     <string name="classic_mute">Mute</string>

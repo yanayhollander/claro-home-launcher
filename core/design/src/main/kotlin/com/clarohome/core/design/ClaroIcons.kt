@@ -1,7 +1,6 @@
 package com.clarohome.core.design
 
 import android.graphics.ImageDecoder
-import android.net.Uri
 import android.provider.ContactsContract
 import android.util.Log
 import androidx.compose.foundation.Canvas
@@ -48,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
 import com.clarohome.core.model.BatteryStatus
 import com.clarohome.core.model.CellularAvailability
 import com.clarohome.core.model.CellularStatus
@@ -260,7 +260,7 @@ fun ClaroAvatar(
     val number = contactNumber?.takeIf(String::isNotBlank)
     val lookupKey = contactLookupKey?.takeIf(String::isNotBlank)
     val hasContact = number != null || lookupKey != null
-    val revision = if (hasContact || photoUri?.let { Uri.parse(it).authority } == ContactsContract.AUTHORITY) {
+    val revision = if (hasContact || photoUri?.toUri()?.authority == ContactsContract.AUTHORITY) {
         LocalClaroContactPhotoRevision.current
     } else {
         0L
@@ -274,7 +274,7 @@ fun ClaroAvatar(
             if (currentUri.isNullOrBlank()) return@withContext null
             try {
                 ImageDecoder.decodeBitmap(
-                    ImageDecoder.createSource(resolver, Uri.parse(currentUri)),
+                    ImageDecoder.createSource(resolver, currentUri.toUri()),
                 ) { decoder, info, _ ->
                     decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
                     val scale = minOf(

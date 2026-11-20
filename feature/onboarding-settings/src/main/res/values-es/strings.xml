@@ -51,7 +51,6 @@
     <string name="onb_classic_mode_card_summary">Teclas numéricas y controles de teléfono conocidos</string>
     <string name="onb_mode_selected">✓ Seleccionado</string>
     <string name="onb_tap_to_choose">Toca para elegir</string>
-    <string name="onb_classic_preview_date">Mié 11</string>
 
     <string name="onb_section_language">Idioma</string>
     <string name="onb_section_text_size">Tamaño del texto</string>
@@ -90,10 +89,7 @@
 
     <string name="onb_open_contacts_and_speed_dial">Abrir mosaicos de inicio</string>
     <string name="onb_people_setup_body">Elige qué aparece en Inicio (contactos, aplicaciones, SOS, despertador y más). Todo es opcional.</string>
-    <string name="onb_speed_dial_assigned">asignado</string>
-    <string name="onb_speed_dial_not_set">sin asignar</string>
     <string name="onb_people_setup_status_configured">Mosaicos de Inicio configurados: %1$d.</string>
-    <string name="onb_people_setup_hold_note">Mantener pulsado 1 o 2 inicia la llamada de inmediato, sin pantalla de confirmación adicional.</string>
 
     <string name="onb_configure_trusted_person">Configurar persona de confianza</string>
     <string name="onb_continue_sos_incomplete">Omitir SOS por ahora</string>

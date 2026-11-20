@@ -9,7 +9,6 @@
     <string name="app_add_home_tile_hint">בחרו איש קשר, אפליקציה, קיצור דרך או וידג׳ט</string>
     <string name="app_tiles_on_home">במסך הבית</string>
     <string name="app_no_tiles_on_home">אין עדיין אריחים במסך הבית. לחצו על הוספת אריח כדי להתחיל.</string>
-    <string name="app_speed_dial_heading">חיוג מהיר</string>
     <string name="app_replace_home_tile">החלפת אריח</string>
     <string name="app_remove_home_tile">הסרה ממסך הבית</string>
     <string name="app_menu">תפריט</string>
@@ -72,9 +71,6 @@
     <string name="app_apps_empty_body">כאן יופיעו האפליקציות שמטפל יאשר. כדי להוסיף, פתחו הגדרות \u2192 אפליקציות ותפריט והפעילו את האפליקציות הרצויות.</string>
     <string name="app_is_missing_or_disabled">האפליקציה חסרה או מושבתת</string>
 
-    <string name="app_not_set">לא הוגדר</string>
-    <string name="app_speed_dial_hold_slot">לחיצה ארוכה על %1$s · %2$s</string>
-    <string name="app_speed_dial_immediate_notice">לחיצה ארוכה על 1 או 2 מחייגת מיד, ללא בקשת אישור.</string>
     <string name="app_clear_selected_slot">ניקוי המקום שנבחר</string>
     <string name="app_no_contacts_available">אין אנשי קשר זמינים. אשרו גישה לאנשי קשר או הוסיפו איש קשר ב-Android.</string>
     <string name="app_load_contacts">טעינת אנשי קשר</string>
@@ -138,12 +134,10 @@
     <string name="app_gallery_partial_access">Android משתף רק חלק מהתמונות. אשרו את כל התמונות כדי לראות את כולן.</string>
     <string name="app_picture_position">תמונה %1$d מתוך %2$d</string>
     <string name="app_apps_and_menu">אפליקציות ותפריט</string>
-    <string name="app_home_slot">אריח %1$d</string>
     <string name="app_alarm_clock">שעון מעורר</string>
     <string name="app_section_shortcuts">קיצורים</string>
     <string name="app_section_apps">אפליקציות</string>
     <string name="app_section_contacts">אנשי קשר</string>
-    <string name="app_choose_for_tile">בחירה עבור אריח %1$d</string>
     <string name="app_choose_for_key">בחירה עבור חיוג מהיר %1$s</string>
     <string name="app_menu_order_title">סדר התפריט</string>
     <string name="app_menu_order_hint">הזיזו פריטים למעלה או למטה. זה הסדר שבו הם מופיעים בתפריט.</string>

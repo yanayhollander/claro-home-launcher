@@ -9,7 +9,6 @@
     <string name="touch_home_role_unknown">Home app status is unavailable.</string>
     <string name="touch_home_role_choose">Choose Claro as Home</string>
     <string name="touch_home_role_open_settings">Open Home settings</string>
-    <string name="touch_add_person">Add person</string>
     <string name="touch_favorite_action_call">Call %1$s</string>
     <string name="touch_signal_no_sim">No SIM</string>
     <string name="touch_signal_no_signal">No signal</string>
@@ -37,7 +36,6 @@
     <string name="touch_action_delete">Delete</string>
     <string name="touch_action_try_again">Try again</string>
     <string name="touch_contacts">Contacts</string>
-    <string name="touch_emergency_call">Emergency services</string>
     <string name="touch_emergency_dialer_title">Emergency dialer</string>
     <string name="touch_emergency_handoff_message">Continue in the system emergency dialer.</string>
     <string name="touch_calling_unavailable_device">Calling is not available on this device.</string>
@@ -49,12 +47,6 @@
     <string name="touch_dial_number_empty_a11y">Phone number empty</string>
     <string name="touch_dial_number_value_a11y">Phone number %1$s</string>
     <string name="touch_backspace">Backspace</string>
-    <string name="touch_speed_dial_chip">%1$s · %2$s</string>
-    <string name="touch_speed_dial_not_set">Speed dial %1$s not set</string>
-    <string name="touch_speed_dial_needs_repair">Speed dial %1$s, %2$s, needs repair</string>
-    <string name="touch_speed_dial_hold_to_call">Hold %1$s to call %2$s</string>
-    <string name="touch_keypad_digit_hold_call">%1$s. Hold to call %2$s</string>
-    <string name="touch_keypad_digit_hold_speed_dial">%1$s. Hold for speed dial</string>
     <string name="touch_search_name_or_number">Search name or number</string>
     <string name="touch_contacts_phone_needs_repair">Contacts are available, but phone access needs repair.</string>
     <string name="touch_no_contacts_yet">No contacts yet.</string>

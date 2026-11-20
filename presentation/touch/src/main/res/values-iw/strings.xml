@@ -9,7 +9,6 @@
     <string name="touch_home_role_unknown">מצב אפליקציית הבית אינו זמין.</string>
     <string name="touch_home_role_choose">בחירת Claro כמסך הבית</string>
     <string name="touch_home_role_open_settings">פתיחת הגדרות מסך הבית</string>
-    <string name="touch_add_person">הוספת איש קשר</string>
     <string name="touch_favorite_action_call">שיחה אל %1$s</string>
     <string name="touch_signal_no_sim">אין SIM</string>
     <string name="touch_signal_no_signal">אין קליטה</string>
@@ -37,7 +36,6 @@
     <string name="touch_action_delete">מחיקה</string>
     <string name="touch_action_try_again">ניסיון חוזר</string>
     <string name="touch_contacts">אנשי קשר</string>
-    <string name="touch_emergency_call">שירותי חירום</string>
     <string name="touch_emergency_dialer_title">חייגן חירום</string>
     <string name="touch_emergency_handoff_message">המשיכו בחייגן החירום של המערכת.</string>
     <string name="touch_calling_unavailable_device">שיחות אינן זמינות במכשיר זה.</string>
@@ -49,12 +47,6 @@
     <string name="touch_dial_number_empty_a11y">מספר טלפון ריק</string>
     <string name="touch_dial_number_value_a11y">מספר טלפון %1$s</string>
     <string name="touch_backspace">מחיקה</string>
-    <string name="touch_speed_dial_chip">%1$s · %2$s</string>
-    <string name="touch_speed_dial_not_set">חיוג מהיר %1$s לא הוגדר</string>
-    <string name="touch_speed_dial_needs_repair">חיוג מהיר %1$s, %2$s, דורש תיקון</string>
-    <string name="touch_speed_dial_hold_to_call">לחיצה ארוכה על %1$s כדי להתקשר אל %2$s</string>
-    <string name="touch_keypad_digit_hold_call">%1$s. לחיצה ארוכה כדי להתקשר אל %2$s</string>
-    <string name="touch_keypad_digit_hold_speed_dial">%1$s. לחיצה ארוכה לחיוג מהיר</string>
     <string name="touch_search_name_or_number">חיפוש שם או מספר</string>
     <string name="touch_contacts_phone_needs_repair">אנשי הקשר זמינים, אך הגישה לטלפון דורשת תיקון.</string>
     <string name="touch_no_contacts_yet">אין אנשי קשר עדיין.</string>

@@ -9,7 +9,6 @@
     <string name="app_add_home_tile_hint">Elige un contacto, una app, un acceso directo o un widget</string>
     <string name="app_tiles_on_home">En la pantalla de inicio</string>
     <string name="app_no_tiles_on_home">Aún no hay mosaicos. Pulsa Añadir mosaico para empezar.</string>
-    <string name="app_speed_dial_heading">Marcación rápida</string>
     <string name="app_replace_home_tile">Reemplazar mosaico</string>
     <string name="app_remove_home_tile">Quitar de Inicio</string>
     <string name="app_menu">Menú</string>
@@ -72,9 +71,6 @@
     <string name="app_apps_empty_body">Aquí aparecerán las aplicaciones que un cuidador permita. Para añadirlas, abre Configuración \u2192 Aplicaciones y menú y activa las que quieras.</string>
     <string name="app_is_missing_or_disabled">La aplicación falta o está desactivada</string>
 
-    <string name="app_not_set">Sin asignar</string>
-    <string name="app_speed_dial_hold_slot">Mantener %1$s · %2$s</string>
-    <string name="app_speed_dial_immediate_notice">Mantener pulsado 1 o 2 llama de inmediato, sin confirmación.</string>
     <string name="app_clear_selected_slot">Vaciar espacio seleccionado</string>
     <string name="app_no_contacts_available">No hay contactos disponibles. Permita el acceso a Contactos o añada un contacto en Android.</string>
     <string name="app_load_contacts">Cargar contactos</string>
@@ -138,12 +134,10 @@
     <string name="app_gallery_partial_access">Android comparte solo algunas fotos. Permite todas las fotos para verlas todas.</string>
     <string name="app_picture_position">Foto %1$d de %2$d</string>
     <string name="app_apps_and_menu">Aplicaciones y menú</string>
-    <string name="app_home_slot">Mosaico %1$d</string>
     <string name="app_alarm_clock">Despertador</string>
     <string name="app_section_shortcuts">Accesos directos</string>
     <string name="app_section_apps">Aplicaciones</string>
     <string name="app_section_contacts">Contactos</string>
-    <string name="app_choose_for_tile">Elegir para el mosaico %1$d</string>
     <string name="app_choose_for_key">Elegir para la marcación rápida %1$s</string>
     <string name="app_menu_order_title">Orden del menú</string>
     <string name="app_menu_order_hint">Mueve los elementos hacia arriba o abajo. Este es el orden en que aparecen en el menú.</string>

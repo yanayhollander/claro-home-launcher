@@ -19,9 +19,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -47,19 +47,22 @@ internal fun HomeWidgetPickerScreen(
     val context = LocalContext.current
     val manager = remember(context) { AppWidgetManager.getInstance(context) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    var providers by remember { mutableStateOf(manager.installedProviders) }
+    var providers by remember { mutableStateOf(manager.installedProviders.toList()) }
     var query by rememberSaveable { mutableStateOf("") }
     DisposableEffect(lifecycle, manager) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) providers = manager.installedProviders
+            if (event == Lifecycle.Event.ON_RESUME) providers = manager.installedProviders.toList()
         }
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer) }
     }
     val classic = visualMode == VisualMode.CLASSIC
-    val widthDp = (LocalConfiguration.current.screenWidthDp - if (classic) 28 else 12) / 3
-    val heightDp = if (classic) 86 else 124
     val density = LocalDensity.current
+    val windowWidthDp = with(density) {
+        LocalWindowInfo.current.containerSize.width.toDp().value.toInt()
+    }
+    val widthDp = ((windowWidthDp - if (classic) 28 else 12) / 3).coerceAtLeast(1)
+    val heightDp = if (classic) 86 else 124
     val widthPx = with(density) { widthDp.dp.roundToPx() }
     val heightPx = with(density) { heightDp.dp.roundToPx() }
     val choices = providers.filter {

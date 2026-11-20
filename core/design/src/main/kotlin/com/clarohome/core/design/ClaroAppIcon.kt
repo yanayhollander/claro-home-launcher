@@ -1,8 +1,8 @@
 package com.clarohome.core.design
 
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
 import android.graphics.Canvas
+import androidx.core.graphics.createBitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -57,7 +57,7 @@ private fun loadAppIcon(packageManager: PackageManager, packageName: String): Im
     runCatching {
         val drawable = packageManager.getApplicationIcon(packageName)
         val edge = 192
-        val bitmap = Bitmap.createBitmap(edge, edge, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(edge, edge)
         val canvas = Canvas(bitmap)
         drawable.setBounds(0, 0, edge, edge)
         drawable.draw(canvas)

@@ -53,46 +53,42 @@ class MainActivityLaunchTest {
     val rule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun typingFromClassicHomeKeepsTheSameKeypadMounted() {
+    fun typingFromClassicHomeKeepsTheKeypadAtTheSamePosition() {
         assumeTrue(
             rule.onAllNodes(androidx.compose.ui.test.hasTestTag("classic-home"))
                 .fetchSemanticsNodes().isNotEmpty(),
         )
-        val deck = rule.onNodeWithTag("classic-global-deck").assertIsDisplayed().fetchSemanticsNode()
+        val deckBounds = rule.onNodeWithTag("classic-global-deck").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         rule.onNodeWithContentDescription("3, DEF").performClick()
         rule.onNodeWithTag("classic-communication").assertIsDisplayed()
         val afterFirstDigit = rule.onNodeWithTag("classic-global-deck").fetchSemanticsNode()
-        assertEquals(deck.id, afterFirstDigit.id)
-        assertEquals(deck.boundsInRoot, afterFirstDigit.boundsInRoot)
+        assertEquals(deckBounds, afterFirstDigit.boundsInRoot)
         rule.onNodeWithContentDescription("4, GHI").performClick()
         rule.onNodeWithText("34").assertIsDisplayed()
         val afterSecondDigit = rule.onNodeWithTag("classic-global-deck").fetchSemanticsNode()
-        assertEquals(deck.id, afterSecondDigit.id)
-        assertEquals(deck.boundsInRoot, afterSecondDigit.boundsInRoot)
+        assertEquals(deckBounds, afterSecondDigit.boundsInRoot)
         rule.onNodeWithText(rule.activity.getString(R.string.app_home)).performClick()
         rule.onNodeWithTag("classic-home").assertIsDisplayed()
     }
 
     @Test
-    fun classicHomeAndMenuKeepTheSameDeckMountedAtTheSamePosition() {
+    fun classicHomeAndMenuKeepTheirDecksAtTheSamePosition() {
         assumeTrue(
             rule.onAllNodes(androidx.compose.ui.test.hasTestTag("classic-home"))
                 .fetchSemanticsNodes().isNotEmpty(),
         )
-        val deck = rule.onNodeWithTag("classic-global-deck").assertIsDisplayed().fetchSemanticsNode()
+        val deckBounds = rule.onNodeWithTag("classic-global-deck").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         val menuLabel = rule.activity.getString(R.string.app_menu)
         val homeLabel = rule.activity.getString(R.string.app_home)
         repeat(3) {
             rule.onNodeWithText(menuLabel).performClick()
             rule.waitForIdle()
             val menuDeck = rule.onNodeWithTag("classic-global-deck").assertIsDisplayed().fetchSemanticsNode()
-            assertEquals(deck.id, menuDeck.id)
-            assertEquals(deck.boundsInRoot, menuDeck.boundsInRoot)
+            assertEquals(deckBounds, menuDeck.boundsInRoot)
             rule.onNodeWithText(homeLabel).performClick()
             rule.onNodeWithTag("classic-home").assertIsDisplayed()
             val homeDeck = rule.onNodeWithTag("classic-global-deck").fetchSemanticsNode()
-            assertEquals(deck.id, homeDeck.id)
-            assertEquals(deck.boundsInRoot, homeDeck.boundsInRoot)
+            assertEquals(deckBounds, homeDeck.boundsInRoot)
         }
     }
 

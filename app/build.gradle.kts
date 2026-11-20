@@ -11,8 +11,10 @@ plugins {
 }
 
 val localTelemetry = Properties().apply {
-    val file = rootProject.file("telemetry.local.properties")
-    if (file.isFile) file.inputStream().use { load(it) }
+    listOf("telemetry.local.properties", "local.properties").forEach { name ->
+        val file = rootProject.file(name)
+        if (file.isFile) file.inputStream().use { load(it) }
+    }
 }
 
 fun telemetryValue(name: String, defaultEnvironment: String = "staging"): String {

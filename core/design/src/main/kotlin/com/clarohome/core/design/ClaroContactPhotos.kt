@@ -70,5 +70,8 @@ internal fun ContentResolver.currentContactPhoto(
     } catch (_: SQLiteException) {
         Log.w("ClaroAvatar", "The contacts provider could not look up the photo.")
         fallbackUri
+    } catch (_: IllegalArgumentException) {
+        Log.w("ClaroAvatar", "The contacts provider rejected the photo lookup.")
+        fallbackUri
     }
 }

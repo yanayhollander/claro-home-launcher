@@ -18,8 +18,9 @@ internal runs the full suite before signing; bundle builds and signs without
 running tests or using a device. Both require CLARO_UPLOAD_KEYSTORE outside the
 repository and CLARO_UPLOAD_KEY_ALIAS. Passwords are prompted locally, or supply
 both CLARO_UPLOAD_STORE_PASSWORD and CLARO_UPLOAD_KEY_PASSWORD through a secure
-environment. Optional CLARO_VERSION_CODE and CLARO_VERSION_NAME select the build
-version. Neither command uploads or publishes anything.
+environment. CLARO_VERSION_CODE and CLARO_VERSION_NAME must explicitly select
+the build version after inspecting live Play state. Both commands require
+complete production telemetry configuration. Neither uploads or publishes.
 EOF
 }
 
@@ -70,6 +71,10 @@ run_all() {
 }
 
 prepare_bundle() {
+    [[ "${CLARO_TELEMETRY_ENVIRONMENT:-production}" == production ]] ||
+        fail "Play candidates require production telemetry; use staging only for local-test verification."
+    : "${CLARO_VERSION_CODE:?Set CLARO_VERSION_CODE after inspecting live Play tracks and bundles.}"
+    : "${CLARO_VERSION_NAME:?Set CLARO_VERSION_NAME to the approved release version name.}"
     : "${CLARO_UPLOAD_KEYSTORE:?Set CLARO_UPLOAD_KEYSTORE to the Play upload keystore path.}"
     : "${CLARO_UPLOAD_KEY_ALIAS:?Set CLARO_UPLOAD_KEY_ALIAS to the Play upload key alias.}"
     [[ -f "$CLARO_UPLOAD_KEYSTORE" && -r "$CLARO_UPLOAD_KEYSTORE" ]] ||
@@ -95,7 +100,7 @@ prepare_bundle() {
     fi
     command -v "$jarsigner" >/dev/null || fail "Use a JDK with jarsigner."
 
-    local gradle_args=(:app:bundleRelease)
+    local gradle_args=(-Pclaro.telemetryEnvironment=production -Pclaro.requireTelemetry=true :app:bundleRelease)
     if [[ -n "${CLARO_VERSION_CODE:-}" ]]; then
         [[ "$CLARO_VERSION_CODE" =~ ^[0-9]+$ ]] ||
             fail "CLARO_VERSION_CODE must be an integer."
@@ -126,7 +131,7 @@ prepare_bundle() {
         rmdir -- "$candidate"
         fail "Signing or signature verification failed; do not upload this build."
     fi
-    printf '\nSigned bundle for manual Play Console Internal Testing upload:\n%s/%s\n' "$PWD" "$bundle"
+    printf '\nSigned candidate for local Android Publisher REST Internal Testing upload:\n%s/%s\n' "$PWD" "$bundle"
     printf 'Verify the registered upload certificate, package and version before uploading. Nothing was published.\n'
 }
 

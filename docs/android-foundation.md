@@ -714,7 +714,8 @@ emulator data, or build directories into repository or session artifact storage.
 
 ## Local verification
 
-Tests run only when requested or when preparing a build for Play Internal Testing.
+Tests run only when explicitly requested; deployment alone does not request a
+full test run.
 There is no Android test workflow on GitHub Actions. Set `ANDROID_HOME` (or
 `ANDROID_SDK_ROOT`) to an SDK containing Android 37 and platform-tools. For device
 tests, use `adb devices` to find an already-booted emulator or designated test
@@ -758,6 +759,9 @@ Play symbol warning and require matching symbols from their publisher. Preserve
 the mapping and available native symbols alongside the exact signed candidate;
 never reuse diagnostic files from a different build.
 
+`app/src/main/res/raw/keep.xml` preserves the generated Firebase configuration
+strings that the SDK resolves by name when resource shrinking is enabled.
+
 Automatic Crashlytics mapping upload is disabled: this app injects Firebase
 resource values directly instead of applying the Google Services plugin required
 by that upload task. This does not disable crash reporting or Play's bundled
@@ -767,37 +771,38 @@ Inspect all Play tracks and artifacts before choosing a version code greater
 than every previously used code; a local version choice does not reserve it.
 Use the existing private Play upload keystore from outside the repository and
 Copilot session storage. Never replace an established upload identity.
-`jarsigner` prompts locally for passwords. Run:
+Use [the local REST release runbook](play-internal-testing.md) and
+[deployment skill](../.github/skills/deploy-internal-testing/SKILL.md).
+`jarsigner` prompts locally for passwords. The normal preparation command is:
 
 ```sh
+export CLARO_TELEMETRY_ENVIRONMENT=production
 export CLARO_UPLOAD_KEYSTORE=/path/to/upload-key.jks
 export CLARO_UPLOAD_KEY_ALIAS=your-upload-alias
-scripts/android-local internal --device emulator-5554
-```
-
-This runs the full local validation before building and signing the release AAB.
-It stops on a failed check or an unavailable test device. To prepare a bundle
-without running tests or interacting with a device, use:
-
-```sh
-export CLARO_VERSION_CODE=2 # Example only: inspect the live store first.
-export CLARO_VERSION_NAME=0.1.0
+export CLARO_VERSION_CODE='<unused-code-selected-from-live-Play-state>'
+export CLARO_VERSION_NAME='<approved-release-version-name>'
 scripts/android-local bundle
 ```
 
 The version overrides map to Gradle properties `claro.versionCode` and
-`claro.versionName`; omitting them preserves the app defaults. For unattended
+`claro.versionName` and are required by the signing helper. The helper enforces
+production telemetry and `claro.requireTelemetry=true`; configuration must not be
+silently omitted from the integrated release. `bundle` does not run tests or use
+a device. `internal` additionally runs the full local suite and must only be used
+when that testing was explicitly requested. For unattended
 local signing, inject **both** `CLARO_UPLOAD_STORE_PASSWORD` and
 `CLARO_UPLOAD_KEY_PASSWORD` from the approved password manager into the process
 environment. Do not put their values in command arguments, chat, logs, Git, or
 GitHub secrets for this local workflow. Supplying only one password fails.
 
-Only upload the AAB
-path printed by the successful invocation to **Play Console → Internal testing**;
-do not upload a prior or unsigned Gradle output. The script does not upload or
-publish anything. Do not edit the checkout during preparation; if the candidate
-changes, rerun the gate. The debug device suite is not a substitute for checking
-the signed build and the physical-device scenarios below.
+Upload only the exact signed AAB path printed by the successful invocation,
+using the existing local service-account Android Publisher REST connection.
+The helper does not upload or publish. Validate and commit the internal-track
+edit, then verify version/status and server/local SHA256 in a fresh edit.
+Do not edit source/config during preparation; if it changes, rebuild and reverify.
+The debug device suite is not a substitute for checking the signed build and the
+physical-device scenarios below. Tester access and policy setup remain separate
+from a completed internal-track release.
 
 ## Remaining release gates
 
