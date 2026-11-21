@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,6 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -57,6 +59,7 @@ fun ClaroScreenScaffold(
     scrollable: Boolean = true,
     dock: (@Composable ColumnScope.() -> Unit)? = null,
     dockInSoftkeys: Boolean = false,
+    headerNavigation: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
@@ -64,7 +67,7 @@ fun ClaroScreenScaffold(
             .fillMaxSize()
             .background(Color.White),
     ) {
-        ClaroHeader(title = title)
+        ClaroHeader(title = title, navigation = headerNavigation)
         val bodyModifier = Modifier
             .weight(1f)
             .fillMaxWidth()
@@ -91,22 +94,52 @@ fun ClaroHeader(
     modifier: Modifier = Modifier,
     centered: Boolean = false,
     titleColor: Color = Color.White,
+    navigation: (@Composable () -> Unit)? = null,
 ) {
+    val titleDirection = LocalLayoutDirection.current
     Box(
         modifier = modifier
             .fillMaxWidth()
             .background(ClaroColors.Charcoal)
-            .padding(horizontal = 10.dp, vertical = 12.dp),
+            .padding(horizontal = 10.dp, vertical = if (navigation == null) 12.dp else 4.dp),
         contentAlignment = if (centered) Alignment.Center else Alignment.CenterStart,
     ) {
-        Text(
-            text = title,
-            color = titleColor,
-            fontSize = 29.sp,
-            lineHeight = 34.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = if (centered) TextAlign.Center else TextAlign.Start,
-            modifier = Modifier.semantics { heading() },
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                navigation?.invoke()
+                CompositionLocalProvider(LocalLayoutDirection provides titleDirection) {
+                    Text(
+                        text = title,
+                        color = titleColor,
+                        fontSize = 29.sp,
+                        lineHeight = 34.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = if (centered) TextAlign.Center else TextAlign.Start,
+                        modifier = Modifier.weight(1f).semantics { heading() },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ClaroHeaderBackButton(label: String, onClick: () -> Unit) {
+    val haptics = LocalClaroHaptics.current
+    IconButton(
+        onClick = {
+            haptics.softkey()
+            onClick()
+        },
+        modifier = Modifier.size(64.dp).claroFocusRing(),
+    ) {
+        ClaroIcon(
+            kind = ClaroIconKind.ARROW_LEFT,
+            tint = Color.White,
+            contentDescription = label,
         )
     }
 }

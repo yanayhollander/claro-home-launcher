@@ -143,11 +143,13 @@ class OnboardingSettingsManager @Inject constructor(
             current.copy(
                 onboarding = current.onboarding.copy(
                     currentStep = next,
-                    completedSteps = if (next.flowIndex > current.onboarding.currentStep.flowIndex) {
-                        current.onboarding.completedSteps + current.onboarding.currentStep
-                    } else {
-                        current.onboarding.completedSteps
-                    },
+                    completedSteps = current.onboarding.completedSteps +
+                        listOfNotNull(
+                            current.onboarding.currentStep.takeIf {
+                                next.flowIndex > it.flowIndex || it == OnboardingStep.COMPLETE
+                            },
+                            next.takeIf { it == OnboardingStep.COMPLETE },
+                        ),
                 ),
             )
         }

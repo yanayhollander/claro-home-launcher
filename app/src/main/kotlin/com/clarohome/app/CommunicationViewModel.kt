@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 
 @HiltViewModel
 class CommunicationViewModel @Inject constructor(
@@ -39,6 +40,7 @@ class CommunicationViewModel @Inject constructor(
     analytics: ProductAnalytics,
     crashReporter: CrashReporter,
 ) : ViewModel() {
+    private var contactsLoadJob: Job? = null
     private val coordinator = PhoneContactsCoordinator(
         roleGateway = roleGateway,
         telecomGateway = telecomGateway,
@@ -78,7 +80,7 @@ class CommunicationViewModel @Inject constructor(
     fun openDialer(showMissedCalls: Boolean = false) = coordinator.openDialer(showMissedCalls)
     fun openContacts(fromDialer: Boolean? = null) {
         coordinator.openContacts(fromDialer)
-        viewModelScope.launch { coordinator.loadContacts() }
+        searchContacts(state.value.contactQuery)
     }
 
     fun returnFromContactsToDialer() = coordinator.returnFromContactsToDialer()
@@ -101,11 +103,13 @@ class CommunicationViewModel @Inject constructor(
     fun swapCall() = coordinator.swapCall()
 
     fun searchContacts(query: String) {
-        viewModelScope.launch { coordinator.loadContacts(query, restart = true) }
+        contactsLoadJob?.cancel()
+        contactsLoadJob = viewModelScope.launch { coordinator.loadContacts(query, restart = true) }
     }
 
     fun loadMoreContacts() {
-        viewModelScope.launch {
+        if (contactsLoadJob?.isActive == true) return
+        contactsLoadJob = viewModelScope.launch {
             coordinator.loadContacts(state.value.contactQuery, restart = false)
         }
     }

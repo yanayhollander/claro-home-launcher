@@ -40,6 +40,22 @@ class OnboardingSettingsManagerTest {
             ),
         ).isTrue()
         assertThat(repository.current.onboarding.currentStep).isEqualTo(OnboardingStep.COMPLETE)
+        assertThat(repository.current.onboarding.completedSteps).contains(OnboardingStep.COMPLETE)
+    }
+
+    @Test
+    fun completedSetupRemainsRecognizableWhenReopenedIncludingOlderInstalls() = runTest {
+        val repository = FakePreferencesRepository(
+            ClaroPreferences(onboarding = com.clarohome.core.model.OnboardingProgress(
+                currentStep = OnboardingStep.COMPLETE,
+            )),
+        )
+        val manager = manager(repository)
+        manager.advanceOnboarding(OnboardingStep.ROLE_READINESS)
+        assertThat(repository.current.onboarding.isInitialSetup).isFalse()
+        assertThat(repository.current.onboarding.completedSteps).contains(OnboardingStep.COMPLETE)
+        manager.advanceOnboarding(OnboardingStep.WELCOME)
+        assertThat(repository.current.onboarding.isInitialSetup).isFalse()
     }
 
     @Test

@@ -14,6 +14,8 @@ import com.clarohome.feature.communication.CallHistoryEntry
 import com.clarohome.feature.communication.CallerIdentity
 import com.clarohome.feature.communication.CallDirection
 import com.clarohome.feature.communication.CallOutcome
+import com.clarohome.feature.communication.ClaroContact
+import com.clarohome.feature.communication.ContactNumber
 import com.clarohome.feature.communication.CommunicationUiState
 import com.clarohome.feature.communication.DialerQualification
 import com.clarohome.feature.communication.MessagingUiState
@@ -24,6 +26,41 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class IntegrationContractsTest {
+    @Test
+    fun onboardingSuggestionsRankRecentCallsAndChooseTheRecentlyUsedNumber() {
+        val mira = ClaroContact("mira", "Mira", null, listOf(
+            ContactNumber("202-555-0101", "Mobile"),
+            ContactNumber("202-555-0102", "Home"),
+        ))
+        val daniel = ClaroContact("daniel", "Daniel", null, listOf(ContactNumber("2025550103", "Mobile")))
+        val history = listOf(
+            CallHistoryEntry("old", CallerIdentity(null, "2025550101"), CallDirection.OUTGOING,
+                CallOutcome.ENDED, 1_000, null),
+            CallHistoryEntry("new", CallerIdentity(null, "2025550102"), CallDirection.OUTGOING,
+                CallOutcome.ENDED, 3_000, null),
+            CallHistoryEntry("other", CallerIdentity(null, "2025550103"), CallDirection.INCOMING,
+                CallOutcome.MISSED_INCOMING, 2_000, null),
+        )
+        val suggestions = suggestedOnboardingContacts(listOf(daniel, mira), history)
+        assertEquals(listOf("mira", "daniel"), suggestions.map { it.contact.lookupKey })
+        assertEquals("2025550102", suggestions.first().key)
+    }
+
+    @Test
+    fun onboardingSuggestionsFallBackWithoutHistoryAndExcludeDuplicateOrEmptyNumbers() {
+        fun contact(id: String, number: String) =
+            ClaroContact(id, id, null, listOf(ContactNumber(number, "Mobile")))
+        val suggestions = suggestedOnboardingContacts(listOf(
+            contact("empty", ""),
+            contact("first", "202-555-0101"),
+            contact("duplicate", "2025550101"),
+            contact("second", "2025550102"),
+            contact("third", "2025550103"),
+            contact("fourth", "2025550104"),
+        ), emptyList())
+        assertEquals(listOf("first", "second", "third"), suggestions.map { it.contact.lookupKey })
+    }
+
     @Test
     fun menuAndHomeUseRealCountsAndClearThemAfterItemsAreReviewed() {
         val tiles = listOf(

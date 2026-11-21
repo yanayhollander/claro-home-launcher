@@ -43,7 +43,7 @@
     <string name="onb_show_apps_tile">Show Apps on Home</string>
     <string name="onb_show_app_on_home">Show %1$s on Home</string>
     <string name="onb_settings_access">Settings access</string>
-    <string name="onb_step_people_and_speed_dial">Home tiles</string>
+    <string name="onb_step_people_and_speed_dial">Your VIP contacts</string>
     <string name="onb_sos_contact_title">SOS contact</string>
     <string name="onb_step_permissions_and_roles">Permissions and roles</string>
     <string name="onb_step_setup_complete">Setup complete</string>
@@ -51,9 +51,13 @@
     <string name="onb_setup_step_progress" tools:ignore="PluralsCandidate">Setup step %1$d of %2$d</string>
 
     <string name="onb_set_up_claro">Set up Claro</string>
-    <string name="onb_welcome_tagline">Your people. One touch away.</string>
-    <string name="onb_welcome_subtitle">A simpler home, phone and messages — set up for yourself or together with someone you trust.</string>
-    <string name="onb_welcome_permissions_sos_note">Android asks separately for Home, Phone, SMS and Camera access when needed. SOS calls one trusted person — it is not monitored emergency dispatch.</string>
+    <string name="onb_welcome_tagline">Big buttons. Less fuss.</string>
+    <string name="onb_welcome_subtitle">Keep your people and everyday apps close, with clear calls, easy messages and a home that feels familiar.</string>
+    <string name="onb_welcome_permissions_sos_note">Let’s make Claro feel like your phone. Choose a style, adjust the text and add what matters — on your own or with someone you trust.</string>
+    <string name="onb_diagnostics_title">Help keep Claro reliable</string>
+    <string name="onb_diagnostics_body">Share basic usage and crash reports to help us fix problems and improve Claro.</string>
+    <string name="onb_diagnostics_privacy">Your contacts, messages and photos stay private. Reports are never used for advertising.</string>
+    <string name="onb_diagnostics_continue_notice">By continuing, you agree to sharing. Turn it off anytime in Settings → Membership &amp; privacy.</string>
 
     <string name="onb_use_style">Use %1$s</string>
     <string name="onb_apply">Apply</string>
@@ -145,7 +149,7 @@
     <string name="onb_settings_access_date_subtitle">Today\'s date question</string>
     <string name="onb_settings_access_pin_subtitle">Caregiver PIN · local recovery</string>
     <string name="onb_membership_and_privacy_title">Membership &amp; privacy</string>
-    <string name="onb_membership_and_privacy_subtitle">Core features free · diagnostics off by default</string>
+    <string name="onb_membership_and_privacy_subtitle">Core features free · your diagnostics choices</string>
     <string name="onb_reset_claro">Reset Claro</string>
     <string name="onb_reset_claro_subtitle">Clear local Claro setup only</string>
 

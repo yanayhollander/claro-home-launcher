@@ -14,6 +14,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import org.json.JSONObject
+import java.math.BigDecimal
 
 data class VendorConfiguration(
     val revenueCatPublicKey: String,
@@ -91,8 +92,10 @@ class MixpanelVendorAdapter @Inject constructor(
     val status: VendorStatus get() = guard.status
     private var instance: MixpanelAPI? = null
     private var enabled = false
+    private var appliedContext: Map<String, String>? = null
 
     override fun setCollectionEnabled(enabled: Boolean, userId: String?) {
+        if (this.enabled != enabled) appliedContext = null
         this.enabled = enabled
         guard.run(enabled) {
             if (enabled) {
@@ -108,16 +111,24 @@ class MixpanelVendorAdapter @Inject constructor(
 
     override fun track(name: String, properties: Map<String, String>) {
         if (enabled) guard.run(true) {
-            val payload = JSONObject(properties)
-            if (name == "conversion" && properties["kind"] == "purchase") {
-                payload.put("amount", checkNotNull(properties["amount"]).toBigDecimal())
-            }
-            checkNotNull(instance).track(name, payload)
+            checkNotNull(instance).track(name, properties.toAnalyticsJson())
+        }
+    }
+
+    override fun context(properties: Map<String, String>) {
+        if (enabled && appliedContext != properties) guard.run(true) {
+            val mixpanel = checkNotNull(instance)
+            CONTEXT_PROPERTIES.forEach { mixpanel.unregisterSuperProperty(it) }
+            mixpanel.registerSuperProperties(properties.toAnalyticsJson())
+            mixpanel.people.set(properties.filterKeys { it in CONTEXT_PROPERTIES }.toAnalyticsJson())
+            (CONTEXT_PROPERTIES - properties.keys).forEach { mixpanel.people.unset(it) }
+            appliedContext = properties.toMap()
         }
     }
 
     override fun reset() = guard.run(false) {
         enabled = false
+        appliedContext = null
         // optOutTracking clears queued events and identity; reset() would explicitly flush.
         instance?.optOutTracking()
     }
@@ -145,8 +156,10 @@ class FirebaseAnalyticsVendorAdapter @Inject constructor(
     val status: VendorStatus get() = guard.status
     private var analytics: FirebaseAnalytics? = null
     private var enabled = false
+    private var appliedContext: Map<String, String>? = null
 
     override fun setCollectionEnabled(enabled: Boolean, userId: String?) {
+        if (this.enabled != enabled) appliedContext = null
         this.enabled = enabled
         guard.run(enabled) {
             if (!enabled && analytics == null) return@run
@@ -173,8 +186,19 @@ class FirebaseAnalyticsVendorAdapter @Inject constructor(
         if (enabled) guard.run(true) { checkNotNull(analytics).logEvent(name, properties.toBundle()) }
     }
 
+    override fun context(properties: Map<String, String>) {
+        if (enabled && appliedContext != properties) guard.run(true) {
+            val instance = checkNotNull(analytics)
+            instance.setDefaultEventParameters(properties.toBundle())
+            CONTEXT_PROPERTIES.forEach { key -> instance.setUserProperty(key, properties[key]) }
+            appliedContext = properties.toMap()
+        }
+    }
+
     override fun reset() = guard.run(false) {
         enabled = false
+        appliedContext = null
+        analytics?.setDefaultEventParameters(null)
         analytics?.setAnalyticsCollectionEnabled(false)
         analytics?.setUserId(null)
         analytics?.resetAnalyticsData()
@@ -237,5 +261,29 @@ class FirebaseCrashVendorAdapter @Inject constructor(
 }
 
 internal fun Map<String, String>.toBundle(): Bundle = Bundle().also { bundle ->
-    forEach { (key, value) -> bundle.putString(key, value) }
+    forEach { (key, value) ->
+        when (val typed = analyticsValue(key, value)) {
+            is Long -> bundle.putLong(key, typed)
+            is Double -> bundle.putDouble(key, typed)
+            is BigDecimal -> bundle.putDouble(key, typed.toDouble())
+            is Boolean -> bundle.putLong(key, if (typed) 1 else 0)
+            else -> bundle.putString(key, value)
+        }
+    }
+}
+
+internal val CONTEXT_PROPERTIES = setOf(
+    "visual_mode", "text_size", "home_tile_count", "home_contact_tile_count",
+    "home_app_tile_count", "home_shortcut_tile_count", "home_widget_tile_count",
+)
+
+internal fun analyticsValue(key: String, value: String): Any = when {
+    (key in CONTEXT_PROPERTIES && key.endsWith("_count")) || key == "tile_position" -> value.toLong()
+    key == "amount" -> value.toBigDecimal()
+    key == "test_mode" -> value.toBooleanStrict()
+    else -> value
+}
+
+internal fun Map<String, String>.toAnalyticsJson(): JSONObject = JSONObject().also { json ->
+    forEach { (key, value) -> json.put(key, analyticsValue(key, value)) }
 }

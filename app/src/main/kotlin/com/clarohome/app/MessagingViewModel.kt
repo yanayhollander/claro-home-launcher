@@ -81,6 +81,11 @@ class MessagingViewModel @Inject constructor(
     fun openConversation(id: Long) = coordinator.openConversation(id)
     fun deleteConversation(id: Long) = coordinator.deleteConversation(id)
     fun startNewMessage() = coordinator.startNewMessage()
+    fun startMessageTo(number: String, displayName: String?) {
+        coordinator.startNewMessage()
+        coordinator.updateRecipientInput(number, displayName)
+    }
+
     fun openRecipientPicker() = coordinator.openRecipientPicker()
     fun cancelRecipientPicker() = coordinator.cancelRecipientPicker()
     fun updateRecipientInput(raw: String) = coordinator.updateRecipientInput(raw)

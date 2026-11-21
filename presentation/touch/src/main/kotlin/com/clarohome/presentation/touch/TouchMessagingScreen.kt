@@ -298,16 +298,10 @@ private fun ComposeRoute(
                 tone = if (state.sendFailure != null) ClaroBannerTone.ERROR else ClaroBannerTone.INFO,
             )
         }
-        MessageFieldLabel(stringResource(R.string.touch_field_to))
-        state.draft.recipient?.displayName?.takeIf { it.isNotBlank() }?.let { recipientName ->
-            Text(
-                text = recipientName,
-                color = ClaroColors.Muted,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 3.dp),
-            )
+        state.draft.recipient?.takeIf { !it.displayName.isNullOrBlank() }?.let { recipient ->
+            RecipientSummaryBar(recipient = recipient)
         }
+        MessageFieldLabel(stringResource(R.string.touch_field_to))
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
             OutlinedTextField(
                 value = state.draft.recipient?.number ?: state.recipientQuery,
@@ -846,6 +840,7 @@ private fun RecipientSummaryBar(recipient: MessageRecipient?) {
             size = 56.dp,
             isUnassigned = displayName == null,
             contactNumber = number,
+            contactLookupKey = recipient?.contactLookupKey,
         )
         Column(modifier = Modifier.weight(1f)) {
             if (displayName == null && number != null) {

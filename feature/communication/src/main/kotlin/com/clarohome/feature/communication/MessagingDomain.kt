@@ -600,12 +600,19 @@ class MessagingCoordinator(
         )
     }
 
-    fun updateRecipientInput(raw: String) {
+    fun updateRecipientInput(raw: String, displayName: String? = null) {
         val trimmed = raw.trim()
         val recipient = if (trimmed.isBlank()) {
             null
         } else {
-            MessageRecipient(number = normalizePhoneNumber(trimmed))
+            val number = normalizePhoneNumber(trimmed)
+            val existing = mutableState.value.draft.recipient
+                ?.takeIf { normalizePhoneNumber(it.number) == number }
+                ?: MessageRecipient(number = number)
+            existing.copy(
+                number = number,
+                displayName = displayName?.takeIf(String::isNotBlank) ?: existing.displayName,
+            )
         }
         val draft = mutableState.value.draft.copy(
             recipient = recipient,

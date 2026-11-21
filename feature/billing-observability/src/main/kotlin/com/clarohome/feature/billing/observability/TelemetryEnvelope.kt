@@ -14,7 +14,12 @@ internal data class TelemetryEnvelope(
 
 internal fun ClaroEvent.envelope(): TelemetryEnvelope = when (this) {
     ClaroEvent.SessionStarted -> TelemetryEnvelope("session_started")
-    is ClaroEvent.ScreenView -> TelemetryEnvelope("screen_view", mapOf("screen" to screen.wireValue()))
+    is ClaroEvent.ScreenView -> TelemetryEnvelope("screen_view", buildMap {
+        put("screen", screen.wireValue())
+        put("screen_name", screen.wireValue())
+        put("screen_class", "claro")
+        step?.let { put("step", it.wireValue()) }
+    })
     is ClaroEvent.SetupStepResult -> TelemetryEnvelope(
         "setup_step_result", mapOf("step" to step.wireValue(), "outcome" to outcome.wireValue()),
     )
@@ -45,6 +50,9 @@ internal fun ClaroEvent.envelope(): TelemetryEnvelope = when (this) {
     )
     is ClaroEvent.CheckoutStarted ->
         TelemetryEnvelope("checkout_started", mapOf("product" to product.wireValue()))
+    is ClaroEvent.HomeTileOpened -> TelemetryEnvelope(
+        "home_tile_opened", mapOf("kind" to kind.wireValue(), "tile_position" to position.toString()),
+    )
     is ClaroEvent.Conversion -> TelemetryEnvelope(
         "conversion",
         buildMap {
@@ -56,12 +64,6 @@ internal fun ClaroEvent.envelope(): TelemetryEnvelope = when (this) {
             }
         },
     )
-}
-
-internal fun ClaroEvent.primaryDestination(): AnalyticsDestination = when {
-    this is ClaroEvent.RoleReadiness -> AnalyticsDestination.FIREBASE
-    this is ClaroEvent.TaskFlowResult && task == EventTask.STARTUP_RECOVERY -> AnalyticsDestination.FIREBASE
-    else -> AnalyticsDestination.MIXPANEL
 }
 
 internal fun ClaroEvent.isMarketingConversion(): Boolean = when (this) {

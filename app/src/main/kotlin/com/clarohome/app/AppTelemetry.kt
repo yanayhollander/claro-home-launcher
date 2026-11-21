@@ -7,6 +7,8 @@ import android.os.SystemClock
 import com.clarohome.core.domain.ClaroPreferencesRepository
 import com.clarohome.core.domain.ClaroEvent
 import com.clarohome.core.domain.EventOutcome
+import com.clarohome.core.domain.HomeRepository
+import com.clarohome.core.domain.HomeTelemetryContext
 import com.clarohome.core.model.ClaroPreferences
 import com.clarohome.core.model.OnboardingStep
 import com.clarohome.feature.billing.observability.ConsentAwareObservability
@@ -19,6 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.combine
 
 @Singleton
 class AppTelemetry @Inject constructor(
@@ -26,6 +29,7 @@ class AppTelemetry @Inject constructor(
     private val consent: ConsentController,
     private val preferences: ClaroPreferencesRepository,
     private val smsTransport: SmsTransport,
+    private val homeRepository: HomeRepository,
 ) : Application.ActivityLifecycleCallbacks {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var startedActivities = 0
@@ -38,8 +42,8 @@ class AppTelemetry @Inject constructor(
         application.registerActivityLifecycleCallbacks(this)
         scope.launch {
             var previous: ClaroPreferences? = null
-            preferences.preferences.collect { current ->
-                observability.updateContext(current.visualMode, current.textSize)
+            combine(preferences.preferences, homeRepository.home) { current, home -> current to home }.collect { (current, home) ->
+                observability.updateContext(current.visualMode, current.textSize, HomeTelemetryContext.from(home.homeSlots))
                 previous?.let { old ->
                     if (old.visualMode != current.visualMode) {
                         observability.track(ClaroEvent.VisualModeSelected(current.visualMode))

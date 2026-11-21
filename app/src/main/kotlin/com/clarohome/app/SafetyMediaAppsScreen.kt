@@ -71,13 +71,14 @@ import com.clarohome.core.design.ClaroAvatar
 import com.clarohome.core.design.ClaroBannerTone
 import com.clarohome.core.design.ClaroColors
 import com.clarohome.core.design.ClaroDimensions
-import com.clarohome.core.design.ClaroEmergencyButton
 import com.clarohome.core.design.ClaroIcon
 import com.clarohome.core.design.ClaroIconKind
 import com.clarohome.core.design.ClaroInfoCard
 import com.clarohome.core.design.ClaroPrimaryButton
 import com.clarohome.core.design.ClaroRowButton
 import com.clarohome.core.design.ClaroScreenScaffold
+import com.clarohome.core.design.ClaroHeaderBackButton
+import com.clarohome.core.model.OnboardingStep
 import com.clarohome.core.design.ClaroSecondaryButton
 import com.clarohome.core.design.ClaroSoftkey
 import com.clarohome.feature.communication.ClaroContact
@@ -92,6 +93,7 @@ import com.clarohome.feature.safety.media.apps.SosState
 import com.clarohome.feature.safety.media.apps.SosReadiness
 import com.clarohome.feature.safety.media.apps.TrustedContact
 import kotlinx.coroutines.delay
+import com.clarohome.core.domain.TelemetryScreen
 
 @Keep
 enum class SafetyMediaAppsDestination {
@@ -111,16 +113,30 @@ fun SafetyMediaAppsScreen(
     onLoadContacts: () -> Unit = {},
     onOpenProtectedSosSettings: () -> Unit = {},
     onRequestMediaAccess: () -> Unit = {},
-    onEmergencyDialer: (() -> Unit)? = null,
     hasActiveCall: Boolean = false,
     onReturnToCall: () -> Unit = {},
     onSearchContacts: (String) -> Unit = {},
     onLoadMoreContacts: () -> Unit = {},
     hasMoreContacts: Boolean = false,
+    onScreenViewed: (TelemetryScreen) -> Unit = {},
 ) {
     var destination by rememberSaveable(initialDestination) { mutableStateOf(initialDestination) }
     val sosState by viewModel.sosState.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val screen = when (destination) {
+        SafetyMediaAppsDestination.SOS -> when (sosState) {
+            is SosState.CountingDown -> TelemetryScreen.SOS_COUNTDOWN
+            is SosState.Failed -> TelemetryScreen.SOS_FAILED
+            else -> TelemetryScreen.SOS
+        }
+        SafetyMediaAppsDestination.SOS_SETTINGS -> TelemetryScreen.SOS_SETTINGS
+        SafetyMediaAppsDestination.CAMERA -> TelemetryScreen.CAMERA
+        SafetyMediaAppsDestination.GALLERY -> TelemetryScreen.GALLERY
+        SafetyMediaAppsDestination.APPS -> TelemetryScreen.APPS
+    }
+    LaunchedEffect(screen, uiState.billingObservability.consent) {
+        onScreenViewed(screen)
+    }
 
     DisposableEffect(viewModel) {
         onDispose {
@@ -148,12 +164,12 @@ fun SafetyMediaAppsScreen(
                 onCancel = viewModel::cancelSos,
                 remainingSeconds = viewModel::sosRemainingSeconds,
                 onOpenProtectedSosSettings = onOpenProtectedSosSettings,
-                onEmergencyDialer = onEmergencyDialer,
                 hasActiveCall = hasActiveCall,
                 onReturnToCall = onReturnToCall,
             )
             SafetyMediaAppsDestination.SOS_SETTINGS -> SosSettingsScreen(
                 state = sosState,
+                onboarding = uiState.preferences.onboarding.currentStep != OnboardingStep.COMPLETE,
                 contacts = contacts,
                 viewModel = viewModel,
                 onLoadContacts = onLoadContacts,
@@ -187,7 +203,6 @@ internal fun SosScreen(
     onCancel: () -> Unit,
     remainingSeconds: (Long) -> Int,
     onOpenProtectedSosSettings: () -> Unit,
-    onEmergencyDialer: (() -> Unit)?,
     hasActiveCall: Boolean,
     onReturnToCall: () -> Unit,
 ) {
@@ -257,12 +272,6 @@ internal fun SosScreen(
                         onClick = onOpenProtectedSosSettings,
                         softkey = ClaroSoftkey.MENU,
                         icon = ClaroIconKind.CONTACT,
-                    )
-                }
-                if (contact?.recipientConsented == true && onEmergencyDialer != null) {
-                    ClaroEmergencyButton(
-                        label = stringResource(R.string.app_emergency_call),
-                        onClick = onEmergencyDialer,
                     )
                 }
             }
@@ -474,6 +483,7 @@ private fun SosSettingsScreen(
     onSearchContacts: (String) -> Unit,
     onLoadMoreContacts: () -> Unit,
     hasMoreContacts: Boolean,
+    onboarding: Boolean = false,
 ) {
     val resources = LocalResources.current
     val existing = state.trustedContactOrNull()
@@ -505,12 +515,21 @@ private fun SosSettingsScreen(
                 pickingContact = false
             },
             onCancel = { pickingContact = false },
+            onboarding = onboarding,
         )
         return
     }
 
     ClaroScreenScaffold(
         title = stringResource(R.string.app_sos_contact_title),
+        headerNavigation = if (!onboarding) null else {
+            {
+                ClaroHeaderBackButton(
+                    label = stringResource(R.string.app_back),
+                    onClick = onBack,
+                )
+            }
+        },
         dockInSoftkeys = true,
         dock = {
             ClaroPrimaryButton(
@@ -648,6 +667,7 @@ private fun SosContactPicker(
     hasMore: Boolean,
     onChoose: (ClaroContact, String) -> Unit,
     onCancel: () -> Unit,
+    onboarding: Boolean = false,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(Unit) { onSearch("") }
@@ -655,8 +675,16 @@ private fun SosContactPicker(
     ClaroScreenScaffold(
         title = stringResource(R.string.app_choose_from_contacts),
         scrollable = false,
-        dock = {
-            ClaroSecondaryButton(label = stringResource(R.string.app_cancel), onClick = onCancel)
+        headerNavigation = if (!onboarding) null else {
+            {
+                ClaroHeaderBackButton(
+                    label = stringResource(R.string.app_back),
+                    onClick = onCancel,
+                )
+            }
+        },
+        dock = if (onboarding) null else {
+            { ClaroSecondaryButton(label = stringResource(R.string.app_cancel), onClick = onCancel) }
         },
     ) {
         OutlinedTextField(
@@ -705,14 +733,14 @@ private fun SosContactPicker(
     }
 }
 
-private fun SosReadiness.configurationError(resources: Resources): String = when (this) {
+internal fun SosReadiness.configurationError(resources: Resources): String = when (this) {
     SosReadiness.RecipientConsentMissing -> resources.getString(R.string.app_sos_setup_consent_required)
     is SosReadiness.Blocked -> localizeSosUnsetMessage(reason, resources)
     SosReadiness.NotConfigured -> resources.getString(R.string.app_sos_invalid_number)
     SosReadiness.Ready -> error("A saved SOS configuration has no error")
 }
 
-private fun SosState.trustedContactOrNull(): TrustedContact? = when (this) {
+internal fun SosState.trustedContactOrNull(): TrustedContact? = when (this) {
     is SosState.Unset -> null
     is SosState.Armed -> contact
     is SosState.CountingDown -> contact

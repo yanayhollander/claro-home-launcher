@@ -194,9 +194,9 @@ locked-screen incoming calls, emergency handoff, and OEM dialer-role repair.
 The safety feature routes a configured trusted-contact
 SOS through the shared Telecom call gateway. If the required role or permission
 is absent, the request fails into a repair state instead of simulating success.
-The dedicated Emergency services shortcut opens a separate native dialer and
-appears only when opening a configured SOS from its Home tile. Dialing an
-emergency number manually still hands off to the system dialer.
+SOS has no separate Emergency services shortcut; its action calls the chosen
+trusted person. Dialing an emergency number manually still hands off to the
+system dialer, and Android's own emergency access is unchanged.
 SOS setup opens a searchable contact/number picker or accepts a specific phone
 number with an optional name. Saving requires a valid non-emergency number and
 recipient agreement; invalid input leaves the existing configuration unchanged.
@@ -204,11 +204,12 @@ The recipient, selected contact identity and photo are stored privately across
 restarts, and linked SOS contacts are protected from contact deletion.
 An unconfigured SOS screen offers Set up SOS, not a disabled countdown button.
 Configured screens show the recipient and a cancellable five-second call action;
-active calls offer Return to call rather than another call request. Telecom
-updates drive SOS call status, and a finished call requires an explicit new
-countdown to call again. Emergency services opens an exported system emergency
-dialer, never an empty normal dial intent that loops back into Claro. No emergency
-number is preselected, and launch failures are shown explicitly.
+active calls offer Return to call rather than another call request. Once Telecom
+reports the outgoing call, navigation opens the regular Phone call screen
+automatically, including live status, End, Speaker and Mute in both styles.
+The countdown alone never claims a connected call. Returning Home does not end
+an active call; Return to call stays available. Telecom updates drive SOS call
+status, and a finished SOS attempt requires an explicit new countdown to call again.
 
 Camera opens the device's own camera app immediately
 (`MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA`, so flash, modes and settings are the
@@ -258,11 +259,16 @@ Reopening the dialer starts with an empty number and no pending call target in
 both phone styles. Typing from Classic Home starts a fresh number, and external
 `tel:` intents replace the previous entry instead of appending to it.
 
-Native onboarding has one welcome action ("Set up Claro") and six setup steps,
-ending with Permissions and roles → Finish setup → Home. Subscription offers,
+Native onboarding has one welcome action ("Set up Claro") with the shared Claro
+logo and eight setup steps, ending with VIP contacts → SOS → Finish setup → Home.
+Permissions and roles precede Home customization. Subscription offers,
 trial messaging and the internal handover checklist are not part of setup;
 membership stays available later in protected Settings. Both system Back and
-the on-screen Back action return to the previous setup step. Permission rows
+the top-left Back arrow return to the previous setup step or close its picker.
+Welcome has no Back button. The extra global
+Back/Home controls and Classic keypad are hidden during first-launch setup,
+including its child pickers. Settings reentry retains normal global navigation.
+First-launch Home access remains blocked until setup completes. Permission rows
 and their action buttons open the corresponding Android request.
 
 New setup starts with the first supported device language (English, Spanish or
@@ -303,15 +309,34 @@ Installed WhatsApp/WhatsApp Business and Facebook/Facebook Lite also appear
 as optional Home switches with their real app icons. Enabling creates a saved
 Home slot and allows the app; hiding removes only its Home shortcut. App
 visibility policy survives restarts, and a full Home never replaces a tile.
-Setup has seven steps; its order is separate from persisted enum values so
+Setup has eight steps after Welcome, starting with **Help keep Claro reliable**.
+Continue explicitly enables usage analytics and crash reports before moving to
+phone style; there is no skip action. No telemetry is
+enabled just by displaying Welcome or the consent screen. The short disclosure
+describes usage and crash reports without vendor names or technical identifiers,
+reassures users that personal content stays private and reports are not used for
+advertising, and points to Membership & privacy settings to turn sharing off.
+Advertising consent is unchanged. Existing completed setups and saved refusals
+are not silently opted in on upgrade. The step
+order is separate from persisted enum values so
 Back navigation, progress and existing completed setups stay compatible.
 Entering Permissions and roles starts sequential native Home, Phone and SMS
 default-app requests, with Phone/SMS permission requests after role approval.
 Cancelling a default-app prompt stops the sequence; Set Claro as default retries
-without silently changing any Android defaults. Finish setup is disabled until
-Android confirms all available roles belong to Claro, and completion verifies
+without silently changing any Android defaults. Continue is disabled until
+Android confirms all available roles belong to Claro; final completion verifies
 them again before persisting or navigating Home. Unavailable roles on devices
 without the relevant support do not block setup.
+
+VIP contacts offers up to three suggestions, ranking matches to recent calls
+among loaded contacts, with saved-contact fallback when history is unavailable.
+A searchable, paginated multi-picker allows additional contacts and individual
+numbers. Selections persist immediately as direct-call Home tiles without
+overwriting existing tiles or duplicating a selected number. SOS reuses the
+contact source with single selection and resets recipient agreement whenever
+the contact changes; manual number entry remains available. Neither setup places
+a call. Denied Contacts access offers a native repair action and does not prevent
+finishing setup without VIPs or SOS. Names and numbers are not telemetry.
 
 Classic screens with Claro's keypad do not open the Android keyboard when a
 text field is focused. Tap **Open keyboard** to open it for the focused field. Moving to another field starts with
@@ -515,8 +540,11 @@ ahead of the application consent controller. Meta uses the minimal `facebook-cor
 artifact, not Facebook Login, Audience Network, or sharing.
 
 Separate persisted consent toggles control usage analytics (Mixpanel/Firebase),
-crash reports, and advertising measurement (Meta). All default to false, including
-the new marketing choice on existing installations. Withdraw/reset turns all three
+crash reports, and advertising measurement (Meta). New onboarding offers analytics
+and crash reporting through its primary Continue action; tapping it saves both as
+true. The underlying unset state remains false until that affirmative action;
+There is no Not now action. Existing stored choices are preserved on upgrade,
+and marketing stays default-off. Withdraw/reset turns all three
 off. Consent is applied at application startup, including service-only launches;
 features never wait for event delivery. SDK failures are logged locally by vendor
 and exception class without exception text or user content.
@@ -556,26 +584,55 @@ The shared typed API is `core/domain/.../Telemetry.kt`. Feature modules depend o
 `ProductAnalytics` / `CrashReporter`, never on a vendor SDK. Serialization/routing
 is centralized in `TelemetryEnvelope.kt` and `ConsentAwareObservability`.
 
-| Events | Primary destination | Additional Meta event, with marketing consent |
+| Events | Destinations | Additional Meta event, with marketing consent |
 |---|---|---|
-| `session_started` | Mixpanel | Activate App plus the SDK's supported install publication |
-| `setup_step_result`, `setup_completed` | Mixpanel | Complete Tutorial for completed setup only |
-| `screen_view`, `visual_mode_selected`, `accessibility_preset_selected` | Mixpanel | None |
-| `home_changed`, widget/call/SMS/SOS/external-action task outcomes | Mixpanel | None |
-| `membership_screen_view` | Mixpanel | View Content |
-| `checkout_started` | Mixpanel | Initiate Checkout |
-| `conversion` trial/subscription/purchase | Mixpanel | Start Trial / Subscribe / Purchase |
-| `role_readiness`, startup recovery task outcome | Firebase Analytics | None |
+| `session_started` | Mixpanel + Firebase Analytics | Activate App plus the SDK's supported install publication |
+| `setup_step_result`, `setup_completed` | Mixpanel + Firebase Analytics | Complete Tutorial for completed setup only |
+| `screen_view`, `visual_mode_selected`, `accessibility_preset_selected` | Mixpanel + Firebase Analytics | None |
+| `home_changed`, `home_tile_opened`, widget/call/SMS/SOS/external-action task outcomes | Mixpanel + Firebase Analytics | None |
+| `membership_screen_view` | Mixpanel + Firebase Analytics | View Content |
+| `checkout_started` | Mixpanel + Firebase Analytics | Initiate Checkout |
+| `conversion` trial/subscription/purchase | Mixpanel + Firebase Analytics | Start Trial / Subscribe / Purchase |
+| `role_readiness`, startup recovery task outcome | Mixpanel + Firebase Analytics | None |
 | Unexpected technical failures, safe breadcrumbs | Crashlytics | None |
 
 Foreground sessions begin on first foreground or after 30 minutes in the
 background; activity recreation and repeated foreground callbacks do not create
 another session. Session emission is deduplicated per destination, so newly
-granted marketing consent does not duplicate Mixpanel activation. Screen views
-come from navigation entries rather than recomposition. Persisted setup/display
+granted marketing consent does not duplicate either analytics activation. Screen views
+come from navigation entries and displayed sub-screens rather than recomposition:
+keypad/recent/missed tabs, contacts/detail, incoming/active/outcome call screens,
+inbox/recipient picker/compose/conversation/sending/failure, SOS/countdown/failure/settings,
+camera/gallery and individual settings destinations. Onboarding views carry the current
+`step`. `screen_view` includes both `screen` and Firebase's standard `screen_name`
+and `screen_class` parameters; automatic Firebase screen reporting stays disabled.
+Repeated views in the same entry/sub-screen are deduplicated, but returning to a
+screen or enabling diagnostics records the current view again. Persisted setup/display
 changes are observed without replaying old preferences on process start.
-Diagnostics are offered after onboarding, so initial setup coverage is limited
+Diagnostics are offered near the start of onboarding, so initial setup coverage is limited
 to events that actually occur after consent; no historical funnel is backfilled.
+
+Schema version 2 mirrors every custom event and its attributes to both analytics
+vendors. SDK-generated automatic events remain vendor-specific. Shared event
+context contains `visual_mode`, `text_size`, `schema_version`, `environment`, and,
+once Home configuration is available, numeric `home_tile_count`,
+`home_contact_tile_count`, `home_app_tile_count`, `home_shortcut_tile_count` and
+`home_widget_tile_count`. Counts exclude empty slots; installed-app tiles and
+widgets are separate from built-in shortcuts. Mixpanel registers mode/text-size/counts
+as super properties and user-profile properties. Firebase uses default event parameters
+and the equivalent user properties (string values, as required by its API); event
+counts and `tile_position` are numeric. Purchase `amount` is numeric in both vendors.
+Firebase represents `test_mode` as 0/1, while Mixpanel supports a boolean.
+Context is refreshed after configuration edits and reset on analytics withdrawal.
+Crashlytics receives the same configuration context as custom keys under crash consent.
+
+`home_tile_opened` records a tap in either Home presentation with `kind` and the
+zero-based position among visible tiles, not a contact/app identity, label, number,
+package name or widget provider. It measures selection, not successful launch/call
+completion. `home_changed` includes the resulting configuration counts. In GA4,
+register these count parameters as event-scoped custom metrics and other context
+as dimensions/user properties before expecting custom reports; raw event delivery
+does not automatically configure reporting dimensions.
 
 Call placement means submitted to Telecom, not connected. SMS submission, carrier
 sent, and delivery confirmation are separate outcomes. SOS telemetry contains
@@ -680,8 +737,8 @@ Use the shared installation UUID to correlate permitted Mixpanel activity with
 Crashlytics diagnostics and Firebase native user IDs; it is not a replacement for
 an authenticated cross-device account identity. GA4 custom-dimension registration
 is not retroactive, and aggregated reports can lag DebugView/realtime receipt.
-Do not treat setup events as a complete first-install funnel: consent may only
-be granted after setup, and the app does not backfill earlier activity.
+Do not treat setup events as a complete first-install funnel: consent is requested
+after Welcome, may be declined, and the app does not backfill earlier activity.
 
 In the vendor consoles, configure data retention/deletion, access roles, Meta
 Business Portfolio/ad account and optimization eligibility, dashboard definitions,

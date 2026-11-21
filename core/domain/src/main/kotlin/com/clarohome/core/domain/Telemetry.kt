@@ -1,6 +1,7 @@
 package com.clarohome.core.domain
 
 import com.clarohome.core.model.HomeTileKind
+import com.clarohome.core.model.HomeTile
 import com.clarohome.core.model.OnboardingStep
 import com.clarohome.core.model.ReadinessCapability
 import com.clarohome.core.model.TextSize
@@ -22,6 +23,30 @@ enum class EventTask {
 enum class TelemetryScreen {
     HOME, ONBOARDING, RECOVERY, PHONE, MESSAGES, SETTINGS, APPS, MENU,
     MEMBERSHIP, MEDIA, SOS, HOME_TILES, WIDGET_PICKER,
+    KEYPAD, RECENT_CALLS, MISSED_CALLS, CONTACTS, CONTACT_DETAIL, CALL_CONFIRMATION,
+    INCOMING_CALL, ACTIVE_CALL, CALL_ENDED, MISSED_CALL, CALL_UNANSWERED, CALL_FAILED, EXTERNAL_HANDOFF,
+    MESSAGE_INBOX, MESSAGE_CONVERSATION, MESSAGE_RECIPIENTS, MESSAGE_COMPOSE,
+    MESSAGE_CONFIRMATION, MESSAGE_SENDING, MESSAGE_FAILED,
+    SOS_COUNTDOWN, SOS_FAILED, SOS_SETTINGS, CAMERA, GALLERY,
+    PHONE_STYLE, DISPLAY_SETTINGS, ACCESS_SETTINGS, PERMISSIONS, CALL_AUDIO, MENU_ORDER, RESET,
+}
+
+data class HomeTelemetryContext(
+    val tileCount: Int,
+    val contactTileCount: Int,
+    val appTileCount: Int,
+    val shortcutTileCount: Int,
+    val widgetTileCount: Int,
+) {
+    companion object {
+        fun from(slots: List<HomeTile?>): HomeTelemetryContext {
+            val tiles = slots.filterNotNull()
+            val contacts = tiles.count { it.kind == HomeTileKind.CONTACT }
+            val apps = tiles.count { it.kind == HomeTileKind.INSTALLED_APP }
+            val widgets = tiles.count { it.kind == HomeTileKind.WIDGET }
+            return HomeTelemetryContext(tiles.size, contacts, apps, tiles.size - contacts - apps - widgets, widgets)
+        }
+    }
 }
 
 enum class HomeAction { SET, REMOVE, REORDER, VISIBILITY }
@@ -37,7 +62,7 @@ data class TelemetryMoney(val amount: BigDecimal, val currency: Currency) {
 
 sealed interface ClaroEvent {
     data object SessionStarted : ClaroEvent
-    data class ScreenView(val screen: TelemetryScreen) : ClaroEvent
+    data class ScreenView(val screen: TelemetryScreen, val step: OnboardingStep? = null) : ClaroEvent
     data class SetupStepResult(val step: OnboardingStep, val outcome: EventOutcome) : ClaroEvent
     data object SetupCompleted : ClaroEvent
     data class RoleReadiness(
@@ -59,6 +84,11 @@ sealed interface ClaroEvent {
         val kind: HomeTileKind?,
         val outcome: EventOutcome = EventOutcome.COMPLETED,
     ) : ClaroEvent
+    data class HomeTileOpened(val kind: HomeTileKind, val position: Int) : ClaroEvent {
+        init {
+            require(position >= 0) { "Tile position must not be negative" }
+        }
+    }
     data class CheckoutStarted(val product: TelemetryProduct) : ClaroEvent
     data class Conversion(
         val kind: ConversionKind,

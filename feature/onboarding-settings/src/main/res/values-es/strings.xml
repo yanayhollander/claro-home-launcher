@@ -34,7 +34,7 @@
     <string name="onb_show_apps_tile">Mostrar Aplicaciones en Inicio</string>
     <string name="onb_show_app_on_home">Mostrar %1$s en Inicio</string>
     <string name="onb_settings_access">Acceso a Configuración</string>
-    <string name="onb_step_people_and_speed_dial">Mosaicos de inicio</string>
+    <string name="onb_step_people_and_speed_dial">Tus contactos VIP</string>
     <string name="onb_sos_contact_title">Contacto SOS</string>
     <string name="onb_step_permissions_and_roles">Permisos y funciones</string>
     <string name="onb_step_setup_complete">Configuración completada</string>
@@ -42,9 +42,13 @@
     <string name="onb_setup_step_progress">Paso %1$d de %2$d de la configuración</string>
 
     <string name="onb_set_up_claro">Configurar Claro</string>
-    <string name="onb_welcome_tagline">Tu gente. A un toque de distancia.</string>
-    <string name="onb_welcome_subtitle">Inicio, teléfono y mensajes más sencillos — configúralo por tu cuenta o junto a alguien de confianza.</string>
-    <string name="onb_welcome_permissions_sos_note">Android pide acceso a Inicio, Teléfono, SMS y Cámara por separado cuando hace falta. SOS llama a una persona de confianza; no es un servicio de emergencias supervisado.</string>
+    <string name="onb_welcome_tagline">Botones grandes. Menos complicaciones.</string>
+    <string name="onb_welcome_subtitle">Tu gente y tus apps de cada día, siempre a mano. Llamadas claras, mensajes sencillos y un inicio familiar.</string>
+    <string name="onb_welcome_permissions_sos_note">Hagamos que Claro sea tuyo. Elige un estilo, ajusta el texto y añade lo que importa — por tu cuenta o con alguien de confianza.</string>
+    <string name="onb_diagnostics_title">Ayúdanos a mejorar Claro</string>
+    <string name="onb_diagnostics_body">Comparte datos básicos de uso e informes de fallos para ayudarnos a mejorar Claro.</string>
+    <string name="onb_diagnostics_privacy">Tus contactos, mensajes y fotos siguen siendo privados. Los informes nunca se usan para publicidad.</string>
+    <string name="onb_diagnostics_continue_notice">Al continuar, aceptas compartir estos datos. Puedes desactivarlo en Ajustes → Membresía y privacidad.</string>
 
     <string name="onb_use_style">Usar %1$s</string>
     <string name="onb_apply">Aplicar</string>
@@ -136,7 +140,7 @@
     <string name="onb_settings_access_date_subtitle">Pregunta con la fecha de hoy</string>
     <string name="onb_settings_access_pin_subtitle">PIN de cuidador · recuperación local</string>
     <string name="onb_membership_and_privacy_title">Suscripción y privacidad</string>
-    <string name="onb_membership_and_privacy_subtitle">Funciones principales gratis · diagnóstico desactivado por defecto</string>
+    <string name="onb_membership_and_privacy_subtitle">Funciones principales gratis · tú decides sobre el diagnóstico</string>
     <string name="onb_reset_claro">Restablecer Claro</string>
     <string name="onb_reset_claro_subtitle">Borra solo la configuración local de Claro</string>
 

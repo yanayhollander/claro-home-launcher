@@ -6,6 +6,7 @@ import com.clarohome.core.domain.ClaroEvent
 import com.clarohome.core.domain.CrashReporter
 import com.clarohome.core.domain.DiagnosticOperation
 import com.clarohome.core.domain.ProductAnalytics
+import com.clarohome.core.domain.HomeTelemetryContext
 import com.clarohome.core.model.TextSize
 import com.clarohome.core.model.VisualMode
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -64,6 +65,7 @@ interface AnalyticsVendor {
     val destination: AnalyticsDestination
     fun setCollectionEnabled(enabled: Boolean, userId: String? = null)
     fun track(name: String, properties: Map<String, String>)
+    fun context(properties: Map<String, String>) = Unit
     fun reset()
 }
 
@@ -164,8 +166,22 @@ class ConsentAwareObservability @Inject constructor(
         consentController.consent.value
     }
 
-    fun updateContext(mode: VisualMode, textSize: TextSize) {
-        context = mapOf("visual_mode" to mode.wireValue(), "text_size" to textSize.wireValue())
+    @Synchronized
+    fun updateContext(mode: VisualMode, textSize: TextSize, home: HomeTelemetryContext? = null) {
+        context = buildMap {
+            put("visual_mode", mode.wireValue())
+            put("text_size", textSize.wireValue())
+            home?.let {
+                put("home_tile_count", it.tileCount.toString())
+                put("home_contact_tile_count", it.contactTileCount.toString())
+                put("home_app_tile_count", it.appTileCount.toString())
+                put("home_shortcut_tile_count", it.shortcutTileCount.toString())
+                put("home_widget_tile_count", it.widgetTileCount.toString())
+            }
+        }
+        if (consentController.consent.value.analytics) {
+            analyticsVendors.filter { it.destination != AnalyticsDestination.META }.forEach { it.context(context) }
+        }
         if (consentController.consent.value.crashReports) crashVendor.context(context)
     }
 
@@ -181,7 +197,10 @@ class ConsentAwareObservability @Inject constructor(
         val consent = consentController.consent.value
         val envelope = event.envelope()
         val destinations = buildSet {
-            if (consent.analytics) add(event.primaryDestination())
+            if (consent.analytics) {
+                add(AnalyticsDestination.MIXPANEL)
+                add(AnalyticsDestination.FIREBASE)
+            }
             if (consent.marketing && event.isMarketingConversion()) add(AnalyticsDestination.META)
         }
         destinations.forEach { destination ->
@@ -193,10 +212,11 @@ class ConsentAwareObservability @Inject constructor(
                 envelope.properties
             } else {
                 context + envelope.properties + mapOf(
-                    "schema_version" to "1", "environment" to BuildConfig.TELEMETRY_ENVIRONMENT,
+                    "schema_version" to "2", "environment" to BuildConfig.TELEMETRY_ENVIRONMENT,
                 )
             }
             analyticsVendors.firstOrNull { it.destination == destination }?.let { vendor ->
+                if (destination != AnalyticsDestination.META) vendor.context(context)
                 networkInspector.onEnvelope(
                     InspectedVendorEnvelope(
                         destination = destination.name,
@@ -244,5 +264,5 @@ private fun DiagnosticsConsent.allows(destination: AnalyticsDestination): Boolea
 fun InspectedVendorEnvelope.toJson(): String = JSONObject().apply {
     put("destination", destination)
     put("name", name)
-    put("properties", JSONObject(properties))
+    put("properties", properties.toAnalyticsJson())
 }.toString()

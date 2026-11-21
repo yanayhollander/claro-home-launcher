@@ -83,6 +83,7 @@ class LocalizationRegressionTest {
                             message = null,
                             callbacks = OnboardingCallbacks(
                                 onContinue = {},
+                                onDiagnosticsConsent = {},
                                 onChooseMode = {},
                                 onLanguageDisplay = { _, _, _ -> },
                                 onUseDateQuestion = {},

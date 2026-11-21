@@ -92,6 +92,7 @@ import com.clarohome.feature.communication.CommunicationRoute
 import com.clarohome.feature.communication.CommunicationUiState
 import com.clarohome.feature.communication.ContactNumber
 import com.clarohome.feature.communication.PhoneContactsCoordinator
+import com.clarohome.core.domain.TelemetryScreen
 import com.clarohome.feature.communication.formatCallDuration
 import com.clarohome.presentation.touch.R
 import java.text.DateFormat
@@ -139,6 +140,7 @@ fun TouchCommunicationScreen(
     onDeleteContact: (String) -> Unit = {},
     onRequestUnlockForContacts: () -> Unit = {},
     onSelectDialerContact: (CallerIdentity) -> Unit = {},
+    onDialerScreenChanged: (TelemetryScreen) -> Unit = {},
 ) {
     var editorMode by rememberSaveable(state.route, state.selectedContact?.lookupKey) {
         mutableStateOf<String?>(null)
@@ -219,6 +221,7 @@ fun TouchCommunicationScreen(
                 onBackspace = onBackspace,
                 onCallEnteredNumber = onCallEnteredNumber,
                 onOpenContacts = onOpenContacts,
+                onScreenChanged = onDialerScreenChanged,
                 onOpenHistoryEntry = onOpenHistoryEntry,
                 onRepairPhone = onRepairPhone,
                 onSelectDialerContact = onSelectDialerContact,
@@ -355,6 +358,7 @@ private fun ColumnScope.TouchDialerRoute(
     onOpenHistoryEntry: (String) -> Unit,
     onRepairPhone: () -> Unit,
     onSelectDialerContact: (CallerIdentity) -> Unit,
+    onScreenChanged: (TelemetryScreen) -> Unit,
 ) {
     var selectedTab by rememberSaveable(state.dialerSearchGeneration) {
         mutableStateOf(
@@ -366,8 +370,21 @@ private fun ColumnScope.TouchDialerRoute(
         )
     }
 
-    TouchPhoneHeader(title = stringResource(R.string.touch_tile_phone)) {
-        TouchPhoneHeaderAction(
+    LaunchedEffect(selectedTab, state.dialerSearchGeneration) {
+        onScreenChanged(when (selectedTab) {
+            DialerTab.KEYPAD -> TelemetryScreen.KEYPAD
+            DialerTab.RECENT -> TelemetryScreen.RECENT_CALLS
+            DialerTab.MISSED -> TelemetryScreen.MISSED_CALLS
+        })
+    }
+
+    TouchPhoneHeader(title = stringResource(R.string.touch_tile_phone)) {}
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = ClaroDimensions.ScreenPadding, vertical = 8.dp),
+    ) {
+        ClaroSecondaryButton(
             label = stringResource(R.string.touch_contacts),
             icon = ClaroIconKind.CONTACT,
             onClick = onOpenContacts,

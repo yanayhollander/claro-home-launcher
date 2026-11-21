@@ -81,8 +81,8 @@
     ["photo", "Photos & apps", "One memory at a time.", "Browse pictures and authorize device deletion deliberately.", "MEDIA-02/03", "Classic Up/Down browses illustrations. Options opens the simulated Android delete confirmation."],
     ["sos", "Help & safety", "Help from someone you trust.", "A family help call is not an emergency dispatch service.", "SOS-01/02", "Start a five-second demo countdown, then cancel it."],
     ["sos-countdown", "Help & safety", "Time to change your mind.", "Five seconds, a clear stop and no hidden side effects.", "SOS-02", "Cancel before zero. Leaving this screen also cancels the countdown."],
-    ["sos-active", "Help & safety", "Calling your trusted person.", "Call progress never means someone has received your request.", "SOS-03", "Review connected or unanswered states. No alert is automatically delivered."],
-    ["sos-failed", "Help & safety", "Help must not be a promise.", "Useful recovery without claiming anyone has been notified.", "SOS-03", "Try again or open the simulated system emergency screen."],
+    ["sos-active", "Help & safety", "Your familiar call controls.", "SOS uses the same call screen, with status, speaker, mute and End.", "SOS-03", "Review dialing, ringing or connected states, then end the simulated call. No alert is automatically delivered."],
+    ["sos-failed", "Help & safety", "Help must not be a promise.", "Useful recovery without claiming anyone has been notified.", "SOS-03", "Review the failure, then explicitly try again or return Home."],
     ["apps", "Photos & apps", "Only the apps you chose.", "Allowed apps only. Search and editing live in protected settings.", "APPS-01/02", "Open an allowed app or review the empty and unavailable states."],
     ["pin", "Caregiver", "A small pause for settings.", "Choose a date question or caregiver PIN during setup.", "PIN-01/02", "The date question uses today's local date in dd/MM/YYYY format. PIN mode uses the credentials you created in Setup."],
     ["settings", "Caregiver", "Thoughtfully set up. Easily kept.", "One protected place for the caregiver’s choices.", "SETTINGS-01/02/03", "Change display, favorites, home layout or readiness; explicitly lock when done."],
@@ -96,10 +96,10 @@
     ["display-picker", "Caregiver", "One clear choice.", "Select a language or text size, then return to the display editor.", "I18N-01 · A11Y-01", "Selection updates the preview; Save applies it."],
     ["sos-settings", "Caregiver", "Agree on help before it is needed.", "Choose a trusted person and explain the limits together.", "SOS-01/04 · SETTINGS-02", "Choose a recipient, confirm their agreement, save and run a simulated test."],
     ["permissions", "Caregiver", "Ready means checked.", "Role grants and successful service are different things.", "SETUP-02/03/04", "Simulate a denial and repair. No OS permission is actually requested."],
-    ["privacy", "Caregiver", "Private by design, not by promise.", "Two optional diagnostics choices, both off by default.", "PRIV-01/02 · DATA-01", "Toggle analytics or crash diagnostics. This demo contains no SDK or upload."],
+    ["privacy", "Caregiver", "Your choice, at any time.", "Usage analytics and crash reports turn on after onboarding consent; either can be turned off here.", "PRIV-01/02 · DATA-01", "Toggle analytics or crash diagnostics. This demo contains no SDK or upload."],
     ["reset", "Caregiver", "A fresh start, not a surprise.", "Reset only this in-memory demo configuration.", "DATA-02", "Review exactly what changes. Cancel is always available."],
-    ["welcome", "Getting started", "A little more independence.", "One welcome action. No subscription offers during setup.", "SETUP-01", "Set up Claro opens the seven-step journey, with Classic preselected."],
-    ["setup", "Getting started", "A careful first handover.", "Seven steps ending with Permissions and roles, then Home.", "SETUP-01/04", "Use Back to revisit a step. Finish requires all supported default-app roles; prompts here are simulations."],
+    ["welcome", "Getting started", "Big buttons. Less fuss.", "A warmer welcome, followed by a clear explanation of helping improve Claro.", "SETUP-01", "Set up Claro opens the eight-step journey. Continue on the next screen enables analytics and crash reports. These can be turned off later in Settings."],
+    ["setup", "Getting started", "Make Claro yours.", "Permissions first, then Home shortcuts, VIP direct-call contacts and an easy SOS choice.", "SETUP-01/04 · PRIV-01", "Select any screen above to review, or follow setup in order. VIP selections save directly to Home. Review shortcuts never give consent; Android prompts are simulations."],
     ["access-settings", "Caregiver", "Settings access.", "Today's date or a six-digit caregiver PIN with a separate recovery secret.", "PIN-01/02", "A recovery secret needs at least 12 characters. Settings stay unlocked until explicitly locked or this page reloads."],
     ["plans", "Membership", "Free essentials. Optional extras.", "Seven-day trial only after an eligible store enrollment.", "BILL-01/02/03 · CORE-01/02", "Select monthly, yearly or separate lifetime. Actual prices are not approved."],
     ["purchase", "Membership", "Review, never assume.", "A store-review simulation, not a real checkout.", "BILL-02/03/04", "Explore pending, canceled and offline outcomes. Nothing can charge you."],
@@ -137,6 +137,7 @@
     language: deviceLanguage, textSize: "Standard", large: false, contrast: false, haptics: true,
     easyAudio: true, maximumVolume: false, selectedStyle: "classic", pendingStyle: "", setupStep: 0, onboarding: false, pickerTarget: "home:0", pickerReturn: "speed-dial", displayPicker: "language",
     analytics: false, crashes: false, accessMode: "date", pin: "", recovery: "", configured: false,
+    setupCompleted: false, setupReentry: false, onboardingPicker: "", onboardingQuery: "",
     readiness: { Home: "Not checked", Phone: "Not checked", Messages: "Not checked", Contacts: "Not checked", Notifications: "Not checked", Media: "Not checked" },
     handover: false, digits: "", recipient: "", body: "", drafts: {}, deletedThreads: [], selected: "mira", numberIndex: 0,
     target: { name: "Mira", number: "202-555-0101" }, messages: [], unread: true,
@@ -256,6 +257,12 @@
   function navigate(id, replace = false) {
     id = legacyRoutes[id] || id;
     if (!registry[id]) id = "home";
+    if (id === "setup" && !state.onboarding && route === "settings") {
+      state.setupReentry = true; state.setupCompleted = true; state.onboarding = true;
+    }
+    if (id === "home" && state.onboarding && !state.setupReentry) {
+      state.notice = "Finish setup before going Home."; render(); return;
+    }
     if (isProtected(id) && !state.unlocked) { state.intended = id; state.pendingAction = ""; id = "pin"; }
     if (id === "camera" && route !== "camera") state.cameraReturn = route;
     if (id === "home") state.pendingAction = "";
@@ -293,6 +300,12 @@
         state.body = state.drafts[state.recipient] || "";
       }
       if (id === "phone-style") state.selectedStyle = classicMode ? "classic" : "touch";
+      if (id === "sos-active") {
+        const recipient = resolve(state.sos);
+        setTarget(recipient, recipient?.number);
+        state.callTarget = { ...state.target };
+        state.callState = variant;
+      }
       if (id === "setup" && !state.onboarding) state.onboarding = true;
       if (id === "camera") state.external = "Device camera";
     }
@@ -324,7 +337,7 @@
     if (classicMode && state.contactMode && classicTarget() && (classicTarget().selectionEnd ?? 0) > 0) { classicDelete(); return; }
     if (state.external && route === "camera") { actions["external-back"](); return; }
     if (state.confirm || state.external || state.contactMode) { state.confirm = ""; state.external = ""; state.contactMode = ""; state.error = ""; render(); return; }
-    if (route === "setup") { if (state.setupStep === 0) navigate("welcome"); else { state.setupStep--; render(); } return; }
+    if (route === "setup") { if (state.onboardingPicker) { actions["setup-picker-done"](); } else if (state.setupStep === 0) navigate("welcome"); else { state.setupStep--; render(); } return; }
     if (state.onboarding && ["speed-dial", "sos-settings"].includes(route)) { navigate("setup"); return; }
     if (route === "reply") { navigate("conversation"); return; }
     if (route === "conversation") { navigate("messages"); return; }
@@ -363,10 +376,10 @@
     camera: ["open-camera", "go:gallery"],
     gallery: ["finish-loading", "pick-photo", "go:camera"],
     photo: ["remove-photo", "go:gallery"],
-    sos: ["go:sos-settings", "start-sos", "emergency"],
+    sos: ["go:sos-settings", "start-sos"],
     "sos-countdown": ["cancel-sos", "start-sos", "go:sos"],
-    "sos-active": ["end-sos", "emergency"],
-    "sos-failed": ["go:home", "start-sos", "emergency"],
+    "sos-active": ["end-call"],
+    "sos-failed": ["go:home", "start-sos"],
     apps: [],
     pin: ["submit", "go:pin-recovery"],
     settings: ["done-settings", "lock"],
@@ -385,7 +398,7 @@
     privacy: ["submit", "go:settings"],
     reset: ["reset-review", "go:settings"],
     welcome: ["start-setup"],
-    setup: ["submit", "setup-next", "finish-setup"],
+    setup: [".consent-notice", "submit", "consent-continue", "setup-next", "finish-setup", "finish-onboarding-sos", "skip-onboarding-sos", "setup-picker-done"],
     plans: ["review-purchase", "go:home"],
     purchase: ["mock-store", "go:plans"],
     membership: ["go:plans", "go:home"],
@@ -395,6 +408,7 @@
   if (classicMode) screenActions["classic-menu"] = [];
   function mountScreenActions() {
     const device = phone.parentElement;
+    const useClassicActions = classicMode && !state.onboarding && !["welcome", "setup"].includes(route);
     let keys = screenActions[route] || [];
     if (state.external) {
       keys = route === "camera" ? ["capture", "external-back"] :
@@ -422,12 +436,12 @@
         key.startsWith(".") ? key :
         key.startsWith("go:") ? `button[data-action="go"][data-route="${key.slice(3)}"]` :
         `button[data-action="${key}"]`;
-      return (classicMode && !state.onboarding ? phone : device).querySelector(selector);
+      return (useClassicActions ? phone : device).querySelector(selector);
     }).filter(Boolean);
     if (!controls.length && route !== "home") {
       controls = [...phone.querySelectorAll(".screen > button.primary, .screen > button.danger")];
     }
-    if (classicMode && !state.onboarding) {
+    if (useClassicActions) {
       mountClassicActions(controls);
       return;
     }
@@ -464,7 +478,7 @@
       control.remove();
     }
     classicActions = classicActions.filter(control =>
-      !["end-call", "end-sos", "decline", "call-keypad"].includes(control.dataset.action) &&
+      !["end-call", "decline", "call-keypad"].includes(control.dataset.action) &&
       !(control.dataset.action === "go" && control.dataset.route === "home" && control.textContent.trim() === t("home")));
     if (state.external) {
       classicActions = classicActions.filter(control => [
@@ -488,7 +502,7 @@
     const focusId = preserve && focused && phone.contains(focused) ? focused.id : "";
     const selection = focusId && "selectionStart" in focused ? [focused.selectionStart, focused.selectionEnd] : null;
     const scroll = phone.scrollTop;
-    const meta = registry[route];
+    const meta = route === "setup" ? { ...registry[route], title: setupSteps[state.setupStep] } : registry[route];
     document.title = `Claro Home${classicMode ? " 2G" : ""} — ${route === "home" ? "Interactive storyboard" : route}`;
     $("section-name").textContent = meta.group;
     $("screen-title").textContent = meta.title; $("screen-subtitle").textContent = meta.subtitle;
@@ -496,6 +510,13 @@
     $("note-title").textContent = meta.title;
     $("note-description").textContent = meta.subtitle;
     $("try-instruction").textContent = meta.try;
+    const onboardingReview = ["welcome", "setup"].includes(route);
+    $("onboarding-flow").hidden = !onboardingReview;
+    if (onboardingReview) {
+      $("onboarding-flow-steps").innerHTML = ["Welcome", ...setupSteps, "Home"].map((label, index) =>
+        button(`<span>${String(index + 1).padStart(2, "0")}</span>${esc(label)}`, "review-setup-step", "",
+          `data-step="${index - 1}" ${index === setupSteps.length + 1 && !state.setupCompleted ? 'disabled title="Finish setup before going Home"' : ""} ${((route === "welcome" && index === 0) || (route === "setup" && index === state.setupStep + 1)) ? 'aria-current="step"' : ""}`)).join("");
+    }
     $("journey-name").textContent = `${meta.group} · ${route} · ${variant}`;
     $("prototype-status").textContent = "Current app UX reference · sample data · changes reset on reload · no real calls, messages, purchases or telemetry.";
     const boundaries = ["camera", "apps", "permissions", "purchase"].includes(route) ? "Android / Play boundary: the external panel is an illustration, not a launched app or real system prompt." : "Every call, message, emergency action and membership result is simulated; no network or device action occurs.";
@@ -518,6 +539,7 @@
     device.classList.toggle("large-text", textSize !== "Standard" || variant === "huge text");
     device.classList.toggle("huge-text", textSize === "Huge" || variant === "huge text");
     document.body.classList.toggle("onboarding-preview", state.onboarding || ["welcome", "setup"].includes(route));
+    document.body.classList.toggle("first-launch-setup", state.onboarding && !state.setupReentry || route === "welcome" && !state.setupCompleted);
     device.classList.toggle("rtl-preview", isRTL);
     phone.dir = isRTL ? "rtl" : "ltr";
     phone.lang = state.language;
@@ -534,6 +556,22 @@
     const content = classicMode && route === "home" ? classicHome() : classicMode && (route === "dialer" || dialerOptions[route]) ? classicDialer() : screens[route]();
     actionDock.replaceChildren();
     phone.innerHTML = `<section class="screen ${route === "home" ? "home-screen" : ""}" data-screen="${route}" aria-label="${esc(route)}">${state.notice ? info(esc(state.notice), "success") : ""}${state.error ? info(esc(state.error), "error") : ""}${content}${state.external && !content.includes('class="external-panel"') ? noticeExternal() : ""}</section>`;
+    if ((state.onboarding || route === "setup") && route !== "welcome") {
+      const screen = phone.querySelector(".screen");
+      const title = screen.querySelector("h2");
+      if (title) {
+        const header = title.parentElement.classList.contains("screen-title-row")
+          ? title.parentElement : document.createElement("header");
+        header.classList.add("onboarding-header");
+        header.dir = "ltr";
+        title.dir = isRTL ? "rtl" : "ltr";
+        if (title.parentElement !== header) header.append(title);
+        header.insertAdjacentHTML("afterbegin", button('<span aria-hidden="true">←</span>', "onboarding-back", "onboarding-back", `aria-label="${esc(t("back"))}"`));
+        screen.prepend(header);
+      }
+      screen.querySelector('[data-action="close-display-picker"]')?.remove();
+      screen.querySelector('[data-action="cancel-picker"]')?.remove();
+    }
     phone.querySelectorAll("form[data-form]").forEach(form => {
       const saved = state.formDrafts[form.dataset.form];
       if (!saved) return;
@@ -778,13 +816,13 @@
   }
   function renderClassicDeck() {
     classicDeck.hidden = false;
-    classicDeck.querySelector(".classic-number-keys").hidden = ["messages", "conversation"].includes(route) || (route === "calling" && state.confirm !== "call-keypad") || route === "incoming";
+    classicDeck.querySelector(".classic-number-keys").hidden = ["messages", "conversation"].includes(route) || (["calling", "sos-active"].includes(route) && state.confirm !== "call-keypad") || route === "incoming";
     syncClassicSelection();
     const blocked = Boolean(state.external) || classicOptionsOpen || route === "incoming" || route === "sos-countdown";
     const selectionOnly = classicSelected?.matches('select, input[type="checkbox"], input[type="radio"]');
     classicDeck.querySelectorAll('[data-action="classic-digit"]').forEach(key => { key.disabled = blocked || Boolean(selectionOnly); });
     const input = classicTarget();
-    $("call-controls-dock").hidden = classicOptionsOpen || route !== "calling";
+    $("call-controls-dock").hidden = classicOptionsOpen || !$("call-controls-dock").querySelector(".call-controls");
     renderClassicSoftkeys();
     syncClassicSelection();
     const mode = $("classic-input-mode");
@@ -896,7 +934,7 @@
     if (destructive?.classList.contains("danger")) { invokeClassicAction(destructive); return; }
     if (state.contactMode) { actions["cancel-contact"](); return; }
     if (route === "incoming") { actions.decline(); return; }
-    if (state.activeCall) { actions[route === "sos-active" ? "end-sos" : "end-call"](); return; }
+    if (state.activeCall) { actions["end-call"](); return; }
     state.digits = ""; classicInput = null; multiTap = null; navigate("home");
   }
   function dialerPreview() {
@@ -1016,22 +1054,84 @@
       ? info("Anyone who knows today's local date can unlock. This prevents accidental taps; it is not a security lock.")
       : `${field("New 6-digit PIN", "newPin", "", "password", 'inputmode="numeric" pattern="[0-9]{6}" minlength="6" required maxlength="6"')}${field("Confirm PIN", "confirmPin", "", "password", 'inputmode="numeric" required maxlength="6"')}${field("Recovery secret (12+ characters)", "recovery", "", "password", 'required minlength="12" maxlength="80" autocomplete="off"')}${info("Keep the PIN and recovery secret safe. Today's date cannot recover PIN mode.", "warning")}`}`;
   }
-  const setupSteps = ["Choose phone style", "Language and display", "Choose Home tiles", "Settings access", "Home tiles", "SOS contact", "Permissions and roles"];
+  const setupSteps = ["Help keep Claro reliable", "Choose phone style", "Language and display", "Permissions and roles", "Choose Home tiles", "Settings access", "Your VIP contacts", "SOS contact"];
   const defaultRolesReady = () => ["Home", "Phone", "Messages"].every(key => state.readiness[key].startsWith("Granted") || state.readiness[key] === "Unavailable");
+  function onboardingContactChoices() {
+    return state.contacts.flatMap(contact => contact.numbers.map((number, index) => ({
+      contact, number, value: `${contact.id}:${index}:${number}`
+    })));
+  }
+  function onboardingSuggestedContacts() {
+    const recent = state.missedCalls.map(call => call.number);
+    return [...state.contacts].sort((a, b) => {
+      const rank = contact => {
+        const index = recent.findIndex(number => contact.numbers.includes(number));
+        return index < 0 ? Infinity : index;
+      };
+      return rank(a) - rank(b);
+    }).slice(0, 3).map(contact => {
+      const index = Math.max(0, contact.numbers.findIndex(number => recent.includes(number)));
+      return { contact, number: contact.numbers[index], value: `${contact.id}:${index}:${contact.numbers[index]}` };
+    });
+  }
+  function onboardingContactRow(choice, sos = false) {
+    const selected = sos ? (state.sosDraft || state.sos) === choice.value : state.slots.includes(`contact:${choice.value}`);
+    return row(`${choice.contact.name}${selected ? " ✓" : ""}`, choice.number,
+      sos ? "select-onboarding-sos" : "toggle-onboarding-vip",
+      `data-value="${esc(choice.value)}" aria-pressed="${selected}"`, avatar(choice.contact));
+  }
+  function onboardingPeopleChoices(sos = false) {
+    if (!state.readiness.Contacts.startsWith("Granted")) {
+      return info("Allow Contacts access to see your people. You can also add contacts later.") +
+        button("Allow Contacts", "permission-request", "secondary inline-action", 'data-permission="Contacts"');
+    }
+    return `<p class="screen-kicker">Suggested contacts · recent calls first</p>` +
+      onboardingSuggestedContacts().map(choice => onboardingContactRow(choice, sos)).join("");
+  }
+  function onboardingPickerScreen() {
+    const sos = state.onboardingPicker === "sos";
+    const query = state.onboardingQuery.trim().toLowerCase();
+    const choices = onboardingContactChoices().filter(choice =>
+      `${choice.contact.name} ${choice.number}`.toLowerCase().includes(query));
+    return heading(sos ? "Choose SOS contact" : "Select VIP contacts") +
+      (sos ? "<p>Choose one person.</p>" : info("Choose as many as you like. Changes save directly to Home.")) +
+      field("Search contacts", "onboardingQuery", state.onboardingQuery, "search", 'data-input="onboarding-contact-search"') +
+      (!state.readiness.Contacts.startsWith("Granted") ? onboardingPeopleChoices(sos) :
+        choices.map(choice => onboardingContactRow(choice, sos)).join("") || info("No contacts match your search.")) +
+      button("Done", "setup-picker-done", "primary");
+  }
   function setupScreen() {
+    if (state.onboardingPicker) return onboardingPickerScreen();
     const step = state.setupStep;
     let content = "";
-    if (step === 0) content = styleChoices() + button("Continue", "setup-next", "primary");
-    if (step === 1) content = displayFields() + button("Continue", "setup-next", "primary");
-    if (step === 2) content = homeVisibility() + button("Continue", "setup-next", "primary");
-    if (step === 3) content = `<form data-form="setup-access" class="stack">${accessFields()}<button type="submit" class="primary">Continue</button></form>`;
-    if (step === 4) content = info(`Home tiles configured: ${state.slots.filter(Boolean).length}. Everything here is optional.`) + goButton("Open Home tiles", "speed-dial") + button("Continue", "setup-next", "primary");
-    if (step === 5) content = info(state.sos && state.sosConsent ? "Trusted recipient recorded with agreement. Test separately." : "SOS is not configured. Choose someone who agrees.", "warning") + goButton("Configure trusted person", "sos-settings") + button(state.sos && state.sosConsent ? "Continue" : "Skip SOS for now", "setup-next", "primary");
-    if (step === 6) content = info("Choose Claro in each Android default-app prompt. Other permissions can be configured separately.") +
+    if (step === 0) content = `<div class="consent-symbol">${icon("lock")}</div><p>Share basic usage and crash reports to help us fix problems and improve Claro.</p>` +
+      info("Your contacts, messages and photos stay private. Reports are never used for advertising.") +
+      `<p class="consent-notice">By continuing, you agree to sharing. Turn it off anytime in Settings → Membership &amp; privacy.</p>` +
+      button("Continue", "consent-continue", "primary");
+    if (step === 1) content = styleChoices() + button("Continue", "setup-next", "primary");
+    if (step === 2) content = displayFields() + button("Continue", "setup-next", "primary");
+    if (step === 3) content = info("Set Claro as your default phone and allow Contacts to choose your VIPs and SOS person next.") +
       button("Set Claro as default", "request-defaults", "secondary inline-action") + permissionRows() +
-      button("Finish setup", "finish-setup", "primary", defaultRolesReady() ? "" : "disabled");
-    return heading(setupSteps[step]) + `<p class="screen-kicker">Setup step ${step + 1} of 7</p><div class="progress">${setupSteps.map((_, index) => `<span class="${index <= step ? "filled" : ""}"></span>`).join("")}</div>` +
-      content + button("Back", "setup-back", "secondary inline-action");
+      button("Continue", "setup-next", "primary", defaultRolesReady() ? "" : "disabled");
+    if (step === 4) content = homeVisibility() + button("Continue", "setup-next", "primary");
+    if (step === 5) content = `<form data-form="setup-access" class="stack">${accessFields()}<button type="submit" class="primary">Continue</button></form>`;
+    if (step === 6) content = `<p>Who do you call most? Add your favourite people to Home for a direct call with one tap.</p>` +
+      onboardingPeopleChoices() + button("Select contacts", "open-onboarding-vips", "secondary inline-action") +
+      info(`On Home: ${state.slots.filter(value => slotContact(value)).length}. Changes save automatically.`) +
+      button("Continue", "setup-next", "primary");
+    if (step === 7) {
+      const chosen = resolve(state.sosDraft || state.sos);
+      content = `<p>Choose one person to call when you need help.</p>` + onboardingPeopleChoices(true) +
+        button("Choose from contacts", "open-onboarding-sos", "secondary inline-action") +
+        (chosen ? info(`${esc(chosen.name)} · ${esc(chosen.number)}`) +
+          `<label class="check-label"><input type="checkbox" data-change="onboarding-sos-consent" ${state.sosConsent ? "checked" : ""}>They agreed to receive help calls.</label>` : "") +
+        goButton("Enter a number instead", "sos-settings", "secondary inline-action") +
+        info("Not an emergency service. Needs mobile service and an answer. No message or location sent.", "warning") +
+        button("Finish setup", "finish-onboarding-sos", "primary", chosen && state.sosConsent ? "" : "disabled") +
+        (state.sos ? "" : button("Skip SOS for now", "skip-onboarding-sos", "secondary inline-action"));
+    }
+    return heading(setupSteps[step]) + `<p class="screen-kicker">Setup step ${step + 1} of ${setupSteps.length}</p><div class="progress">${setupSteps.map((_, index) => `<span class="${index <= step ? "filled" : ""}"></span>`).join("")}</div>` +
+      content;
   }
   function styleChoices() {
     return `<div class="button-row">${["classic", "touch"].map(style => button(`${style === "classic" ? "Classic Phone" : "Touch Home"}${state.selectedStyle === style ? " ✓" : ""}`, "select-style", "secondary picker-choice", `data-style="${style}" aria-pressed="${state.selectedStyle === style}"`)).join("")}</div>`;
@@ -1040,7 +1140,9 @@
     return Object.entries(state.readiness).map(([name, value]) => `<div class="permission-card"><h3>${({ Home: "Default home", Phone: "Default phone", Messages: "Default SMS", Contacts: "Contacts", Notifications: "Notifications", Media: "Photos" })[name]}</h3><p>${esc(value)}</p>${button("Allow or repair", "permission-request", "secondary inline-action", `data-permission="${name}"`)}</div>`).join("");
   }
   function composeScreen(replying = false) {
-    return heading(replying ? `Reply to ${state.target.name}` : "Write a message") + `<form data-form="compose" class="stack">${replying ? `<p dir="ltr">${esc(state.recipient)}</p>` : field("To", "recipient", state.recipient, "tel", 'data-input="recipient" dir="ltr" required maxlength="24"') + button(`${icon("contact")} Contacts`, "choose-recipient", "secondary inline-action")}
+    const contact = recipientContact();
+    const recipientHeader = contact ? `<div class="message-recipient" role="group" aria-label="Recipient">${avatar(contact)}<div><strong>${esc(contact.name)}</strong><bdi dir="ltr">${esc(state.recipient)}</bdi></div></div>` : "";
+    return heading(replying ? `Reply to ${state.target.name}` : "Write a message") + recipientHeader + `<form data-form="compose" class="stack">${replying ? (contact ? "" : `<p dir="ltr">${esc(state.recipient)}</p>`) : field("To", "recipient", state.recipient, "tel", 'data-input="recipient" dir="ltr" required maxlength="24"') + button(`${icon("contact")} Contacts`, "choose-recipient", "secondary inline-action")}
       <label><span class="field-label">Message</span><textarea id="field-body" name="body" data-input="body" required maxlength="2000" placeholder="Write here…">${esc(state.body)}</textarea></label>${button(icon("backspace"), "delete-body", "secondary inline-action", 'aria-label="Delete last character"')}
       ${variant === "offline" ? info("No internet. SMS needs mobile service.", "warning") : ""}<button class="primary" type="submit">Send</button></form>`;
   }
@@ -1076,7 +1178,9 @@
     }).join(""),
     home: () => homeHeader() + homeTiles(),
     dialer: () => {
-      const header = titleAction(t("phone"), icon("contact"), "go", `data-route="contacts" aria-label="${esc(t("contacts"))}"`);
+      const header = classicMode
+        ? titleAction(t("phone"), icon("contact"), "go", `data-route="contacts" aria-label="${esc(t("contacts"))}"`)
+        : heading(t("phone")) + goButton(`${icon("contact")} ${esc(t("contacts"))}`, "contacts", "secondary contacts-shortcut");
       if (variant === "permission denied" || state.readiness.Phone.startsWith("Denied")) return header + permissionWarning("Phone");
       const tab = state.dialTab;
       const tabs = `<div class="tab-row" role="group" aria-label="Phone views">${["keypad", "recent", "missed"].map(v => button(esc(t(v)), "dial-tab", v === tab ? "selected" : "", `data-tab="${v}" aria-pressed="${v === tab}"`)).join("")}</div>`;
@@ -1180,14 +1284,13 @@
         info(recipient ? `${avatar(recipient)}<strong>${esc(recipient.name)}</strong><br><bdi>${esc(recipient.number)}</bdi>` : "Choose a help contact in Settings.", blocked ? "warning" : "") +
         info("Not an emergency service. Calls your contact only. No message or location sent.", "warning") +
         (blocked ? info(["no signal", "no SIM"].includes(variant) || state.network !== "available" ? `${esc(state.network !== "available" ? state.network : variant)}. Cannot call.` : state.readiness.Phone.startsWith("Denied") ? "Phone access needed." : "Choose a contact who has agreed.", "error") : "") +
-        (state.activeCall ? goButton("Return to call", "calling", "primary") : !recipient ? goButton("Set up SOS", "sos-settings", "primary") : button("Call in 5 seconds", "start-sos", "danger", blocked ? 'disabled aria-disabled="true"' : "")) + (recipient && state.sosConsent ? emergency() : "") + goButton("Settings", "sos-settings") + noticeExternal();
+        (state.activeCall ? goButton("Return to call", "calling", "primary") : !recipient ? goButton("Set up SOS", "sos-settings", "primary") : button("Call in 5 seconds", "start-sos", "danger", blocked ? 'disabled aria-disabled="true"' : "")) + goButton("Settings", "sos-settings") + noticeExternal();
     },
     "sos-countdown": () => heading("Calling in…") + `<div class="countdown" id="countdown-value" role="timer" aria-live="polite">${countdown}</div><p>${esc(resolve(state.sos)?.name || "No contact")}</p>` +
       (variant === "canceled" || variant === "interrupted" ? info("Canceled. No call started.", "success") + button("Try again", "start-sos", "danger") + goButton("SOS", "sos") : button("STOP", "cancel-sos", "danger", 'aria-label="Stop help call"')) +
       '<small>Back or Home cancels the call.</small>',
-    "sos-active": () => heading("Help call") + avatar(resolve(state.sos), true) + `<h3>${esc(resolve(state.sos)?.name || "No contact")}</h3>` + info(`${esc(variant)}. Help is not confirmed.`) +
-      info("Not an emergency service.", "warning") + button(`${icon("end")} End`, "end-sos", "danger") + goButton("No answer", "sos-failed") + emergency() + noticeExternal(),
-    "sos-failed": () => heading("Help call failed") + info(`${esc(variant)}. No one reached. No alert or location delivered. In danger? Use Emergency call.`, "error") + button("Try again", "start-sos", "danger") + emergency() + goButton("Home", "home") + noticeExternal(),
+    "sos-active": () => variant === "ended" ? screens["call-ended"]() : screens.calling(),
+    "sos-failed": () => heading("Help call failed") + info(`${esc(variant)}. No one reached. No alert or location delivered.`, "error") + button("Try again", "start-sos", "danger") + goButton("Home", "home") + noticeExternal(),
     apps: () => {
       const list = variant === "empty" ? [] : state.allowed;
       return heading(t("apps")) + (list.map(a => row(a, "", "app", `data-app="${a}"`, appArtwork(a))).join("") || info("No apps chosen yet. Ask your caregiver to add apps in Settings → Apps & Menu.")) + noticeExternal();
@@ -1211,7 +1314,7 @@
       ["Language & display", `${languages[state.language]} · ${state.textSize}`, "display"],
       ["SOS contact", "", "sos-settings"],
       ["Permissions", "", "permissions"],
-      ["Membership & privacy", "Core features free · diagnostics off by default", "membership"],
+      ["Membership & privacy", "Core features free · your diagnostics choices", "membership"],
       ["Settings access", state.accessMode === "date" ? "Today's date question" : "Caregiver PIN", "access-settings"],
       ["Reset Claro", "", "reset"]
     ].map(a => row(a[0], a[1], "go", `data-route="${a[2]}"`, icon(a[2] === "speed-dial" ? "contact" : a[2] === "sos-settings" ? "sos" : "settings"))).join("")}${button("Done", "done-settings", "primary")}${button("Lock settings", "lock")}</div>`,
@@ -1246,7 +1349,7 @@
     privacy: () => heading("Privacy") + `<form data-form="privacy" class="stack"><label class="setting-toggle">Usage analytics<input name="analytics" type="checkbox" ${state.analytics ? "checked" : ""}></label><label class="setting-toggle">Crash reports<input name="crashes" type="checkbox" ${state.crashes ? "checked" : ""}></label><p>Optional. Change your choices anytime.</p><button class="primary" type="submit">Save</button>${button("Turn both off", "withdraw-consent")}${goButton("Cancel", "settings")}</form>`,
     reset: () => heading("Reset Claro?") + info("Clears local preferences, Home tiles, speed dials, drafts, SOS, access credentials and diagnostics consent. Android contacts, call log, messages, photos and store purchases stay unchanged.", "warning") +
       (state.activeCall || variant === "active call" ? info("End your call first.", "error") + goButton("Return to call", "calling") : state.confirm === "reset" ? info("Reset all Claro changes?") + button("Cancel", "cancel-confirm", "primary") + button("Reset", "confirm-reset", "danger") : button("Continue", "reset-review", "danger")) + goButton("Cancel", "settings"),
-    welcome: () => heading("Welcome to Claro") + `<div class="welcome-symbol">${icon("sun")}</div><p>Your people. One touch away.</p><p>A simpler home, phone and messages — set up for yourself or together with someone you trust.</p>${button("Set up Claro", "start-setup", "primary")}`,
+    welcome: () => heading("Welcome to Claro") + `<img class="welcome-symbol welcome-logo" src="marketing/store/assets/logo-2048.png" alt=""><h3>Big buttons. Less fuss.</h3><p>Keep your people and everyday apps close, with clear calls, easy messages and a home that feels familiar.</p>${info("Let’s make Claro feel like your phone. Choose a style, adjust the text and add what matters — on your own or with someone you trust.")}${button("Set up Claro", "start-setup", "primary")}`,
     setup: setupScreen,
     plans: () => variant === "unconfigured" ? heading("Membership") + info("Purchases unavailable. No store products are configured. Calls, messages, SOS and Home stay available.", "warning") + goButton("Back to Settings", "settings") : heading("Membership") + info("Calls, messages, SOS and your home stay free.") +
       (variant === "loading" ? info("Loading plans…") : "") +
@@ -1313,7 +1416,12 @@
     countdownTimer = setInterval(() => {
       countdown -= 1;
       const target = $("countdown-value"); if (target) target.textContent = String(countdown);
-      if (countdown <= 0) { clearInterval(countdownTimer); state.activeCall = true; const c = resolve(state.sos); setTarget(c, c.number); state.callTarget = { ...state.target }; navigate("sos-active"); }
+      if (countdown <= 0) {
+        clearInterval(countdownTimer);
+        const contact = resolve(state.sos);
+        setTarget(contact, contact?.number);
+        placeCall();
+      }
     }, 1000);
   }
   function protectedAction(destination, action) {
@@ -1467,25 +1575,66 @@
     "close-display-picker": () => { state.inlineDisplayPicker = false; navigate(state.onboarding ? "setup" : "display"); },
     "enable-maximum": () => { state.maximumVolume = true; state.confirm = ""; render(); },
     "start-setup": () => {
-      state.onboarding = true; state.setupStep = 0; state.selectedStyle = "classic";
-      state.sos = ""; state.sosConsent = false; navigate("setup");
+      state.onboarding = true; state.setupReentry = state.setupCompleted; state.setupStep = 0; state.selectedStyle = "classic";
+      state.onboardingPicker = ""; state.onboardingQuery = "";
+      if (!state.setupReentry) { state.sos = ""; state.sosConsent = false; state.sosDraft = ""; }
+      navigate("setup");
     },
-    "setup-back": () => { if (state.setupStep > 0) { state.setupStep--; render(); } else navigate("welcome"); },
+    "review-setup-step": el => {
+      const step = Number(el.dataset.step);
+      if (step < 0) { navigate("welcome"); return; }
+      if (step >= setupSteps.length) {
+        if (!state.setupCompleted) { state.notice = "Finish setup first. Home is not available during first launch."; render(); return; }
+        state.onboarding = false; navigate("home"); return;
+      }
+      state.setupStep = step; state.setupReentry = state.setupCompleted; state.onboarding = true; state.inlineDisplayPicker = false;
+      state.onboardingPicker = "";
+      state.error = ""; state.notice = ""; draft = null; navigate("setup");
+    },
+    "consent-continue": () => {
+      state.analytics = true; state.crashes = true; delete state.formDrafts.privacy;
+      actions["setup-next"]();
+    },
+    "open-onboarding-vips": () => { state.onboardingPicker = "vips"; state.onboardingQuery = ""; render(); phone.scrollTop = 0; },
+    "open-onboarding-sos": () => { state.onboardingPicker = "sos"; state.onboardingQuery = ""; render(); phone.scrollTop = 0; },
+    "setup-picker-done": () => { state.onboardingPicker = ""; state.onboardingQuery = ""; render(); phone.scrollTop = 0; },
+    "toggle-onboarding-vip": el => {
+      const value = `contact:${el.dataset.value}`;
+      state.slots = state.slots.includes(value) ? state.slots.filter(slot => slot !== value) : [...state.slots, value];
+      render(true);
+    },
+    "select-onboarding-sos": el => {
+      state.sosDraft = el.dataset.value; state.sosConsent = false; state.onboardingPicker = ""; state.onboardingQuery = ""; render(); phone.scrollTop = 0;
+    },
+    "finish-onboarding-sos": () => {
+      const selected = state.sosDraft || state.sos, recipient = resolve(selected);
+      if (!recipient || !validNumber(recipient.number) || emergencyNumber(recipient.number) || !state.sosConsent) {
+        state.error = "Choose a valid non-emergency contact and confirm their agreement."; render(); return;
+      }
+      state.sos = selected; state.sosDraft = ""; actions["finish-setup"]();
+    },
+    "skip-onboarding-sos": () => { state.sosDraft = ""; actions["finish-setup"](); },
+    "onboarding-back": () => {
+      if (route === "contacts" && state.picker) actions["cancel-picker"]();
+      else if (route === "display-picker") actions["close-display-picker"]();
+      else back();
+    },
     "setup-next": () => {
-      if (state.setupStep === 0) applyPhoneStyle(state.selectedStyle);
-      if (state.setupStep === 1 && draft) saveDisplay();
-      state.setupStep = Math.min(6, state.setupStep + 1); state.error = ""; state.notice = ""; render(); phone.scrollTop = 0;
-      if (state.setupStep === 6) actions["request-defaults"]();
+      if (state.setupStep === 3 && !defaultRolesReady()) { state.error = "Confirm all supported default-app roles first."; render(); return; }
+      if (state.setupStep === 1) applyPhoneStyle(state.selectedStyle);
+      if (state.setupStep === 2 && draft) saveDisplay();
+      state.setupStep = Math.min(setupSteps.length - 1, state.setupStep + 1); state.error = ""; state.notice = ""; render(); phone.scrollTop = 0;
+      if (state.setupStep === 3) actions["request-defaults"]();
     },
     "finish-setup": () => {
-      if (!defaultRolesReady()) { state.error = "Confirm all supported default-app roles first."; render(); return; }
-      state.configured = true; state.onboarding = false; lock(); navigate("home");
+      if (!defaultRolesReady()) { state.setupStep = 3; state.error = "Confirm all supported default-app roles first."; render(); return; }
+      state.configured = true; state.setupCompleted = true; state.onboarding = false; lock(); navigate("home");
     },
     "request-defaults": () => { state.roleQueue = ["Home", "Phone", "Messages"].filter(name => !state.readiness[name].startsWith("Granted") && state.readiness[name] !== "Unavailable"); advanceRoleQueue(); },
     "permission-request": el => { state.roleQueue = []; permissionPrompt(el.dataset.permission); },
     "accept-permission": () => {
       state.readiness[state.permission] = "Granted · not service-tested";
-      state.external = "";
+      state.external = ""; state.notice = ""; state.error = "";
       if (state.roleQueue?.length) advanceRoleQueue();
       else render();
     },
@@ -1523,7 +1672,7 @@
       if (route === "calling" && el.dataset.variant === "no answer") { navigate("call-unanswered"); return; }
       if (route === "call-ended" && el.dataset.variant === "missed") { navigate("missed-call"); return; }
       cleanup(); variant = el.dataset.variant; state.error = ""; state.notice = ""; state.confirm = ""; state.external = "";
-      if (route === "calling") state.callState = variant;
+      if (["calling", "sos-active"].includes(route)) state.callState = variant;
       if (route === "camera" && variant !== "unavailable") state.external = "Device camera";
       if (route === "home" && variant === "missed") state.missedCalls[0].unread = true;
       if (route === "home" && variant === "unread messages") state.unread = true;
@@ -1693,7 +1842,6 @@
     "finish-loading": () => { variant = "standard"; render(); },
     "start-sos": startSOS,
     "cancel-sos": () => { clearInterval(countdownTimer); variant = "canceled"; state.notice = "Countdown stopped. No help call started."; render(); },
-    "end-sos": () => { state.activeCall = false; variant = "ended"; state.notice = "Call ended. Help not confirmed."; render(); },
     emergency: () => { state.external = "Emergency dialer"; render(); },
     native: () => { state.external = ["messages", "conversation", "message-failed", "compose"].includes(route) ? "Messages" : ["gallery", "photo"].includes(route) ? "Photos" : "Phone"; render(); },
     "external-back": () => {
@@ -1796,7 +1944,7 @@
       state.accessMode = accessMode; state.pin = pin; state.recovery = recovery; state.configured = true; state.unlocked = true;
       state.attempts = 0; state.cooldown = 0; state.recoveryAttempts = 0; state.recoveryCooldown = 0;
       accessModeDraft = null; state.error = ""; state.notice = "Settings access saved.";
-      if (state.onboarding) { state.setupStep = 4; navigate("setup"); }
+      if (state.onboarding) { state.setupStep = 6; navigate("setup"); }
       else navigate("settings");
       render();
     },
@@ -1858,8 +2006,9 @@
       case "contact-search": state.search = el.value; render(true); break;
       case "message-search": state.search = el.value; render(true); break;
       case "app-search": state.search = el.value; render(true); break;
-      case "recipient": state.recipient = el.value; break;
+      case "recipient": state.recipient = el.value; render(true); break;
       case "body": state.body = el.value; break;
+      case "onboarding-contact-search": state.onboardingQuery = el.value; render(true); break;
     }
     if (classicMode) updateClassicNavigation();
   });
@@ -1887,6 +2036,7 @@
         render(true); break;
       }
       case "home-visibility": state.error = ""; setHomeVisibility(el.value, el.checked); render(true); break;
+      case "onboarding-sos-consent": state.sosConsent = el.checked; render(true); break;
       case "haptics": if (draft) draft.haptics = el.checked; else state.haptics = el.checked; break;
       case "easy-audio": state.easyAudio = el.checked; if (!el.checked) state.maximumVolume = false; render(); break;
       case "maximum-volume": if (el.checked) state.confirm = "maximum-volume"; else state.maximumVolume = false; render(); break;
@@ -1929,7 +2079,10 @@
     if (event.key === "Escape") { clearHold(); if ($("clean-preview") && !document.body.classList.contains("classic-embed")) $("clean-preview").checked = false; if (state.external || state.confirm || state.contactMode) back(); }
   });
   $("phone-back").addEventListener("click", back);
-  $("phone-home").addEventListener("click", () => navigate(state.onboarding ? "setup" : "home"));
+  $("phone-home").addEventListener("click", () => {
+    if (state.onboarding && !state.setupReentry) return;
+    state.onboarding = false; navigate("home");
+  });
   $("previous-screen").addEventListener("click", () => navigate(definitions[(registry[route].index - 1 + definitions.length) % definitions.length][0]));
   $("next-screen").addEventListener("click", () => navigate(definitions[(registry[route].index + 1) % definitions.length][0]));
   window.addEventListener("popstate", () => activate(location.hash.slice(1), true));

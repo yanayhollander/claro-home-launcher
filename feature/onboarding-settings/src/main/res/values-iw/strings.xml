@@ -34,7 +34,7 @@
     <string name="onb_show_apps_tile">הצגת יישומים במסך הבית</string>
     <string name="onb_show_app_on_home">הצגת %1$s במסך הבית</string>
     <string name="onb_settings_access">גישה להגדרות</string>
-    <string name="onb_step_people_and_speed_dial">אריחי מסך הבית</string>
+    <string name="onb_step_people_and_speed_dial">האנשים החשובים לכם</string>
     <string name="onb_sos_contact_title">איש קשר לחירום (SOS)</string>
     <string name="onb_step_permissions_and_roles">הרשאות וברירות מחדל</string>
     <string name="onb_step_setup_complete">ההגדרה הושלמה</string>
@@ -42,9 +42,13 @@
     <string name="onb_setup_step_progress">שלב הגדרה %1$d מתוך %2$d</string>
 
     <string name="onb_set_up_claro">הגדרת Claro</string>
-    <string name="onb_welcome_tagline">האנשים הקרובים אליכם. בנגיעה אחת.</string>
-    <string name="onb_welcome_subtitle">מסך בית, טלפון והודעות פשוטים וברורים יותר — להגדרה עצמית או יחד עם אדם קרוב.</string>
-    <string name="onb_welcome_permissions_sos_note">Android מבקשת בנפרד גישה למסך הבית, לטלפון, ל-SMS ולמצלמה בעת הצורך. לחצן SOS מתקשר לאיש קשר אחד שבחרתם — זה אינו מוקד חירום מאויש.</string>
+    <string name="onb_welcome_tagline">כפתורים גדולים. פחות סיבוכים.</string>
+    <string name="onb_welcome_subtitle">האנשים והיישומים החשובים לכם, קרוב ובהישג יד. שיחות ברורות, הודעות פשוטות ומסך בית שמרגיש מוכר.</string>
+    <string name="onb_welcome_permissions_sos_note">בואו נתאים את Claro אליכם. בחרו סגנון, התאימו את גודל הטקסט והוסיפו את מה שחשוב — לבד או עם אדם קרוב.</string>
+    <string name="onb_diagnostics_title">עוזרים ל־Claro להשתפר</string>
+    <string name="onb_diagnostics_body">שתפו נתוני שימוש בסיסיים ודוחות תקלות כדי לעזור לנו לשפר את Claro.</string>
+    <string name="onb_diagnostics_privacy">אנשי הקשר, ההודעות והתמונות שלכם נשארים פרטיים. הדוחות לעולם לא משמשים לפרסום.</string>
+    <string name="onb_diagnostics_continue_notice">לחיצה על המשך מהווה הסכמה לשיתוף. אפשר לבטל בכל עת בהגדרות ← מינוי ופרטיות.</string>
 
     <string name="onb_use_style">בחירת %1$s</string>
     <string name="onb_apply">החל</string>
@@ -136,7 +140,7 @@
     <string name="onb_settings_access_date_subtitle">שאלה עם התאריך של היום</string>
     <string name="onb_settings_access_pin_subtitle">קוד PIN למלווה · שחזור מקומי</string>
     <string name="onb_membership_and_privacy_title">מינוי ופרטיות</string>
-    <string name="onb_membership_and_privacy_subtitle">תכונות הליבה בחינם · אבחון כבוי כברירת מחדל</string>
+    <string name="onb_membership_and_privacy_subtitle">תכונות הליבה בחינם · בחירות האבחון שלכם</string>
     <string name="onb_reset_claro">איפוס Claro</string>
     <string name="onb_reset_claro_subtitle">ניקוי ההגדרות המקומיות של Claro בלבד</string>
 

@@ -35,17 +35,19 @@ enum class OnboardingStep {
     COMPLETE,
     // Append persisted steps; display order is defined separately below.
     HOME_TILES,
+    DIAGNOSTICS_CONSENT,
 }
 
 val onboardingStepOrder = listOf(
     OnboardingStep.WELCOME,
+    OnboardingStep.DIAGNOSTICS_CONSENT,
     OnboardingStep.PHONE_STYLE,
     OnboardingStep.LANGUAGE_AND_DISPLAY,
+    OnboardingStep.ROLE_READINESS,
     OnboardingStep.HOME_TILES,
     OnboardingStep.SETTINGS_ACCESS,
     OnboardingStep.PEOPLE_AND_SPEED_DIAL,
     OnboardingStep.SOS_CONTACT,
-    OnboardingStep.ROLE_READINESS,
     OnboardingStep.COMPLETE,
 )
 
@@ -125,7 +127,10 @@ data class OnboardingProgress(
     val readiness: Map<ReadinessCapability, CapabilityStatus> =
         ReadinessCapability.entries.associateWith { CapabilityStatus.NEEDS_ATTENTION },
     val handoverChecks: Set<HandoverCheck> = emptySet(),
-)
+) {
+    val isInitialSetup: Boolean
+        get() = currentStep != OnboardingStep.COMPLETE && OnboardingStep.COMPLETE !in completedSteps
+}
 
 data class ClaroPreferences(
     val visualMode: VisualMode = VisualMode.TOUCH,

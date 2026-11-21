@@ -9,6 +9,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.clarohome.core.data.deviceAppLanguage
+import com.clarohome.core.data.homeSlotTile
 import com.clarohome.core.design.withClaroLanguage
 import com.clarohome.core.domain.ClaroPreferencesRepository
 import com.clarohome.core.domain.CriticalActivityRepository
@@ -41,6 +42,7 @@ import com.clarohome.core.domain.EventOutcome
 import com.clarohome.core.domain.EventTask
 import com.clarohome.core.domain.HomeAction
 import com.clarohome.core.domain.TelemetryScreen
+import com.clarohome.core.domain.HomeTelemetryContext
 import com.clarohome.feature.billing.observability.ConsentAwareObservability
 import com.clarohome.feature.billing.observability.ConsentController
 import com.clarohome.feature.billing.observability.DiagnosticsConsent
@@ -72,6 +74,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 data class MainUiState(
     val startup: StartupRecoveryState = StartupRecoveryState.Recovering,
@@ -115,6 +119,9 @@ class MainViewModel @Inject constructor(
     private val sosPreferences = appContext.getSharedPreferences("claro_sos_contact", Context.MODE_PRIVATE)
     private var lastReadiness: Map<ReadinessCapability, CapabilityStatus> = emptyMap()
     private var lastSosOutcome: EventOutcome? = null
+    private val onboardingConsentMutex = Mutex()
+    private val onboardingContactsMutex = Mutex()
+    private var lastScreenView: Triple<String, ClaroEvent.ScreenView, DiagnosticsConsent>? = null
 
     val sosState: StateFlow<SosState> = mutableSosState
     private val billingObservability = combine(
@@ -182,9 +189,31 @@ class MainViewModel @Inject constructor(
             val applied = settingsManager.advanceOnboarding(next, appContext.defaultAppReadiness())
             if (!applied) {
                 observability.track(ClaroEvent.SetupStepResult(next, EventOutcome.NEEDS_ATTENTION))
+                settingsManager.advanceOnboarding(OnboardingStep.ROLE_READINESS)
                 message.value = localizedContext().getString(R.string.app_default_apps_required)
             } else if (next == OnboardingStep.COMPLETE) {
                 onCompleted()
+            }
+        }
+    }
+
+    fun saveOnboardingDiagnosticsConsent(enabled: Boolean) = launch {
+        onboardingConsentMutex.withLock {
+            if (preferencesRepository.preferences.first().onboarding.currentStep !=
+                OnboardingStep.DIAGNOSTICS_CONSENT
+            ) return@withLock
+            try {
+                consentController.update(
+                    consentController.consent.value.copy(analytics = enabled, crashReports = enabled),
+                )
+                settingsManager.advanceOnboarding(OnboardingStep.PHONE_STYLE)
+                message.value = null
+            } catch (error: IllegalStateException) {
+                Log.e("ClaroTelemetry", "Onboarding consent save failed: ${error.javaClass.simpleName}")
+                message.value = localizedContext().getString(R.string.app_diagnostics_save_failed)
+            } catch (error: java.io.IOException) {
+                Log.e("ClaroTelemetry", "Onboarding progress save failed: ${error.javaClass.simpleName}")
+                message.value = localizedContext().getString(R.string.app_diagnostics_save_failed)
             }
         }
     }
@@ -270,11 +299,34 @@ class MainViewModel @Inject constructor(
         lastReadiness = readiness.toMap()
     }
 
-    fun screenViewed(entryId: String, screen: TelemetryScreen) {
-        if (savedStateHandle.get<String>("telemetry_last_entry") == entryId) return
-        savedStateHandle["telemetry_last_entry"] = entryId
-        observability.track(ClaroEvent.ScreenView(screen))
+    fun screenViewed(entryId: String, screen: TelemetryScreen, step: OnboardingStep? = null) {
+        val consent = consentController.consent.value
+        val event = ClaroEvent.ScreenView(screen, step)
+        val key = Triple(entryId, event, consent)
+        if (lastScreenView == key) return
+        lastScreenView = key
+        observability.track(event)
         if (screen == TelemetryScreen.MEMBERSHIP) membershipOpened()
+    }
+
+    fun homeTileOpened(tile: HomeTile) {
+        val home = uiState.value.home ?: return
+        val position = home.homeTiles.indexOfFirst { it.id == tile.id }
+        if (position < 0) return
+        val preferences = uiState.value.preferences
+        observability.updateContext(
+            preferences.visualMode, preferences.textSize, HomeTelemetryContext.from(home.homeSlots),
+        )
+        observability.track(ClaroEvent.HomeTileOpened(tile.kind, position))
+    }
+
+    private suspend fun trackHomeChanged(event: ClaroEvent.HomeChanged) {
+        val preferences = preferencesRepository.preferences.first()
+        val home = homeRepository.home.first()
+        observability.updateContext(
+            preferences.visualMode, preferences.textSize, HomeTelemetryContext.from(home.homeSlots),
+        )
+        observability.track(event)
     }
 
     fun widgetSetupResult(outcome: EventOutcome) {
@@ -421,7 +473,33 @@ class MainViewModel @Inject constructor(
             val before = homeRepository.home.first().homeSlots
             homeRepository.setHomeSlot(slot, tile)
             if (homeRepository.home.first().homeSlots != before) {
-                observability.track(ClaroEvent.HomeChanged(HomeAction.SET, tile.kind))
+                trackHomeChanged(ClaroEvent.HomeChanged(HomeAction.SET, tile.kind))
+            }
+        }
+    }
+
+    internal fun setOnboardingVipContact(choice: OnboardingContactChoice, selected: Boolean) = launch {
+        onboardingContactsMutex.withLock {
+            val slots = homeRepository.home.first().homeSlots
+            val matching = slots.withIndex().filter { (_, tile) ->
+                tile?.kind == HomeTileKind.CONTACT && tile.phoneNumber?.let(::onboardingNumberKey) == choice.key
+            }
+            if (selected && matching.isEmpty()) {
+                val slot = slots.indexOfLast { it != null } + 1
+                homeRepository.setHomeSlot(
+                    slot,
+                    homeSlotTile(
+                        slot = slot,
+                        kind = HomeTileKind.CONTACT,
+                        label = choice.contact.displayName,
+                        phoneNumber = choice.number.value,
+                        photoUri = choice.contact.photoUri,
+                    ),
+                )
+                trackHomeChanged(ClaroEvent.HomeChanged(HomeAction.SET, HomeTileKind.CONTACT))
+            } else if (!selected && matching.isNotEmpty()) {
+                matching.forEach { homeRepository.clearHomeSlot(it.index) }
+                trackHomeChanged(ClaroEvent.HomeChanged(HomeAction.REMOVE, HomeTileKind.CONTACT))
             }
         }
     }
@@ -443,7 +521,7 @@ class MainViewModel @Inject constructor(
             val before = homeRepository.home.first().homeSlots
             homeRepository.clearHomeSlot(slot)
             if (homeRepository.home.first().homeSlots != before) {
-                observability.track(ClaroEvent.HomeChanged(HomeAction.REMOVE, before.getOrNull(slot)?.kind))
+                trackHomeChanged(ClaroEvent.HomeChanged(HomeAction.REMOVE, before.getOrNull(slot)?.kind))
             }
         }
     }
@@ -453,7 +531,7 @@ class MainViewModel @Inject constructor(
             val before = homeRepository.home.first().homeSlots
             homeRepository.moveHomeTile(slot, moveUp)
             if (homeRepository.home.first().homeSlots != before) {
-                observability.track(ClaroEvent.HomeChanged(HomeAction.REORDER, before.getOrNull(slot)?.kind))
+                trackHomeChanged(ClaroEvent.HomeChanged(HomeAction.REORDER, before.getOrNull(slot)?.kind))
             }
         }
     }
@@ -660,8 +738,8 @@ class MainViewModel @Inject constructor(
         savedStateHandle["sos_test"] = snapshot.testMode
     }
 
-    private fun trackHomeVisibility(kind: HomeTileKind, result: HomeTileVisibilityResult) {
-        observability.track(ClaroEvent.HomeChanged(
+    private suspend fun trackHomeVisibility(kind: HomeTileKind, result: HomeTileVisibilityResult) {
+        trackHomeChanged(ClaroEvent.HomeChanged(
             HomeAction.VISIBILITY, kind,
             if (result == HomeTileVisibilityResult.APPLIED) EventOutcome.COMPLETED else EventOutcome.UNAVAILABLE,
         ))

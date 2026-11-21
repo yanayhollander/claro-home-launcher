@@ -307,6 +307,51 @@ class MessagingCoordinatorTest {
     }
 
     @Test
+    fun editingRecipientPreservesContactIdentityOnlyForTheSameNumber() = runTest {
+        val contact = ClaroContact(
+            lookupKey = "mira",
+            displayName = "Mira",
+            numbers = listOf(ContactNumber("+15550101", "Mobile")),
+        )
+        val fixture = fixture(contacts = FakeContactsGateway(listOf(contact)))
+        fixture.coordinator.startNewMessage()
+        fixture.coordinator.chooseContactNumber(contact, contact.numbers.single())
+        fixture.coordinator.updateBody("Unsent draft")
+
+        fixture.coordinator.updateRecipientInput("+1 (555) 0101")
+
+        val matched = fixture.coordinator.state.value.draft.recipient
+        assertThat(matched?.displayName).isEqualTo("Mira")
+        assertThat(matched?.contactLookupKey).isEqualTo("mira")
+        assertThat(matched?.number).isEqualTo("+15550101")
+
+        fixture.coordinator.updateRecipientInput("+15550202")
+
+        val changed = fixture.coordinator.state.value.draft
+        assertThat(changed.recipient?.displayName).isNull()
+        assertThat(changed.recipient?.contactLookupKey).isNull()
+        assertThat(changed.recipient?.number).isEqualTo("+15550202")
+        assertThat(changed.body).isEqualTo("Unsent draft")
+        assertThat(fixture.transport.submissions).isEqualTo(0)
+    }
+
+    @Test
+    fun composingFromKnownNumberKeepsItsNameAndExistingDraft() = runTest {
+        val fixture = fixture()
+        fixture.coordinator.startNewMessage()
+        fixture.coordinator.updateRecipientInput("202-555-0101")
+        fixture.coordinator.updateBody("Unsent draft")
+
+        fixture.coordinator.updateRecipientInput("2025550101", displayName = "Mira")
+
+        val draft = fixture.coordinator.state.value.draft
+        assertThat(draft.recipient?.displayName).isEqualTo("Mira")
+        assertThat(draft.recipient?.number).isEqualTo("2025550101")
+        assertThat(draft.body).isEqualTo("Unsent draft")
+        assertThat(fixture.transport.submissions).isEqualTo(0)
+    }
+
+    @Test
     fun openingInboxDoesNotClearUnreadAndConversationClearsOnlyItself() = runTest {
         val repository = FakeMessageRepository(
             initialConversations = listOf(

@@ -45,16 +45,26 @@ links resolve to the dialer and message editor, not obsolete confirmation screen
   battery percentage at the top right. Home tiles offers
   an Add tile action, an editable list with up/down controls to reorder tiles,
   and searchable pickers.
-- **Setup:** one welcome action, then Phone style (Classic preselected),
-  Language and display, Choose Home tiles, Settings access, Home tiles,
-  SOS contact, and Permissions and roles. Back revisits steps.
+- **Setup:** a friendly welcome, then Help keep Claro reliable, Phone style (Classic preselected),
+  Language and display, Permissions and roles, Choose Home tiles, Settings access,
+  Your VIP contacts, and SOS contact. A top-left Back arrow on each setup screen
+  and picker revisits the previous screen; Welcome has no Back button.
+  The extra Back/Home bar is hidden until first-launch setup is complete.
+  Continue on the privacy step enables usage analytics and crash reports;
+  there is no skip action. Collection stays off before Continue,
+  advertising stays off, and existing installations keep their saved choices.
+  VIP setup offers three suggestions (recent calls first among loaded contacts)
+  and a searchable multi-picker; selections save directly as Home call tiles.
+  SOS has a similar single-contact picker with explicit recipient agreement.
+  The storyboard's full-flow strip opens every onboarding screen for review.
   Finish requires all supported Home/Phone/SMS roles; the sequential Android
   prompts are illustrated, and declining one stops the sequence.
   No plans, trial or handover checklist is included in setup.
 - **Calls:** direct dialing, number-to-contact matches and history rows with
   direction indicators. Touch shows only configured speed-dial shortcuts, with
-  Contacts in the app bar. Neither dialer has an emergency button; the dedicated
-  shortcut is available from the Home SOS tile when SOS is configured. Contact matches
+  a large labeled Contacts button above the keypad/history tabs. Neither dialer nor SOS has an emergency-services button;
+  Android emergency calling remains separate. After the SOS countdown, the normal
+  call screen shows live status and the same End, Speaker and Mute controls. Contact matches
   appear below the keypad so they don't move the number buttons while typing.
   Touch Contacts uses app-bar icons for Add, Edit, and Delete. Deleting a
   contact requires a separate confirmation in a dialog.
@@ -66,7 +76,9 @@ links resolve to the dialer and message editor, not obsolete confirmation screen
   Speaker/Mute/Hold controls are docked; Classic hides the number pad until Keypad.
 - **Messages:** direct Send without review, date/time labels, retained new-message
   and per-recipient reply drafts, and explicit duplicate-risk confirmation for
-  uncertain retries. Classic inbox/conversations have no number pad or inbox
+  uncertain retries. Touch compose shows a recognized contact's photo, name and
+  number, matching Classic; changing to a different number clears the old identity.
+  Classic inbox/conversations have no number pad or inbox
   search; Reply opens a separate writing view. Back from Reply retains the draft.
   Options contains confirmed conversation deletion.
 - **Settings:** session-long unlock, explicit Lock settings, Apps & Menu
@@ -282,8 +294,15 @@ presentation, onboarding, protected settings, Home customization, Telecom calls,
 contacts, SMS/MMS, gallery, allowed apps and SOS integration. Native production
 debug builds do not seed storyboard people or invented entitlements.
 RevenueCat, Mixpanel, Firebase Analytics, Crashlytics and Meta App Events adapters
-are configuration-gated, with separate default-off usage analytics, crash reporting
-and advertising measurement consent. Meta receives only approved activation and
+are configuration-gated. Onboarding Continue opts into usage analytics and crash
+reporting; no collection starts before consent. Both remain independently
+adjustable in Membership & privacy, and advertising measurement stays default-off.
+Every custom analytics event is mirrored to Mixpanel and Firebase Analytics.
+Detailed screen names, numeric Home tile counts and privacy-safe Home tile taps
+support navigation and usage analysis. Mode, text size and tile counts are also
+Mixpanel super/profile properties and Firebase default parameters/user properties;
+contact names, numbers, messages and app identities are excluded.
+Meta receives only approved activation and
 conversion events, never calls, SMS, contacts or SOS activity; it also requires an
 explicit build-time enablement after consent/queue review. Unconfigured
 billing is explicitly unavailable rather than supplying fake plans.

@@ -90,6 +90,7 @@ import com.clarohome.core.design.ClaroInfoCard
 import com.clarohome.core.design.ClaroPrimaryButton
 import com.clarohome.core.design.ClaroRowButton
 import com.clarohome.core.design.ClaroScreenScaffold
+import com.clarohome.core.design.ClaroHeaderBackButton
 import com.clarohome.core.design.ClaroSecondaryButton
 import com.clarohome.core.design.ClaroSoftkey
 import com.clarohome.core.design.LocalClaroHaptics
@@ -112,6 +113,7 @@ import kotlinx.coroutines.launch
 
 data class OnboardingCallbacks(
     val onContinue: (OnboardingStep) -> Unit,
+    val onDiagnosticsConsent: (Boolean) -> Unit,
     val onChooseMode: (VisualMode) -> Unit,
     val onLanguageDisplay: (AppLanguage, TextSize, Boolean) -> Unit,
     val onUseDateQuestion: () -> Unit,
@@ -134,11 +136,12 @@ fun OnboardingFlow(
     defaultAppReadiness: Map<ReadinessCapability, CapabilityStatus> = preferences.onboarding.readiness,
     installedApps: List<InstalledApp> = emptyList(),
     homeAppPackages: Set<String> = emptySet(),
+    peopleStep: (@Composable (onBack: () -> Unit, onContinue: () -> Unit) -> Unit)? = null,
+    sosStep: (@Composable (onBack: () -> Unit, onContinue: () -> Unit) -> Unit)? = null,
 ) {
     val step = preferences.onboarding.currentStep
     val previousStep = when (step) {
         OnboardingStep.WELCOME, OnboardingStep.COMPLETE -> null
-        OnboardingStep.HANDOVER -> OnboardingStep.SOS_CONTACT
         else -> onboardingStepOrder.getOrNull(step.flowIndex - 1)
     }
     val onBack: () -> Unit = {
@@ -149,7 +152,12 @@ fun OnboardingFlow(
     when (step) {
         OnboardingStep.WELCOME -> WelcomeStep(
             message = message,
-            onContinue = { callbacks.onContinue(OnboardingStep.PHONE_STYLE) },
+            onContinue = { callbacks.onContinue(OnboardingStep.DIAGNOSTICS_CONSENT) },
+        )
+        OnboardingStep.DIAGNOSTICS_CONSENT -> DiagnosticsConsentStep(
+            message = message,
+            onConsent = callbacks.onDiagnosticsConsent,
+            onBack = onBack,
         )
         OnboardingStep.PHONE_STYLE -> PhoneStyleChoice(
             preferences = preferences,
@@ -165,7 +173,7 @@ fun OnboardingFlow(
             onSave = { language, size, contrast, haptics ->
                 callbacks.onLanguageDisplay(language, size, contrast)
                 callbacks.onHapticFeedbackChange(haptics)
-                callbacks.onContinue(OnboardingStep.HOME_TILES)
+                callbacks.onContinue(OnboardingStep.ROLE_READINESS)
             },
         )
         OnboardingStep.HOME_TILES -> OnboardingStepScaffold(
@@ -198,25 +206,29 @@ fun OnboardingFlow(
             },
             onPin = callbacks.onConfigurePin,
         )
-        OnboardingStep.PEOPLE_AND_SPEED_DIAL -> PeopleSetupStep(
+        OnboardingStep.PEOPLE_AND_SPEED_DIAL -> if (peopleStep != null) {
+            peopleStep(onBack) { callbacks.onContinue(OnboardingStep.SOS_CONTACT) }
+        } else PeopleSetupStep(
             preferences = preferences,
             message = message,
             onOpenPeopleSetup = callbacks.onOpenPeopleSetup,
             onContinue = { callbacks.onContinue(OnboardingStep.SOS_CONTACT) },
             onBack = onBack,
         )
-        OnboardingStep.SOS_CONTACT -> SosSetupStep(
+        OnboardingStep.SOS_CONTACT -> if (sosStep != null) {
+            sosStep(onBack) { callbacks.onContinue(OnboardingStep.COMPLETE) }
+        } else SosSetupStep(
             agreed = preferences.onboarding.sosRecipientAgreed,
             message = message,
             onOpenSosSetup = callbacks.onOpenSosSetup,
-            onContinue = { callbacks.onContinue(OnboardingStep.ROLE_READINESS) },
+            onContinue = { callbacks.onContinue(OnboardingStep.COMPLETE) },
             onBack = onBack,
         )
         OnboardingStep.ROLE_READINESS, OnboardingStep.HANDOVER -> ReadinessChecklist(
             readiness = preferences.onboarding.readiness,
             message = message,
             onRequest = callbacks.onRequestCapability,
-            onContinue = { callbacks.onContinue(OnboardingStep.COMPLETE) },
+            onContinue = { callbacks.onContinue(OnboardingStep.HOME_TILES) },
             onBack = onBack,
             defaultAppReadiness = defaultAppReadiness,
             onSetDefaultApps = callbacks.onSetDefaultApps,
@@ -1020,19 +1032,13 @@ private fun WelcomeStep(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Box(
+            Image(
+                painter = painterResource(com.clarohome.core.design.R.drawable.claro_logo),
+                contentDescription = null,
                 modifier = Modifier
                     .size(116.dp)
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(ClaroColors.PaleBlue),
-                contentAlignment = Alignment.Center,
-            ) {
-                ClaroIcon(
-                    kind = ClaroIconKind.SUN,
-                    tint = ClaroColors.Blue,
-                    size = 84.dp,
-                )
-            }
+                    .clip(RoundedCornerShape(28.dp)),
+            )
             Text(
                 text = stringResource(R.string.onb_welcome_tagline),
                 color = ClaroColors.Ink,
@@ -1052,6 +1058,45 @@ private fun WelcomeStep(
                 text = stringResource(R.string.onb_welcome_permissions_sos_note),
                 tone = ClaroBannerTone.INFO,
             )
+        }
+    }
+}
+
+@Composable
+private fun DiagnosticsConsentStep(
+    message: String?,
+    onConsent: (Boolean) -> Unit,
+    onBack: () -> Unit,
+) {
+    OnboardingStepScaffold(
+        title = OnboardingStep.DIAGNOSTICS_CONSENT.title(),
+        stepIndex = OnboardingStep.DIAGNOSTICS_CONSENT.flowIndex,
+        message = message,
+        onBack = onBack,
+        dock = {
+            Text(
+                text = stringResource(R.string.onb_diagnostics_continue_notice),
+                style = MaterialTheme.typography.bodyMedium,
+                color = ClaroColors.Muted,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+            ClaroPrimaryButton(
+                label = stringResource(R.string.onb_continue),
+                onClick = { onConsent(true) },
+            )
+        },
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            ClaroIcon(kind = ClaroIconKind.LOCK, tint = ClaroColors.Blue, size = 64.dp)
+            Text(
+                text = stringResource(R.string.onb_diagnostics_body),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            ClaroInfoCard(text = stringResource(R.string.onb_diagnostics_privacy))
         }
     }
 }
@@ -1124,6 +1169,7 @@ private fun LanguageDisplayOnboardingStep(
             onLanguageChange = { language = it },
             onTextSizeChange = { textSize = it },
             onClose = { picker = null },
+            onboarding = true,
         )
         return
     }
@@ -1334,7 +1380,7 @@ private fun ReadinessChecklist(
                 )
             }
             ClaroPrimaryButton(
-                label = stringResource(R.string.onb_finish_setup),
+                label = stringResource(R.string.onb_continue),
                 onClick = onContinue,
                 enabled = defaultsReady,
             )
@@ -1352,11 +1398,12 @@ private fun ReadinessChecklist(
 }
 
 @Composable
-private fun OnboardingStepScaffold(
+fun OnboardingStepScaffold(
     title: String,
     stepIndex: Int?,
     message: String?,
     onBack: (() -> Unit)? = null,
+    scrollable: Boolean = true,
     dock: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -1365,16 +1412,11 @@ private fun OnboardingStepScaffold(
         modifier = Modifier.testTag("onboarding-screen"),
         bannerText = message,
         bannerTone = messageBannerTone(message),
-        dock = {
-            dock?.invoke(this)
-            if (onBack != null) {
-                ClaroSecondaryButton(
-                    label = stringResource(R.string.onb_back),
-                    icon = ClaroIconKind.ARROW_LEFT,
-                    onClick = onBack,
-                )
-            }
+        scrollable = scrollable,
+        headerNavigation = if (onBack == null) null else {
+            { ClaroHeaderBackButton(label = stringResource(R.string.onb_back), onClick = onBack) }
         },
+        dock = dock,
     ) {
         if (stepIndex != null) {
             OnboardingProgressBar(
@@ -1651,6 +1693,7 @@ private fun DisplayPickerScreen(
     onLanguageChange: (AppLanguage) -> Unit,
     onTextSizeChange: (TextSize) -> Unit,
     onClose: () -> Unit,
+    onboarding: Boolean = false,
 ) {
     BackHandler(onBack = onClose)
     ClaroScreenScaffold(
@@ -1658,13 +1701,18 @@ private fun DisplayPickerScreen(
             if (picker == DisplayPicker.LANGUAGE) R.string.onb_section_language else R.string.onb_section_text_size,
         ),
         modifier = Modifier.testTag("onboarding-screen"),
+        headerNavigation = if (!onboarding) null else {
+            { ClaroHeaderBackButton(label = stringResource(R.string.onb_back), onClick = onClose) }
+        },
         dockInSoftkeys = true,
-        dock = {
-            ClaroSecondaryButton(
-                label = stringResource(R.string.onb_cancel),
-                softkey = ClaroSoftkey.BACK,
-                onClick = onClose,
-            )
+        dock = if (onboarding) null else {
+            {
+                ClaroSecondaryButton(
+                    label = stringResource(R.string.onb_cancel),
+                    softkey = ClaroSoftkey.BACK,
+                    onClick = onClose,
+                )
+            }
         },
     ) {
         if (picker == DisplayPicker.LANGUAGE) {
@@ -2239,6 +2287,7 @@ private fun messageBannerTone(message: String?): ClaroBannerTone {
 private fun OnboardingStep.title() = stringResource(
     when (this) {
         OnboardingStep.WELCOME -> R.string.onboarding_welcome
+        OnboardingStep.DIAGNOSTICS_CONSENT -> R.string.onb_diagnostics_title
         OnboardingStep.PHONE_STYLE -> R.string.onb_step_choose_phone_style
         OnboardingStep.LANGUAGE_AND_DISPLAY -> R.string.onb_language_and_display_title
         OnboardingStep.HOME_TILES -> R.string.onb_home_tiles_title

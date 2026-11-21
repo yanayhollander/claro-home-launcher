@@ -134,6 +134,8 @@ import com.clarohome.feature.communication.MessagingUiState
 import com.clarohome.feature.communication.PhoneAssignment
 import com.clarohome.feature.communication.SmsQualification
 import com.clarohome.feature.safety.media.apps.SosState
+import com.clarohome.feature.safety.media.apps.SosCallOutcome
+import com.clarohome.feature.safety.media.apps.TrustedContact
 import com.clarohome.feature.onboarding.settings.AccessGateScreen
 import com.clarohome.feature.onboarding.settings.OnboardingCallbacks
 import com.clarohome.feature.onboarding.settings.OnboardingFlow
@@ -283,7 +285,6 @@ class StoryboardRegressionTest {
     @Test
     fun unsetSosOffersWorkingSetupWithoutAnUnconfiguredCallButton() {
         var setupRequests = 0
-        var emergencyRequests = 0
         var callRequests = 0
         compose.setContent {
             ClaroLocaleContainer(AppLanguage.ENGLISH) {
@@ -294,7 +295,6 @@ class StoryboardRegressionTest {
                         onCancel = {},
                         remainingSeconds = { 0 },
                         onOpenProtectedSosSettings = { setupRequests++ },
-                        onEmergencyDialer = { emergencyRequests++ },
                         hasActiveCall = false,
                         onReturnToCall = {},
                     )
@@ -306,7 +306,43 @@ class StoryboardRegressionTest {
         compose.onNodeWithText("Emergency services").assertDoesNotExist()
         compose.runOnIdle {
             assertEquals(1, setupRequests)
-            assertEquals(0, emergencyRequests)
+            assertEquals(0, callRequests)
+        }
+    }
+
+    @Test
+    fun configuredSosOmitsEmergencyShortcutAndReturnsToExistingCall() {
+        val contact = TrustedContact("mira", "Mira", "2025550101", recipientConsented = true)
+        var state: SosState by mutableStateOf(SosState.Armed(contact))
+        var hasActiveCall by mutableStateOf(false)
+        var callRequests = 0
+        var returnRequests = 0
+        compose.setContent {
+            ClaroLocaleContainer(AppLanguage.ENGLISH) {
+                ClaroTheme {
+                    SosScreen(
+                        state = state,
+                        onStart = { _, _ -> callRequests++ },
+                        onCancel = {},
+                        remainingSeconds = { 0 },
+                        onOpenProtectedSosSettings = {},
+                        hasActiveCall = hasActiveCall,
+                        onReturnToCall = { returnRequests++ },
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText("Call in 5 seconds").assertIsDisplayed()
+        compose.onNodeWithText("Emergency services").assertDoesNotExist()
+        compose.runOnIdle {
+            state = SosState.Calling(contact, 1, SosCallOutcome.DIALING, testMode = false)
+            hasActiveCall = true
+        }
+        compose.onNodeWithText("Call in 5 seconds").assertDoesNotExist()
+        compose.onNodeWithText("Emergency services").assertDoesNotExist()
+        compose.onNodeWithText("Return to call").performClick()
+        compose.runOnIdle {
+            assertEquals(1, returnRequests)
             assertEquals(0, callRequests)
         }
     }
@@ -522,6 +558,8 @@ class StoryboardRegressionTest {
     @Test
     fun touchDialerKeysStayInPlaceWhileTypingAndContactMatchesChange() {
         val mira = CallerIdentity("Mira", "3335550101")
+        var contactRequests = 0
+        val screens = mutableListOf<com.clarohome.core.domain.TelemetryScreen>()
         var state by mutableStateOf(
             CommunicationUiState(
                 route = CommunicationRoute.DIALER,
@@ -536,7 +574,7 @@ class StoryboardRegressionTest {
                     onDigit = { state = state.copy(digits = state.digits + it, dialerMatchesLoading = true) },
                     onBackspace = {},
                     onCallEnteredNumber = {},
-                    onOpenContacts = {},
+                    onOpenContacts = { contactRequests++ },
                     onSearchContacts = {},
                     onLoadMoreContacts = {},
                     onOpenContact = {},
@@ -552,6 +590,7 @@ class StoryboardRegressionTest {
                     onSwap = {},
                     onRepairPhone = {},
                     onHome = {},
+                    onDialerScreenChanged = { screens += it },
                 )
             }
         }
@@ -562,7 +601,8 @@ class StoryboardRegressionTest {
         key.performClick()
         compose.onNodeWithText("Matching contacts").assertDoesNotExist()
         assertEquals(initialBounds, key.fetchSemanticsNode().boundsInRoot)
-
+        compose.onNodeWithText("Contacts").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(1, contactRequests) }
         compose.runOnIdle {
             state = state.copy(dialerMatches = listOf(mira), dialerMatchesLoading = false)
         }
@@ -575,6 +615,13 @@ class StoryboardRegressionTest {
         }
         compose.onNodeWithText("Matching contacts").assertDoesNotExist()
         assertEquals(initialBounds, key.fetchSemanticsNode().boundsInRoot)
+        compose.onNodeWithText("Recent").performClick()
+        compose.runOnIdle {
+            assertEquals(listOf(
+                com.clarohome.core.domain.TelemetryScreen.KEYPAD,
+                com.clarohome.core.domain.TelemetryScreen.RECENT_CALLS,
+            ), screens)
+        }
     }
 
     @Test
@@ -1451,6 +1498,7 @@ class StoryboardRegressionTest {
     fun onboardingRequiresAnExplicitVisualModeChoice() {
         var step by mutableStateOf(OnboardingStep.WELCOME)
         var chosenMode by mutableStateOf(VisualMode.TOUCH)
+        var consentChoice: Boolean? = null
         compose.setContent {
             ClaroTheme {
                 OnboardingFlow(
@@ -1461,16 +1509,24 @@ class StoryboardRegressionTest {
                     message = null,
                     callbacks = noOpOnboardingCallbacks(
                         onContinue = { step = it },
+                        onDiagnosticsConsent = {
+                            consentChoice = it
+                            step = OnboardingStep.PHONE_STYLE
+                        },
                         onChooseMode = { chosenMode = it },
                     ),
                 )
             }
         }
 
-        compose.onNodeWithText("Your people. One touch away.").assertIsDisplayed()
+        compose.onNodeWithText("Big buttons. Less fuss.").assertIsDisplayed()
         compose.onNodeWithText("Continue free").assertDoesNotExist()
         capture("onboarding-welcome", "onboarding-screen")
         compose.onNodeWithText("Set up Claro").performClick()
+        compose.onNodeWithText("Help keep Claro reliable").assertIsDisplayed()
+        compose.runOnIdle { assertEquals(null, consentChoice) }
+        compose.onNodeWithText("Continue").performClick()
+        compose.runOnIdle { assertEquals(true, consentChoice) }
 
         compose.onNodeWithText("Touch Home").assertIsDisplayed()
         compose.onNodeWithText("Classic Phone").assertIsDisplayed()
@@ -1478,6 +1534,44 @@ class StoryboardRegressionTest {
         compose.onNodeWithText("Touch Home").performClick()
         compose.onNodeWithText("Use Touch Home").assertHeightIsAtLeast(64.dp)
         capture("onboarding-mode-choice", "onboarding-screen")
+    }
+
+    @Test
+    fun onboardingDiagnosticsHasNoSkipAndBackDoesNotGrantConsent() {
+        var step by mutableStateOf(OnboardingStep.DIAGNOSTICS_CONSENT)
+        var consentChoice: Boolean? = null
+        compose.setContent {
+            ClaroTheme {
+                OnboardingFlow(
+                    preferences = ClaroPreferences(onboarding = OnboardingProgress(currentStep = step)),
+                    message = null,
+                    callbacks = noOpOnboardingCallbacks(
+                        onContinue = { step = it },
+                        onDiagnosticsConsent = {
+                            consentChoice = it
+                            step = OnboardingStep.PHONE_STYLE
+                        },
+                    ),
+                )
+            }
+        }
+        compose.runOnIdle { assertEquals(null, consentChoice) }
+        compose.onNodeWithText("Not now").assertDoesNotExist()
+        compose.onNodeWithText("Back").assertDoesNotExist()
+        val back = compose.onNodeWithContentDescription("Back").assertHeightIsAtLeast(64.dp)
+        val backBounds = back.fetchSemanticsNode().boundsInRoot
+        val titleBounds = compose.onNodeWithText("Help keep Claro reliable").fetchSemanticsNode().boundsInRoot
+        assertTrue(backBounds.left < titleBounds.left)
+        assertTrue(backBounds.top <= titleBounds.bottom)
+        back.performClick()
+        compose.runOnIdle {
+            assertEquals(null, consentChoice)
+            assertEquals(OnboardingStep.WELCOME, step)
+        }
+        compose.onNodeWithContentDescription("Back").assertDoesNotExist()
+        compose.onNodeWithText("Set up Claro").performClick()
+        compose.onNodeWithText("Help keep Claro reliable").assertIsDisplayed()
+        compose.runOnIdle { assertEquals(null, consentChoice) }
     }
 
     @Test
@@ -1497,12 +1591,60 @@ class StoryboardRegressionTest {
 
         compose.onNodeWithText("Language", useUnmergedTree = true).performClick()
         compose.onNodeWithText("Español").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Back").assertIsDisplayed()
+        compose.onNodeWithText("Cancel").assertDoesNotExist()
         compose.runOnIdle { backDispatcher.onBackPressed() }
         compose.onNodeWithText("Language and display").assertIsDisplayed()
         compose.runOnIdle { backDispatcher.onBackPressed() }
         compose.onNodeWithText("Choose phone style").assertIsDisplayed()
-        compose.onNodeWithText("Back").performClick()
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithText("Help keep Claro reliable").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("Welcome to Claro").assertIsDisplayed()
+    }
+
+    @Test
+    fun onboardingVipPickerPreservesMultipleChoicesAcrossSearches() {
+        val contacts = listOf(
+            ClaroContact("mira", "Mira", null, listOf(ContactNumber("2025550101", "Mobile"))),
+            ClaroContact("daniel", "Daniel", null, listOf(ContactNumber("2025550103", "Mobile"))),
+        )
+        var visible by mutableStateOf(contacts)
+        var selected by mutableStateOf(emptySet<String>())
+        var closed = false
+        compose.setContent {
+            ClaroTheme {
+                OnboardingContactPicker(
+                    communication = CommunicationUiState(
+                        qualification = DialerQualification(true, true, true, true, true, true, true),
+                        contacts = visible,
+                    ),
+                    contactsAllowed = true,
+                    selectedNumbers = selected,
+                    multiple = true,
+                    onSearch = { query -> visible = contacts.filter { it.displayName.contains(query, true) } },
+                    onLoadMore = {},
+                    onAllowContacts = {},
+                    onChoose = { choice ->
+                        selected = if (choice.key in selected) selected - choice.key else selected + choice.key
+                    },
+                    onDone = { closed = true },
+                )
+            }
+        }
+        compose.onNodeWithText("Mira").performClick()
+        compose.onNodeWithText("Search").performTextReplacement("Daniel")
+        compose.onNodeWithText("Mira").assertDoesNotExist()
+        compose.onNodeWithText("Daniel").performClick()
+        compose.onNodeWithText("Search").performTextReplacement("")
+        compose.runOnIdle { assertEquals(setOf("2025550101", "2025550103"), selected) }
+        compose.onNodeWithText("Mira").performClick()
+        compose.runOnIdle { assertEquals(setOf("2025550103"), selected) }
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.runOnIdle {
+            assertTrue(closed)
+            assertEquals(setOf("2025550103"), selected)
+        }
     }
 
     @Test
@@ -1523,6 +1665,8 @@ class StoryboardRegressionTest {
                     preferences = ClaroPreferences(onboarding = OnboardingProgress(currentStep = step)),
                     message = null,
                     homeTileKinds = kinds,
+                    defaultAppReadiness = com.clarohome.core.model.defaultAppCapabilities
+                        .associateWith { CapabilityStatus.READY },
                     callbacks = noOpOnboardingCallbacks(
                         onContinue = { step = it },
                         onHomeTileVisibility = { kind, visible ->
@@ -1532,7 +1676,7 @@ class StoryboardRegressionTest {
                 )
             }
         }
-        compose.onNodeWithContentDescription("Setup step 3 of 7").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Setup step 5 of 8").assertIsDisplayed()
         compose.onNodeWithText("Show Messages on Home").assertIsOff().performClick()
         compose.onNodeWithText("Show Messages on Home").assertIsOn().performClick()
         for (label in listOf("Show Camera on Home", "Show Gallery on Home", "Show Apps on Home")) {
@@ -1542,12 +1686,12 @@ class StoryboardRegressionTest {
 
         compose.onNodeWithText("Continue").performClick()
         compose.onNodeWithText("Settings access").assertIsDisplayed()
-        compose.onNodeWithText("Back").performClick()
+        compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithText("Choose Home tiles").assertIsDisplayed()
         compose.onNodeWithText("Show Messages on Home").assertIsOff()
         compose.onNodeWithText("Show Camera on Home").assertIsOff()
-        compose.onNodeWithText("Back").performClick()
-        compose.onNodeWithText("Language and display").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithText("Permissions and roles").assertIsDisplayed()
         compose.onNodeWithText("Continue").performClick()
         compose.onNodeWithText("Choose Home tiles").assertIsDisplayed()
         compose.onNodeWithText("Show Gallery on Home").assertIsOff()
@@ -1555,7 +1699,7 @@ class StoryboardRegressionTest {
     }
 
     @Test
-    fun permissionsFinishSetupWithoutHandoverOrPlans() {
+    fun permissionsContinueToHomeChoicesWithoutHandoverOrPlans() {
         var next: OnboardingStep? = null
         compose.setContent {
             ClaroTheme {
@@ -1573,8 +1717,8 @@ class StoryboardRegressionTest {
         }
 
         compose.onNodeWithText("Optional plans").assertDoesNotExist()
-        compose.onNodeWithText("Finish setup").performClick()
-        compose.runOnIdle { assertEquals(OnboardingStep.COMPLETE, next) }
+        compose.onNodeWithText("Continue").performClick()
+        compose.runOnIdle { assertEquals(OnboardingStep.HOME_TILES, next) }
     }
 
     @Test
@@ -1599,25 +1743,25 @@ class StoryboardRegressionTest {
             }
         }
         compose.runOnIdle { assertEquals(1, requests) }
-        compose.onNodeWithText("Finish setup").assertIsNotEnabled()
+        compose.onNodeWithText("Continue").assertIsNotEnabled()
         compose.onNodeWithText("Set Claro as default").performClick()
         compose.runOnIdle {
             assertEquals(2, requests)
             assertEquals(null, next)
             defaults = defaults + (ReadinessCapability.HOME to CapabilityStatus.READY)
         }
-        compose.onNodeWithText("Finish setup").assertIsNotEnabled()
+        compose.onNodeWithText("Continue").assertIsNotEnabled()
         compose.runOnIdle {
             defaults = defaults + (ReadinessCapability.PHONE to CapabilityStatus.READY)
         }
-        compose.onNodeWithText("Finish setup").assertIsNotEnabled()
+        compose.onNodeWithText("Continue").assertIsNotEnabled()
         compose.runOnIdle {
             defaults = defaults + (ReadinessCapability.MESSAGES to CapabilityStatus.READY)
         }
-        compose.onNodeWithText("Finish setup").assertIsEnabled().performClick()
+        compose.onNodeWithText("Continue").assertIsEnabled().performClick()
         compose.runOnIdle {
             assertEquals(2, requests)
-            assertEquals(OnboardingStep.COMPLETE, next)
+            assertEquals(OnboardingStep.HOME_TILES, next)
         }
     }
 
@@ -2024,6 +2168,7 @@ class StoryboardRegressionTest {
         capture("messages-inbox", "touch-messaging")
 
         compose.onNodeWithText("Write a message").performClick()
+        compose.onNodeWithContentDescription("Recipient Mira, 202-555-0101").assertIsDisplayed()
         compose.onNodeWithText("Send").assertHeightIsAtLeast(64.dp)
         capture("message-compose", "touch-messaging")
         compose.runOnIdle { checkNotNull(backDispatcher).onBackPressed() }
@@ -2206,10 +2351,12 @@ private fun storyboardHome() = HomeSnapshot(
 
 private fun noOpOnboardingCallbacks(
     onContinue: (OnboardingStep) -> Unit = {},
+    onDiagnosticsConsent: (Boolean) -> Unit = { onContinue(OnboardingStep.PHONE_STYLE) },
     onChooseMode: (VisualMode) -> Unit = {},
     onHomeTileVisibility: (HomeTileKind, Boolean) -> Unit = { _, _ -> },
 ) = OnboardingCallbacks(
     onContinue = onContinue,
+    onDiagnosticsConsent = onDiagnosticsConsent,
     onChooseMode = onChooseMode,
     onLanguageDisplay = { _, _, _ -> },
     onUseDateQuestion = {},
